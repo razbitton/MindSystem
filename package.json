@@ -10,10 +10,10 @@
     "test": "pnpm build && pnpm -r test",
     "typecheck": "pnpm build",
     "db:migrate": "pnpm --filter @personal-context-os/db migrate",
-    "render:start:api": "pnpm --filter @personal-context-os/db migrate && pnpm --filter @personal-context-os/api start",
-    "render:start:mcp": "pnpm --filter @personal-context-os/mcp-server start",
-    "render:start:web": "pnpm --filter @personal-context-os/web exec next start -H 0.0.0.0 -p ${PORT:-10000}",
-    "render:start:worker": "pnpm --filter @personal-context-os/worker start"
+    "render:start:api": "node scripts/render-start.mjs api",
+    "render:start:mcp": "node scripts/render-start.mjs mcp",
+    "render:start:web": "node scripts/render-start.mjs web",
+    "render:start:worker": "node scripts/render-start.mjs worker"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
