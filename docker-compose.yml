@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: personal_context_os
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d personal_context_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis-data:/data
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+    volumes:
+      - minio-data:/data
+
+  api:
+    build: .
+    command: sh -c "pnpm --filter @personal-context-os/db migrate && pnpm --filter @personal-context-os/api dev"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/personal_context_os
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: minio123
+      S3_BUCKET: personal-context-os
+      JWT_SECRET: change-me-in-production
+      APP_BASE_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:4000
+      MCP_SERVER_URL: http://localhost:4100
+      BOOTSTRAP_USER_EMAIL: local@personal-context-os.test
+      BOOTSTRAP_USER_NAME: Local User
+      BOOTSTRAP_USER_PASSWORD: local-dev-password
+      SESSION_COOKIE_DOMAIN: ""
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  worker:
+    build: .
+    command: pnpm --filter @personal-context-os/worker dev
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/personal_context_os
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: minio123
+      S3_BUCKET: personal-context-os
+      JWT_SECRET: change-me-in-production
+      APP_BASE_URL: http://localhost:3000
+      API_BASE_URL: http://api:4000
+      MCP_SERVER_URL: http://localhost:4100
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  mcp-server:
+    build: .
+    command: pnpm --filter @personal-context-os/mcp-server dev
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/personal_context_os
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: minio123
+      S3_BUCKET: personal-context-os
+      JWT_SECRET: change-me-in-production
+      APP_BASE_URL: http://localhost:3000
+      API_BASE_URL: http://api:4000
+      MCP_SERVER_URL: http://localhost:4100
+    ports:
+      - "4100:4100"
+    depends_on:
+      api:
+        condition: service_started
+
+  web:
+    build: .
+    command: pnpm --filter @personal-context-os/web dev
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      API_BASE_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
