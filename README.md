@@ -144,13 +144,47 @@ Example Codex/OpenClaw MCP config:
 
 ## Render and Domain Notes
 
+This repository includes `render.yaml` for Render Blueprints. It defines:
+
+- `mindsystem-web`: public Next.js web service
+- `mindsystem-api`: public Fastify API service
+- `mindsystem-mcp`: public MCP service for external agents
+- `mindsystem-worker`: background worker
+- `mindsystem-postgres`: Render Postgres
+- `mindsystem-redis`: Render Key Value
+- `mindsystem-runtime`: shared generated/secrets environment group
+
+To deploy:
+
+1. Push the repo to GitHub.
+2. In Render, choose New > Blueprint.
+3. Connect `razbitton/MindSystem`.
+4. Fill the prompted values:
+   - `BOOTSTRAP_USER_EMAIL`
+   - `BOOTSTRAP_USER_PASSWORD`
+   - `S3_ENDPOINT`
+   - `S3_ACCESS_KEY`
+   - `S3_SECRET_KEY`
+5. Deploy the Blueprint.
+6. Open `https://mindsystem-web.onrender.com/login` and sign in with the bootstrap credentials.
+
+The worker uses Render's `starter` plan because Render does not support the `free` instance type for background workers. The web/API/MCP services and datastores are configured with free plans where Render supports them.
+
+Before adding your final custom domain, update these Render environment variables:
+
+- On `mindsystem-api`: set `APP_BASE_URL` to `https://your-domain.com`.
+- On `mindsystem-worker` and `mindsystem-mcp`: set `APP_BASE_URL` to the same value for consistency.
+- On `mindsystem-web`: keep `API_BASE_URL` pointed at `https://mindsystem-api.onrender.com` unless you also add a custom API domain.
+
+The web app proxies browser calls from `/api/*` to `API_BASE_URL`, so login cookies remain same-origin on the web domain. Do not set `NEXT_PUBLIC_API_BASE_URL` on Render unless you intentionally want browsers to call the API service directly.
+
 For Render or another hosted environment, run Postgres, Redis, the API, worker, MCP server, and web app as separate services or containers. Set these values per environment:
 
 - `DATABASE_URL`, `REDIS_URL`, S3/MinIO-compatible storage variables
 - `JWT_SECRET` with a long random value
 - `BOOTSTRAP_USER_EMAIL` and `BOOTSTRAP_USER_PASSWORD` for the first login
 - `APP_BASE_URL` to your web domain, for example `https://app.example.com`
-- `API_BASE_URL` and `NEXT_PUBLIC_API_BASE_URL` to the public API URL
+- `API_BASE_URL` to the API service URL
 - `MCP_SERVER_URL` to the public MCP URL if agents connect over the internet
 - `SESSION_COOKIE_DOMAIN` only when sharing the session across subdomains, for example `.example.com`
 

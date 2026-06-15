@@ -1,13 +1,13 @@
 export type AnyRecord = Record<string, any>;
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 interface ApiOptions {
   redirectOnUnauthorized?: boolean;
 }
 
 export async function apiGet<T = AnyRecord>(path: string, query?: AnyRecord, options: ApiOptions = {}): Promise<T> {
-  const url = new URL(path, API_BASE_URL);
+  const url = apiUrl(path);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
   }
@@ -17,7 +17,7 @@ export async function apiGet<T = AnyRecord>(path: string, query?: AnyRecord, opt
 }
 
 export async function apiPost<T = AnyRecord>(path: string, body: AnyRecord, options: ApiOptions = {}): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await fetch(apiUrl(path), {
     method: "POST",
     headers: { "content-type": "application/json" },
     credentials: "include",
@@ -28,7 +28,7 @@ export async function apiPost<T = AnyRecord>(path: string, body: AnyRecord, opti
 }
 
 export async function apiPatch<T = AnyRecord>(path: string, body: AnyRecord, options: ApiOptions = {}): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), {
+  const response = await fetch(apiUrl(path), {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     credentials: "include",
@@ -59,6 +59,12 @@ async function throwIfNotOk(response: Response, options: ApiOptions) {
   }
 
   throw new Error(await readErrorMessage(response));
+}
+
+function apiUrl(path: string) {
+  if (API_BASE_URL) return new URL(path, API_BASE_URL);
+  if (typeof window !== "undefined") return new URL(path, window.location.origin);
+  return new URL(path, "http://localhost:3000");
 }
 
 async function readErrorMessage(response: Response) {

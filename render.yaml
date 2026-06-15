@@ -1,0 +1,142 @@
+envVarGroups:
+  - name: mindsystem-runtime
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: personal-context-os
+
+services:
+  - type: keyvalue
+    name: mindsystem-redis
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: mindsystem-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "pnpm --filter @personal-context-os/db migrate && pnpm --filter @personal-context-os/api start"
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mindsystem-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: mindsystem-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: mindsystem-redis
+          property: port
+      - key: APP_BASE_URL
+        value: https://mindsystem-web.onrender.com
+      - key: API_BASE_URL
+        value: https://mindsystem-api.onrender.com
+      - key: MCP_SERVER_URL
+        value: https://mindsystem-mcp.onrender.com
+      - key: BOOTSTRAP_USER_EMAIL
+        sync: false
+      - key: BOOTSTRAP_USER_NAME
+        value: Render User
+      - key: BOOTSTRAP_USER_PASSWORD
+        sync: false
+      - fromGroup: mindsystem-runtime
+
+  - type: web
+    name: mindsystem-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "pnpm --filter @personal-context-os/web exec next start -H 0.0.0.0 -p ${PORT:-10000}"
+    healthCheckPath: /login
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: API_BASE_URL
+        value: https://mindsystem-api.onrender.com
+
+  - type: worker
+    name: mindsystem-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerCommand: pnpm --filter @personal-context-os/worker start
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mindsystem-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: mindsystem-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: mindsystem-redis
+          property: port
+      - key: APP_BASE_URL
+        value: https://mindsystem-web.onrender.com
+      - key: API_BASE_URL
+        value: https://mindsystem-api.onrender.com
+      - key: MCP_SERVER_URL
+        value: https://mindsystem-mcp.onrender.com
+      - fromGroup: mindsystem-runtime
+
+  - type: web
+    name: mindsystem-mcp
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: pnpm --filter @personal-context-os/mcp-server start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mindsystem-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: mindsystem-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: mindsystem-redis
+          property: port
+      - key: APP_BASE_URL
+        value: https://mindsystem-web.onrender.com
+      - key: API_BASE_URL
+        value: https://mindsystem-api.onrender.com
+      - key: MCP_SERVER_URL
+        value: https://mindsystem-mcp.onrender.com
+      - fromGroup: mindsystem-runtime
+
+databases:
+  - name: mindsystem-postgres
+    databaseName: mindsystem
+    user: mindsystem
+    plan: free

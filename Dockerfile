@@ -8,9 +8,6 @@ COPY apps ./apps
 COPY packages ./packages
 
 RUN pnpm install --frozen-lockfile=false
-RUN pnpm --filter @personal-context-os/config build \
-  && pnpm --filter @personal-context-os/shared build \
-  && pnpm --filter @personal-context-os/db build \
-  && pnpm --filter @personal-context-os/ai build
+RUN pnpm build
 
 EXPOSE 3000 4000 4100

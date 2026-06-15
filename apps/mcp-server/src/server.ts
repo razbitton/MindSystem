@@ -8,6 +8,7 @@ import { getToolDefinition, toolDefinitions } from "./tools.js";
 const env = loadEnv();
 const database = createDb(env.DATABASE_URL);
 await ensureDefaultWorkspace(database.db);
+const port = Number(process.env.PORT ?? 4100);
 
 const app = Fastify({ logger: true });
 
@@ -260,8 +261,8 @@ function summarizeResult(result: unknown) {
 }
 
 try {
-  await app.listen({ host: "0.0.0.0", port: 4100 });
-  app.log.info("Personal Context OS MCP server listening on :4100");
+  await app.listen({ host: "0.0.0.0", port });
+  app.log.info(`Personal Context OS MCP server listening on :${port}`);
 } catch (error) {
   app.log.error(error);
   process.exit(1);

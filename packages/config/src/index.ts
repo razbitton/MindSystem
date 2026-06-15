@@ -1,8 +1,13 @@
 import { z } from "zod";
 
-export const envSchema = z.object({
+const rawEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
-  REDIS_URL: z.string().url().default("redis://localhost:6379"),
+  REDIS_URL: z.string().url().optional().or(z.literal("")),
+  REDIS_HOST: z.string().optional().or(z.literal("")),
+  REDIS_PORT: z.string().default("6379"),
+  REDIS_USERNAME: z.string().optional().or(z.literal("")),
+  REDIS_PASSWORD: z.string().optional().or(z.literal("")),
+  REDIS_TLS: z.string().optional().or(z.literal("")),
   S3_ENDPOINT: z.string().url().default("http://localhost:9000"),
   S3_ACCESS_KEY: z.string().default("minio"),
   S3_SECRET_KEY: z.string().default("minio123"),
@@ -17,6 +22,21 @@ export const envSchema = z.object({
   SESSION_COOKIE_DOMAIN: z.string().optional().or(z.literal("")),
   OPENAI_API_KEY: z.string().optional().or(z.literal(""))
 });
+
+export const envSchema = rawEnvSchema.transform((env) => ({
+  ...env,
+  REDIS_URL: env.REDIS_URL || buildRedisUrl(env)
+}));
+
+function buildRedisUrl(env: z.infer<typeof rawEnvSchema>) {
+  if (!env.REDIS_HOST) return "redis://localhost:6379";
+  const protocol = env.REDIS_TLS === "true" ? "rediss" : "redis";
+  const credentials =
+    env.REDIS_USERNAME || env.REDIS_PASSWORD
+      ? `${encodeURIComponent(env.REDIS_USERNAME || "default")}:${encodeURIComponent(env.REDIS_PASSWORD || "")}@`
+      : "";
+  return `${protocol}://${credentials}${env.REDIS_HOST}:${env.REDIS_PORT}`;
+}
 
 export type AppEnv = z.infer<typeof envSchema>;
 
