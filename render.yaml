@@ -22,7 +22,7 @@ services:
   - type: web
     name: mindsystem-api
     runtime: docker
-    plan: free
+    plan: starter
     dockerfilePath: ./Dockerfile
     dockerCommand: pnpm render:start:api
     healthCheckPath: /health
@@ -61,7 +61,7 @@ services:
   - type: web
     name: mindsystem-web
     runtime: docker
-    plan: free
+    plan: starter
     dockerfilePath: ./Dockerfile
     dockerCommand: pnpm render:start:web
     healthCheckPath: /login
