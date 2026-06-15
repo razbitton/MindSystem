@@ -24,7 +24,7 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    dockerCommand: sh -c "pnpm --filter @personal-context-os/db migrate && pnpm --filter @personal-context-os/api start"
+    dockerCommand: pnpm render:start:api
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
@@ -63,7 +63,7 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    dockerCommand: sh -c "pnpm --filter @personal-context-os/web exec next start -H 0.0.0.0 -p ${PORT:-10000}"
+    dockerCommand: pnpm render:start:web
     healthCheckPath: /login
     autoDeployTrigger: commit
     envVars:
@@ -77,7 +77,7 @@ services:
     runtime: docker
     plan: starter
     dockerfilePath: ./Dockerfile
-    dockerCommand: pnpm --filter @personal-context-os/worker start
+    dockerCommand: pnpm render:start:worker
     autoDeployTrigger: commit
     envVars:
       - key: DATABASE_URL
@@ -107,7 +107,7 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    dockerCommand: pnpm --filter @personal-context-os/mcp-server start
+    dockerCommand: pnpm render:start:mcp
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:

@@ -9,7 +9,11 @@
     "lint": "pnpm -r lint",
     "test": "pnpm build && pnpm -r test",
     "typecheck": "pnpm build",
-    "db:migrate": "pnpm --filter @personal-context-os/db migrate"
+    "db:migrate": "pnpm --filter @personal-context-os/db migrate",
+    "render:start:api": "pnpm --filter @personal-context-os/db migrate && pnpm --filter @personal-context-os/api start",
+    "render:start:mcp": "pnpm --filter @personal-context-os/mcp-server start",
+    "render:start:web": "pnpm --filter @personal-context-os/web exec next start -H 0.0.0.0 -p ${PORT:-10000}",
+    "render:start:worker": "pnpm --filter @personal-context-os/worker start"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
