@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Edit3, LayoutGrid, List, Plus, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Edit3, LayoutGrid, List, Plus, RefreshCw, Search } from "lucide-react";
 import { apiGet, apiPatch, apiPost, type AnyRecord } from "../lib/api";
-import { dateValue, loadPreference, matchesQuery, projectName, savePreference, truncate, type ViewMode } from "../lib/view-models";
+import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
 import { useI18n } from "../i18n";
 
@@ -23,6 +23,11 @@ export default function NotesView() {
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
+
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeForm, setComposeForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
+  const composeRef = useRef<HTMLDivElement | null>(null);
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
@@ -46,11 +51,40 @@ export default function NotesView() {
     savePreference(preferenceKey, nextView);
   }
 
-  function openCreate() {
-    setEditingNote(null);
-    setForm({ title: "", body: "", projectId: projectFilter });
-    setDrawerOpen(true);
+  function resetCompose() {
+    setComposeForm({ title: "", body: "", projectId: projectFilter });
   }
+
+  async function submitCompose() {
+    const title = composeForm.title.trim();
+    const body = composeForm.body.trim();
+    if (!title && !body) {
+      setComposeOpen(false);
+      resetCompose();
+      return;
+    }
+    const payload = {
+      title: title || body.slice(0, 60),
+      body: body || title,
+      projectId: composeForm.projectId || null
+    };
+    await apiPost("/api/notes", payload);
+    setComposeOpen(false);
+    resetCompose();
+    await load();
+  }
+
+  useEffect(() => {
+    if (!composeOpen) return;
+    function handleClick(event: MouseEvent) {
+      if (composeRef.current && !composeRef.current.contains(event.target as Node)) {
+        void submitCompose();
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeOpen, composeForm]);
 
   function openEdit(note: AnyRecord) {
     setEditingNote(note);
@@ -69,13 +103,14 @@ export default function NotesView() {
   }
 
   async function save() {
-    if (!form.title.trim() || !form.body.trim()) return;
-    const payload = { ...form, projectId: form.projectId || null };
-    if (editingNote) {
-      await apiPatch(`/api/notes/${editingNote.id}`, payload);
-    } else {
-      await apiPost("/api/notes", payload);
-    }
+    if (!editingNote || (!form.title.trim() && !form.body.trim())) return;
+    const title = form.title.trim();
+    const body = form.body.trim();
+    await apiPatch(`/api/notes/${editingNote.id}`, {
+      title: title || body.slice(0, 60),
+      body: body || title,
+      projectId: form.projectId || null
+    });
     closeDrawer();
     await load();
   }
@@ -94,16 +129,60 @@ export default function NotesView() {
         title={t("notes.title")}
         subtitle={t("notes.subtitle")}
         actions={
-          <>
-            <button className="button" type="button" onClick={load}>
-              <RefreshCw size={16} aria-hidden /> {t("common.refresh")}
-            </button>
-            <button className="button primary" type="button" onClick={openCreate}>
-              <Plus size={16} aria-hidden /> {t("notes.newNote")}
-            </button>
-          </>
+          <button className="button" type="button" onClick={load}>
+            <RefreshCw size={16} aria-hidden /> {t("common.refresh")}
+          </button>
         }
       />
+
+      {composeOpen ? (
+        <div className="notes-compose" ref={composeRef}>
+          <input
+            className="notes-compose-title"
+            dir="auto"
+            autoFocus
+            placeholder={t("notes.titlePlaceholder")}
+            value={composeForm.title}
+            onChange={(event) => setComposeForm({ ...composeForm, title: event.target.value })}
+          />
+          <textarea
+            className="notes-compose-body"
+            dir="auto"
+            rows={3}
+            placeholder={t("notes.bodyPlaceholder")}
+            value={composeForm.body}
+            onChange={(event) => setComposeForm({ ...composeForm, body: event.target.value })}
+          />
+          <div className="notes-compose-footer">
+            <div className="notes-compose-tools">
+              <select
+                className="select compact"
+                value={composeForm.projectId}
+                onChange={(event) => setComposeForm({ ...composeForm, projectId: event.target.value })}
+              >
+                <option value="">{t("common.noProject")}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </div>
+            <button className="button primary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void submitCompose()}>
+              <Check size={16} aria-hidden /> {t("common.save")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          className="notes-compose-collapsed"
+          type="button"
+          onClick={() => {
+            resetCompose();
+            setComposeOpen(true);
+          }}
+        >
+          <Plus size={18} aria-hidden /> {t("notes.takeANote")}
+        </button>
+      )}
 
       <Panel>
         <div className="filter-bar">
@@ -132,52 +211,85 @@ export default function NotesView() {
           <EmptyState title={t("notes.empty")}>
             {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
           </EmptyState>
-        ) : null}
-
-        {view === "cards" ? (
-          <div className="cards-grid">
-            {filteredNotes.map((note) => (
-              <button className="item-card" type="button" key={note.id} onClick={() => openEdit(note)}>
-                <div className="item-card-header">
-                  <div>
-                    <p className="item-card-title" dir="auto">{note.title}</p>
-                    <p className="item-card-body" dir="auto">{truncate(note.body, 210)}</p>
+        ) : view === "cards" ? (
+          <div className="notes-masonry">
+            {filteredNotes.map((note) => {
+              const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
+              return (
+                <div
+                  className="note-card"
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(note)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEdit(note);
+                    }
+                  }}
+                >
+                  {note.title ? <p className="note-card-title" dir="auto">{note.title}</p> : null}
+                  <p className="note-card-body" dir="auto">{note.body}</p>
+                  <div className="note-card-footer">
+                    <span className="note-chip">{linkedProject || t("common.noProject")}</span>
+                    <span>{formatDate(dateValue(note, "updatedAt"))}</span>
                   </div>
-                  <Edit3 size={17} aria-hidden />
                 </div>
-                <div className="item-card-meta">
-                  <span>{formatDate(dateValue(note, "updatedAt"))}</span>
-                  {note.projectId || note.project_id ? <span>{projectName(projects, String(note.projectId ?? note.project_id))}</span> : <span>{t("common.noProject")}</span>}
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="list-surface">
-            {filteredNotes.map((note) => (
-              <div className="row-item" key={note.id}>
-                <div>
-                  <p className="row-title" dir="auto">{note.title}</p>
-                  <p className="row-meta" dir="auto">{truncate(note.body, 220)} - {formatDate(dateValue(note, "updatedAt"))}</p>
+            {filteredNotes.map((note) => {
+              const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
+              return (
+                <div
+                  className="note-row"
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(note)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEdit(note);
+                    }
+                  }}
+                >
+                  <div className="note-row-content">
+                    <p className="row-title" dir="auto">{note.title || note.body}</p>
+                    {note.body && note.title ? <p className="note-row-body" dir="auto">{note.body}</p> : null}
+                    <div className="note-row-meta">
+                      <span className="note-chip">{linkedProject || t("common.noProject")}</span>
+                      <span className="row-meta">{formatDate(dateValue(note, "updatedAt"))}</span>
+                    </div>
+                  </div>
+                  <IconButton
+                    label={t("common.edit")}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEdit(note);
+                    }}
+                  >
+                    <Edit3 size={16} aria-hidden />
+                  </IconButton>
                 </div>
-                <IconButton label={t("common.edit")} onClick={() => openEdit(note)}>
-                  <Edit3 size={16} aria-hidden />
-                </IconButton>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Panel>
 
       <Drawer
         open={drawerOpen}
-        title={editingNote ? t("notes.editNote") : t("notes.newNote")}
+        title={t("notes.editNote")}
         subtitle={editingNote ? formatDate(dateValue(editingNote, "updatedAt")) : t("notes.subtitle")}
         onClose={closeDrawer}
         footer={
           <>
             <button className="button" type="button" onClick={closeDrawer}>{t("common.cancel")}</button>
-            <button className="button primary" type="button" onClick={save} disabled={!form.title.trim() || !form.body.trim()}>{t("common.save")}</button>
+            <button className="button primary" type="button" onClick={save} disabled={!form.title.trim() && !form.body.trim()}>{t("common.save")}</button>
           </>
         }
       >

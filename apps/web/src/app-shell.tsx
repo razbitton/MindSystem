@@ -22,7 +22,7 @@ import {
   X
 } from "lucide-react";
 import { IconButton } from "./components/page";
-import { LanguageSwitcher, useI18n } from "./i18n";
+import { LanguageSwitcher, ThemeToggle, useI18n } from "./i18n";
 import { getCurrentSession, logout, type AnyRecord } from "./lib/api";
 
 const navSections = [
@@ -162,6 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <span>{t("app.name")}</span>
         </div>
+        <ThemeToggle />
         <Link className="icon-button" href="/inbox" title={t("shell.quickCapture")} aria-label={t("shell.quickCapture")}>
           <Inbox size={18} aria-hidden />
         </Link>
@@ -212,7 +213,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <LanguageSwitcher />
+          <div className="sidebar-tools">
+            <LanguageSwitcher />
+            <ThemeToggle />
+          </div>
           <div className="user-menu">
             <button className="user-button" type="button" onClick={() => setUserMenuOpen((open) => !open)}>
               <span className="user-avatar" aria-hidden>{userInitial}</span>
