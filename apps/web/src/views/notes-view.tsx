@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, LayoutGrid, List, Palette, Plus, RefreshCw, Search } from "lucide-react";
+import { Check, Edit3, LayoutGrid, List, Plus, RefreshCw, Search } from "lucide-react";
 import { apiGet, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
 import { useI18n } from "../i18n";
 
 const preferenceKey = "mindsystem.notes.view";
-const colorStorageKey = "mindsystem.notes.colors";
 const viewModes = ["cards", "list"] as const;
-
-const noteColors = ["default", "yellow", "green", "blue", "pink", "violet"] as const;
-type NoteColor = (typeof noteColors)[number];
 
 type NoteForm = {
   title: string;
@@ -20,60 +16,21 @@ type NoteForm = {
   projectId: string;
 };
 
-function loadColorMap(): Record<string, NoteColor> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(colorStorageKey);
-    return raw ? (JSON.parse(raw) as Record<string, NoteColor>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveColorMap(map: Record<string, NoteColor>) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(colorStorageKey, JSON.stringify(map));
-  }
-}
-
-function ColorPicker({ value, onChange, label }: { value: NoteColor; onChange: (color: NoteColor) => void; label: string }) {
-  return (
-    <div className="color-dots" role="group" aria-label={label}>
-      {noteColors.map((color) => (
-        <button
-          key={color}
-          type="button"
-          className={`color-dot ${color}${value === color ? " selected" : ""}`}
-          aria-label={color}
-          aria-pressed={value === color}
-          onClick={(event) => {
-            event.stopPropagation();
-            onChange(color);
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function NotesView() {
   const { t, formatDate } = useI18n();
   const [notes, setNotes] = useState<AnyRecord[]>([]);
   const [projects, setProjects] = useState<AnyRecord[]>([]);
-  const [colorMap, setColorMap] = useState<Record<string, NoteColor>>({});
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
 
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeForm, setComposeForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
-  const [composeColor, setComposeColor] = useState<NoteColor>("default");
   const composeRef = useRef<HTMLDivElement | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
-  const [editColor, setEditColor] = useState<NoteColor>("default");
 
   async function load() {
     const [noteData, projectData] = await Promise.all([
@@ -86,7 +43,6 @@ export default function NotesView() {
 
   useEffect(() => {
     setView(loadPreference(preferenceKey, "cards", viewModes));
-    setColorMap(loadColorMap());
     void load();
   }, []);
 
@@ -95,27 +51,8 @@ export default function NotesView() {
     savePreference(preferenceKey, nextView);
   }
 
-  function colorOf(note: AnyRecord): NoteColor {
-    return colorMap[String(note.id)] ?? "default";
-  }
-
-  function setNoteColor(noteId: string, color: NoteColor) {
-    setColorMap((current) => {
-      const next = { ...current };
-      if (color === "default") {
-        delete next[noteId];
-      } else {
-        next[noteId] = color;
-      }
-      saveColorMap(next);
-      return next;
-    });
-  }
-
-  // --- inline composer ---
   function resetCompose() {
     setComposeForm({ title: "", body: "", projectId: projectFilter });
-    setComposeColor("default");
   }
 
   async function submitCompose() {
@@ -131,17 +68,12 @@ export default function NotesView() {
       body: body || title,
       projectId: composeForm.projectId || null
     };
-    const created = await apiPost<{ note?: AnyRecord }>("/api/notes", payload);
-    const newId = created?.note?.id;
-    if (newId && composeColor !== "default") {
-      setNoteColor(String(newId), composeColor);
-    }
+    await apiPost("/api/notes", payload);
     setComposeOpen(false);
     resetCompose();
     await load();
   }
 
-  // close composer when clicking outside
   useEffect(() => {
     if (!composeOpen) return;
     function handleClick(event: MouseEvent) {
@@ -152,9 +84,8 @@ export default function NotesView() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [composeOpen, composeForm, composeColor]);
+  }, [composeOpen, composeForm]);
 
-  // --- edit drawer ---
   function openEdit(note: AnyRecord) {
     setEditingNote(note);
     setForm({
@@ -162,7 +93,6 @@ export default function NotesView() {
       body: String(note.body ?? ""),
       projectId: String(note.projectId ?? note.project_id ?? "")
     });
-    setEditColor(colorOf(note));
     setDrawerOpen(true);
   }
 
@@ -170,13 +100,17 @@ export default function NotesView() {
     setDrawerOpen(false);
     setEditingNote(null);
     setForm({ title: "", body: "", projectId: "" });
-    setEditColor("default");
   }
 
   async function save() {
     if (!editingNote || (!form.title.trim() && !form.body.trim())) return;
-    await apiPatch(`/api/notes/${editingNote.id}`, { ...form, projectId: form.projectId || null });
-    setNoteColor(String(editingNote.id), editColor);
+    const title = form.title.trim();
+    const body = form.body.trim();
+    await apiPatch(`/api/notes/${editingNote.id}`, {
+      title: title || body.slice(0, 60),
+      body: body || title,
+      projectId: form.projectId || null
+    });
     closeDrawer();
     await load();
   }
@@ -201,7 +135,6 @@ export default function NotesView() {
         }
       />
 
-      {/* Inline Keep-style composer */}
       {composeOpen ? (
         <div className="notes-compose" ref={composeRef}>
           <input
@@ -222,7 +155,6 @@ export default function NotesView() {
           />
           <div className="notes-compose-footer">
             <div className="notes-compose-tools">
-              <ColorPicker value={composeColor} onChange={setComposeColor} label={t("notes.color")} />
               <select
                 className="select compact"
                 value={composeForm.projectId}
@@ -282,10 +214,21 @@ export default function NotesView() {
         ) : view === "cards" ? (
           <div className="notes-masonry">
             {filteredNotes.map((note) => {
-              const color = colorOf(note);
               const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
               return (
-                <div className={`note-card ${color}`} key={note.id} role="button" tabIndex={0} onClick={() => openEdit(note)} onKeyDown={(e) => { if (e.key === "Enter") openEdit(note); }}>
+                <div
+                  className="note-card"
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(note)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEdit(note);
+                    }
+                  }}
+                >
                   {note.title ? <p className="note-card-title" dir="auto">{note.title}</p> : null}
                   <p className="note-card-body" dir="auto">{note.body}</p>
                   <div className="note-card-footer">
@@ -302,14 +245,18 @@ export default function NotesView() {
               const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
               return (
                 <div
-                  className={`note-row ${colorOf(note)}`}
+                  className="note-row"
                   key={note.id}
                   role="button"
                   tabIndex={0}
                   onClick={() => openEdit(note)}
-                  onKeyDown={(e) => { if (e.key === "Enter") openEdit(note); }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEdit(note);
+                    }
+                  }}
                 >
-                  <span className={`note-color-bar ${colorOf(note)}`} aria-hidden />
                   <div className="note-row-content">
                     <p className="row-title" dir="auto">{note.title || note.body}</p>
                     {note.body && note.title ? <p className="note-row-body" dir="auto">{note.body}</p> : null}
@@ -318,8 +265,14 @@ export default function NotesView() {
                       <span className="row-meta">{formatDate(dateValue(note, "updatedAt"))}</span>
                     </div>
                   </div>
-                  <IconButton label={t("common.edit")} onClick={() => openEdit(note)}>
-                    <Palette size={16} aria-hidden />
+                  <IconButton
+                    label={t("common.edit")}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEdit(note);
+                    }}
+                  >
+                    <Edit3 size={16} aria-hidden />
                   </IconButton>
                 </div>
               );
@@ -357,10 +310,6 @@ export default function NotesView() {
                 <option key={project.id} value={project.id}>{project.name}</option>
               ))}
             </select>
-          </div>
-          <div className="form-row">
-            <label>{t("notes.color")}</label>
-            <ColorPicker value={editColor} onChange={setEditColor} label={t("notes.color")} />
           </div>
         </div>
       </Drawer>
