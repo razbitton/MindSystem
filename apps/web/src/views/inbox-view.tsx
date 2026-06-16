@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { CheckCircle2, Inbox, Send } from "lucide-react";
 import { apiPost, type AnyRecord } from "../lib/api";
-import { EmptyState, PageHeader, Panel, StatusBadge } from "../components/page";
+import { truncate } from "../lib/view-models";
+import { EmptyState, EntityBadge, PageHeader, Panel, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
 
 export default function InboxView() {
@@ -28,12 +29,15 @@ export default function InboxView() {
     }
   }
 
+  const createdEntities = result?.createdEntities ?? [];
+  const reviewItems = result?.reviewItems ?? [];
+
   return (
     <>
-      <PageHeader title={t("inbox.title")} subtitle={t("inbox.subtitle")} />
-      <div className="grid two">
+      <PageHeader eyebrow={t("shell.quickCapture")} title={t("inbox.title")} subtitle={t("inbox.subtitle")} />
+      <div className="layout-grid">
         <Panel title={t("inbox.capturePanel")}>
-          <div className="form-grid">
+          <div className="capture-composer">
             <textarea
               className="textarea"
               dir="auto"
@@ -41,45 +45,78 @@ export default function InboxView() {
               onChange={(event) => setText(event.target.value)}
               placeholder={t("inbox.placeholder")}
             />
-            <button className="button primary" onClick={submit} disabled={loading || !text.trim()}>
-              <Send size={16} /> {t("common.capture")}
-            </button>
+            <div className="toolbar space-between">
+              <p className="row-meta">{t("home.captureHelp")}</p>
+              <button className="button primary" type="button" onClick={submit} disabled={loading || !text.trim()}>
+                <Send size={16} aria-hidden /> {loading ? t("common.loading") : t("common.capture")}
+              </button>
+            </div>
           </div>
         </Panel>
+
         <Panel title={t("inbox.resultPanel")}>
           {error ? <EmptyState>{error}</EmptyState> : null}
-          {!result ? <EmptyState>{t("inbox.emptyResult")}</EmptyState> : null}
+          {!result ? (
+            <EmptyState title={t("inbox.emptyResult")}>
+              {t("home.captureHelp")}
+            </EmptyState>
+          ) : null}
           {result ? (
-            <div className="row-list">
-              <div className="row-item">
-                <div>
-                  <p className="row-title">{t("inbox.rawItem")}</p>
-                  <p className="row-meta" dir="ltr">{result.rawItem?.id}</p>
-                </div>
-                <StatusBadge value={result.requiresReview ? "review" : "created"} />
-              </div>
-              <div className="row-item">
-                <div>
-                  <p className="row-title">{t("inbox.detectedIntent", { intent: translateValue("intent", result.normalized?.intent) })}</p>
-                  <p className="row-meta">{t("inbox.appliedReview", { applied: result.applied ?? 0, review: result.requiresReview ?? 0 })}</p>
-                </div>
-              </div>
-              {(result.createdEntities ?? []).map((item: AnyRecord, index: number) => (
-                <div className="row-item" key={item.entity?.id ?? index}>
+            <div className="grid">
+              <div className="item-card">
+                <div className="item-card-header">
                   <div>
-                    <p className="row-title" dir="auto">{item.entity?.title}</p>
-                    <p className="row-meta">{translateValue("entity", item.entity?.entityType)}</p>
+                    <p className="item-card-title">{t("inbox.rawItem")}</p>
+                    <p className="item-card-body" dir="ltr">{result.rawItem?.id}</p>
                   </div>
+                  <StatusBadge value={result.requiresReview ? "review" : "created"} />
                 </div>
-              ))}
-              {(result.reviewItems ?? []).map((item: AnyRecord) => (
-                <div className="row-item" key={item.id}>
-                  <div>
-                    <p className="row-title" dir="auto">{translateValue("reviewReason", item.reason)}</p>
-                    <p className="row-meta" dir="auto">{translateValue("action", item.suggestedAction)}</p>
+                <div className="meta-row">
+                  <span>{t("inbox.detectedIntent", { intent: translateValue("intent", result.normalized?.intent) })}</span>
+                  <span>{t("inbox.appliedReview", { applied: result.applied ?? 0, review: reviewItems.length })}</span>
+                </div>
+              </div>
+
+              <section className="grid">
+                <div className="toolbar space-between">
+                  <h2 className="panel-title">{t("inbox.createdEntities")}</h2>
+                  <span className="badge info">{createdEntities.length}</span>
+                </div>
+                {!createdEntities.length ? <EmptyState>{t("common.nothingHere")}</EmptyState> : null}
+                <div className="cards-grid">
+                  {createdEntities.map((item: AnyRecord, index: number) => (
+                    <div className="item-card" key={item.entity?.id ?? index}>
+                      <div className="item-card-header">
+                        <div>
+                          <p className="item-card-title" dir="auto">{item.entity?.title}</p>
+                          <p className="item-card-body" dir="auto">{truncate(item.entity?.summary ?? item.entity?.body, 140)}</p>
+                        </div>
+                        <EntityBadge value={item.entity?.entityType} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {reviewItems.length ? (
+                <section className="grid">
+                  <div className="toolbar space-between">
+                    <h2 className="panel-title">{t("inbox.reviewNeeded")}</h2>
+                    <StatusBadge value="review" />
                   </div>
-                </div>
-              ))}
+                  {reviewItems.map((item: AnyRecord) => (
+                    <div className="item-card" key={item.id}>
+                      <div className="item-card-header">
+                        <div>
+                          <p className="item-card-title" dir="auto">{translateValue("reviewReason", item.reason)}</p>
+                          <p className="item-card-body" dir="auto">{translateValue("action", item.suggestedAction)}</p>
+                        </div>
+                        <CheckCircle2 size={18} aria-hidden />
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              ) : null}
             </div>
           ) : null}
         </Panel>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiGet, type AnyRecord } from "../lib/api";
-import { EmptyState, PageHeader, Panel } from "../components/page";
+import { EmptyState, EntityBadge, PageHeader, Panel } from "../components/page";
 import { useI18n } from "../i18n";
 
 const entityTypes = ["project", "task", "note", "document", "decision", "reminder", "person", "goal"] as const;
@@ -18,25 +18,35 @@ export default function SchemasView() {
   return (
     <>
       <PageHeader title={t("schemas.title")} subtitle={t("schemas.subtitle")} />
-      <div className="grid two">
+      <div className="layout-grid">
         <Panel title={t("schemas.entityModel")}>
-          <div className="row-list">
+          <div className="cards-grid">
             {entityTypes.map((type) => (
-              <div className="row-item" key={type}>
-                <div>
-                  <p className="row-title">{translateValue("entity", type)}</p>
-                  <p className="row-meta">{t("schemas.entityDescription")}</p>
+              <article className="item-card" key={type}>
+                <div className="item-card-header">
+                  <p className="item-card-title">{translateValue("entity", type)}</p>
+                  <EntityBadge value={type} />
                 </div>
-              </div>
+                <p className="item-card-body">{t("schemas.entityDescription")}</p>
+              </article>
             ))}
           </div>
         </Panel>
-        <Panel title={t("schemas.openapi")}>
-          {openapi ? <pre className="code">{JSON.stringify({ title: openapi.info?.title, paths: Object.keys(openapi.paths ?? {}) }, null, 2)}</pre> : <EmptyState>{t("schemas.openapiUnavailable")}</EmptyState>}
-        </Panel>
-        <Panel title={t("schemas.projectOverrides")}>
-          <EmptyState>{t("schemas.noOverrides")}</EmptyState>
-        </Panel>
+        <div className="grid">
+          <Panel title={t("schemas.openapi")}>
+            {openapi ? (
+              <details className="advanced-details" open>
+                <summary>{openapi.info?.title ?? t("schemas.openapi")}</summary>
+                <pre className="code">{JSON.stringify({ title: openapi.info?.title, paths: Object.keys(openapi.paths ?? {}) }, null, 2)}</pre>
+              </details>
+            ) : (
+              <EmptyState>{t("schemas.openapiUnavailable")}</EmptyState>
+            )}
+          </Panel>
+          <Panel title={t("schemas.projectOverrides")}>
+            <EmptyState>{t("schemas.noOverrides")}</EmptyState>
+          </Panel>
+        </div>
       </div>
     </>
   );

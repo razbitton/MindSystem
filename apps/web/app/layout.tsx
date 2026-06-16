@@ -4,8 +4,8 @@ import { LocaleProvider } from "../src/i18n";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Personal Context OS | מערכת ההקשר האישית",
-  description: "Self-hosted personal context and task orchestration with English and Hebrew support. מערכת אישית לניהול הקשר, משימות וסוכני AI בעברית ובאנגלית."
+  title: "MindSystem",
+  description: "Capture-first personal knowledge workspace with notes, tasks, projects, documents, agents, and English/Hebrew support."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

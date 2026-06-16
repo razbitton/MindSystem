@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CheckCircle, RefreshCw } from "lucide-react";
 import { apiGet, apiPost, type AnyRecord } from "../lib/api";
-import { EmptyState, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
+import { dateValue, truncate } from "../lib/view-models";
+import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
 
 export default function ProjectDetailView({ projectId }: { projectId: string }) {
@@ -29,73 +31,117 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     await load();
   }
 
+  const project = data?.project;
+  const activity = [...(data?.tasks ?? []), ...(data?.notes ?? []), ...(data?.documents ?? [])]
+    .sort((a, b) => String(dateValue(b, "updatedAt")).localeCompare(String(dateValue(a, "updatedAt"))))
+    .slice(0, 10);
+
   return (
     <>
       <PageHeader
-        title={data?.project?.name ?? t("projectDetail.fallbackTitle")}
-        subtitle={data?.project?.description ?? t("projectDetail.fallbackSubtitle")}
-        actions={<button className="button" onClick={load}><RefreshCw size={16} /> {t("common.refresh")}</button>}
+        eyebrow={t("projects.title")}
+        title={project?.name ?? t("projectDetail.fallbackTitle")}
+        subtitle={project?.description ?? t("projectDetail.fallbackSubtitle")}
+        actions={
+          <>
+            <Link className="button subtle" href="/projects">{t("projects.title")}</Link>
+            <button className="button" type="button" onClick={load}>
+              <RefreshCw size={16} aria-hidden /> {t("common.refresh")}
+            </button>
+          </>
+        }
       />
       {error ? <EmptyState>{error}</EmptyState> : null}
-      <div className="grid two">
-        <Panel title={t("projectDetail.summary")}>
-          {data?.project ? (
-            <div className="row-list">
-              <div className="row-item">
-                <div>
-                  <p className="row-title" dir="auto">{data.project.goal || t("projectDetail.noGoal")}</p>
-                  <p className="row-meta">{t("common.due")} {formatDate(data.project.dueAt ?? data.project.due_at)} - {t("common.updated")} {formatDate(data.project.updatedAt ?? data.project.updated_at)}</p>
+
+      <div className="layout-grid">
+        <div className="grid">
+          <Panel title={t("projectDetail.summary")}>
+            {project ? (
+              <div className="item-card">
+                <div className="item-card-header">
+                  <div>
+                    <p className="item-card-title" dir="auto">{project.goal || t("projectDetail.noGoal")}</p>
+                    <p className="item-card-body" dir="auto">{project.description || t("common.noDescription")}</p>
+                  </div>
+                  <div className="toolbar">
+                    <PriorityBadge value={project.priority} />
+                    <StatusBadge value={project.status} />
+                  </div>
                 </div>
-                <div className="toolbar">
-                  <PriorityBadge value={data.project.priority} />
-                  <StatusBadge value={data.project.status} />
-                </div>
-              </div>
-            </div>
-          ) : <EmptyState>{t("projectDetail.loading")}</EmptyState>}
-        </Panel>
-        <Panel title={t("projectDetail.contextPack")}>
-          <pre className="code">{data?.contextPack ?? t("projectDetail.noContextPack")}</pre>
-        </Panel>
-        <Panel title={t("projectDetail.tasks")}>
-          <div className="row-list">
-            {(data?.tasks ?? []).map((task: AnyRecord) => (
-              <div className="row-item" key={task.id}>
-                <div>
-                  <p className="row-title" dir="auto">{task.title}</p>
-                  <p className="row-meta" dir="auto">{task.description || t("common.noDescription")} - {formatDate(task.dueAt ?? task.due_at)}</p>
-                </div>
-                <div className="toolbar">
-                  <PriorityBadge value={task.priority} />
-                  <StatusBadge value={task.status} />
-                  {task.status !== "done" ? (
-                    <button className="button" title={t("common.complete")} aria-label={t("common.complete")} onClick={() => completeTask(task.id)}>
-                      <CheckCircle size={16} />
-                    </button>
-                  ) : null}
+                <div className="meta-row">
+                  <MetaItem label={t("common.due")} value={formatDate(dateValue(project, "dueAt"))} />
+                  <MetaItem label={t("common.updated")} value={formatDate(dateValue(project, "updatedAt"))} />
                 </div>
               </div>
-            ))}
-            {!(data?.tasks ?? []).length ? <EmptyState>{t("projectDetail.noTasks")}</EmptyState> : null}
+            ) : (
+              <EmptyState>{t("projectDetail.loading")}</EmptyState>
+            )}
+          </Panel>
+
+          <div className="grid two">
+            <Panel title={t("projectDetail.tasks")}>
+              <TaskRows tasks={data?.tasks ?? []} formatDate={formatDate} emptyText={t("projectDetail.noTasks")} completeTask={completeTask} />
+            </Panel>
+            <Panel title={t("projectDetail.notes")}>
+              <SimpleRows rows={data?.notes ?? []} titleKey="title" bodyKey="body" emptyText={t("projectDetail.nothingLinked")} formatDate={formatDate} />
+            </Panel>
           </div>
-        </Panel>
-        <Panel title={t("projectDetail.notes")}>
-          <SimpleRows rows={data?.notes ?? []} titleKey="title" bodyKey="body" emptyText={t("projectDetail.nothingLinked")} formatDate={formatDate} />
-        </Panel>
-        <Panel title={t("projectDetail.documents")}>
-          <SimpleRows rows={data?.documents ?? []} titleKey="title" bodyKey="objectKey" emptyText={t("projectDetail.nothingLinked")} formatDate={formatDate} />
-        </Panel>
-        <Panel title={t("projectDetail.activity")}>
-          <SimpleRows
-            rows={[...(data?.tasks ?? []), ...(data?.notes ?? []), ...(data?.documents ?? [])].sort((a, b) => String(b.updatedAt ?? b.updated_at).localeCompare(String(a.updatedAt ?? a.updated_at))).slice(0, 12)}
-            titleKey="title"
-            bodyKey="updatedAt"
-            emptyText={t("projectDetail.nothingLinked")}
-            formatDate={formatDate}
-          />
-        </Panel>
+
+          <Panel title={t("projectDetail.activity")}>
+            <SimpleRows rows={activity} titleKey="title" bodyKey="updatedAt" emptyText={t("projectDetail.nothingLinked")} formatDate={formatDate} />
+          </Panel>
+        </div>
+
+        <div className="grid">
+          <Panel title={t("projectDetail.documents")}>
+            <SimpleRows rows={data?.documents ?? []} titleKey="title" bodyKey="objectKey" emptyText={t("projectDetail.nothingLinked")} formatDate={formatDate} />
+          </Panel>
+          <details className="advanced-details">
+            <summary>{t("projectDetail.contextPack")}</summary>
+            <div className="panel-body">
+              <p className="row-meta">{t("projectDetail.contextHelp")}</p>
+              <pre className="code">{data?.contextPack ?? t("projectDetail.noContextPack")}</pre>
+            </div>
+          </details>
+        </div>
       </div>
     </>
+  );
+}
+
+function TaskRows({
+  tasks,
+  formatDate,
+  emptyText,
+  completeTask
+}: {
+  tasks: AnyRecord[];
+  formatDate: (value?: string | null) => string;
+  emptyText: string;
+  completeTask: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
+  return (
+    <div className="row-list">
+      {tasks.map((task) => (
+        <div className="row-item" key={task.id}>
+          <div>
+            <p className="row-title" dir="auto">{task.title}</p>
+            <p className="row-meta" dir="auto">{truncate(task.description, 130) || t("common.noDescription")} - {formatDate(dateValue(task, "dueAt"))}</p>
+          </div>
+          <div className="toolbar">
+            <PriorityBadge value={task.priority} />
+            <StatusBadge value={task.status} />
+            {task.status !== "done" ? (
+              <IconButton label={t("common.complete")} onClick={() => completeTask(task.id)}>
+                <CheckCircle size={16} aria-hidden />
+              </IconButton>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -116,13 +162,12 @@ function SimpleRows({
   return (
     <div className="row-list">
       {rows.map((row) => {
-        const bodyValue = row[bodyKey] ?? row[bodyKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)];
-        const shouldFormatDate = bodyKey.toLowerCase().includes("at");
+        const bodyValue = bodyKey.toLowerCase().includes("at") ? formatDate(dateValue(row, bodyKey)) : row[bodyKey] ?? row[bodyKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)];
         return (
           <div className="row-item" key={row.id}>
             <div>
-              <p className="row-title" dir="auto">{row[titleKey]}</p>
-              <p className="row-meta" dir="auto">{shouldFormatDate ? formatDate(bodyValue) : bodyValue}</p>
+              <p className="row-title" dir="auto">{row[titleKey] ?? row.name}</p>
+              <p className="row-meta" dir="auto">{truncate(String(bodyValue ?? ""), 180)}</p>
             </div>
           </div>
         );
