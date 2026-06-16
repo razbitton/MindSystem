@@ -1735,6 +1735,57 @@ a.row-item:hover {
 .note-color-bar.violet { background: var(--note-violet-line); }
 .note-color-bar.default { background: var(--line-strong); }
 
+.note-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: start;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.note-row:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.note-row.yellow { background: var(--note-yellow); border-color: var(--note-yellow-line); }
+.note-row.green { background: var(--note-green); border-color: var(--note-green-line); }
+.note-row.blue { background: var(--note-blue); border-color: var(--note-blue-line); }
+.note-row.pink { background: var(--note-pink); border-color: var(--note-pink-line); }
+.note-row.violet { background: var(--note-violet); border-color: var(--note-violet-line); }
+
+.note-row-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.note-row-body {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.note-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.note-row .note-color-bar {
+  align-self: stretch;
+}
+
 
 /* ===================== Responsive ===================== */
 

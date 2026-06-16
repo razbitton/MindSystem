@@ -298,18 +298,32 @@ export default function NotesView() {
           </div>
         ) : (
           <div className="list-surface">
-            {filteredNotes.map((note) => (
-              <div className="row-item" key={note.id}>
-                <span className={`note-color-bar ${colorOf(note)}`} aria-hidden />
-                <div>
-                  <p className="row-title" dir="auto">{note.title || note.body}</p>
-                  <p className="row-meta" dir="auto">{formatDate(dateValue(note, "updatedAt"))}</p>
+            {filteredNotes.map((note) => {
+              const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
+              return (
+                <div
+                  className={`note-row ${colorOf(note)}`}
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(note)}
+                  onKeyDown={(e) => { if (e.key === "Enter") openEdit(note); }}
+                >
+                  <span className={`note-color-bar ${colorOf(note)}`} aria-hidden />
+                  <div className="note-row-content">
+                    <p className="row-title" dir="auto">{note.title || note.body}</p>
+                    {note.body && note.title ? <p className="note-row-body" dir="auto">{note.body}</p> : null}
+                    <div className="note-row-meta">
+                      <span className="note-chip">{linkedProject || t("common.noProject")}</span>
+                      <span className="row-meta">{formatDate(dateValue(note, "updatedAt"))}</span>
+                    </div>
+                  </div>
+                  <IconButton label={t("common.edit")} onClick={() => openEdit(note)}>
+                    <Palette size={16} aria-hidden />
+                  </IconButton>
                 </div>
-                <IconButton label={t("common.edit")} onClick={() => openEdit(note)}>
-                  <Palette size={16} aria-hidden />
-                </IconButton>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Panel>
