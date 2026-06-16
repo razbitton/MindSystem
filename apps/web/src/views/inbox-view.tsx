@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Inbox, Send } from "lucide-react";
+import { CheckCircle2, Send } from "lucide-react";
 import { apiPost, type AnyRecord } from "../lib/api";
 import { truncate } from "../lib/view-models";
 import { EmptyState, EntityBadge, PageHeader, Panel, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function InboxView() {
   const { t, translateValue } = useI18n();
@@ -33,94 +37,117 @@ export default function InboxView() {
   const reviewItems = result?.reviewItems ?? [];
 
   return (
-    <>
-      <PageHeader eyebrow={t("shell.quickCapture")} title={t("inbox.title")} subtitle={t("inbox.subtitle")} />
-      <div className="layout-grid">
+    <div className="flex flex-col gap-6">
+      <PageHeader title={t("inbox.title")} subtitle={t("inbox.subtitle")} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
         <Panel title={t("inbox.capturePanel")}>
-          <div className="capture-composer">
-            <textarea
-              className="textarea"
+          <div className="flex flex-col gap-3">
+            <Textarea
               dir="auto"
+              rows={8}
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder={t("inbox.placeholder")}
             />
-            <div className="toolbar space-between">
-              <p className="row-meta">{t("home.captureHelp")}</p>
-              <button className="button primary" type="button" onClick={submit} disabled={loading || !text.trim()}>
-                <Send size={16} aria-hidden /> {loading ? t("common.loading") : t("common.capture")}
-              </button>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">{t("home.captureHelp")}</p>
+              <Button onClick={submit} disabled={loading || !text.trim()}>
+                <Send data-icon="inline-start" />
+                {loading ? t("common.loading") : t("common.capture")}
+              </Button>
             </div>
           </div>
         </Panel>
 
         <Panel title={t("inbox.resultPanel")}>
-          {error ? <EmptyState>{error}</EmptyState> : null}
-          {!result ? (
-            <EmptyState title={t("inbox.emptyResult")}>
-              {t("home.captureHelp")}
-            </EmptyState>
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           ) : null}
+
+          {!result && !error ? (
+            <EmptyState title={t("inbox.emptyResult")}>{t("home.captureHelp")}</EmptyState>
+          ) : null}
+
           {result ? (
-            <div className="grid">
-              <div className="item-card">
-                <div className="item-card-header">
-                  <div>
-                    <p className="item-card-title">{t("inbox.rawItem")}</p>
-                    <p className="item-card-body" dir="ltr">{result.rawItem?.id}</p>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-sm font-medium text-foreground">{t("inbox.rawItem")}</p>
+                    <p className="font-mono text-xs text-muted-foreground" dir="ltr">
+                      {result.rawItem?.id}
+                    </p>
                   </div>
                   <StatusBadge value={result.requiresReview ? "review" : "created"} />
                 </div>
-                <div className="meta-row">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>{t("inbox.detectedIntent", { intent: translateValue("intent", result.normalized?.intent) })}</span>
                   <span>{t("inbox.appliedReview", { applied: result.applied ?? 0, review: reviewItems.length })}</span>
                 </div>
               </div>
 
-              <section className="grid">
-                <div className="toolbar space-between">
-                  <h2 className="panel-title">{t("inbox.createdEntities")}</h2>
-                  <span className="badge info">{createdEntities.length}</span>
+              <section className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium text-foreground">{t("inbox.createdEntities")}</h3>
+                  <Badge variant="info">{createdEntities.length}</Badge>
                 </div>
-                {!createdEntities.length ? <EmptyState>{t("common.nothingHere")}</EmptyState> : null}
-                <div className="cards-grid">
-                  {createdEntities.map((item: AnyRecord, index: number) => (
-                    <div className="item-card" key={item.entity?.id ?? index}>
-                      <div className="item-card-header">
-                        <div>
-                          <p className="item-card-title" dir="auto">{item.entity?.title}</p>
-                          <p className="item-card-body" dir="auto">{truncate(item.entity?.summary ?? item.entity?.body, 140)}</p>
+                {!createdEntities.length ? (
+                  <EmptyState>{t("common.nothingHere")}</EmptyState>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {createdEntities.map((item: AnyRecord, index: number) => (
+                      <div
+                        key={item.entity?.id ?? index}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <p className="truncate text-sm font-medium text-foreground" dir="auto">
+                            {item.entity?.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground" dir="auto">
+                            {truncate(item.entity?.summary ?? item.entity?.body, 140)}
+                          </p>
                         </div>
                         <EntityBadge value={item.entity?.entityType} />
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               {reviewItems.length ? (
-                <section className="grid">
-                  <div className="toolbar space-between">
-                    <h2 className="panel-title">{t("inbox.reviewNeeded")}</h2>
+                <section className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-medium text-foreground">{t("inbox.reviewNeeded")}</h3>
                     <StatusBadge value="review" />
                   </div>
-                  {reviewItems.map((item: AnyRecord) => (
-                    <div className="item-card" key={item.id}>
-                      <div className="item-card-header">
-                        <div>
-                          <p className="item-card-title" dir="auto">{translateValue("reviewReason", item.reason)}</p>
-                          <p className="item-card-body" dir="auto">{translateValue("action", item.suggestedAction)}</p>
+                  <div className="flex flex-col gap-2">
+                    {reviewItems.map((item: AnyRecord) => (
+                      <div
+                        key={item.id}
+                        className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
+                      >
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <p className="text-sm font-medium text-foreground" dir="auto">
+                            {translateValue("reviewReason", item.reason)}
+                          </p>
+                          <p className="text-xs text-muted-foreground" dir="auto">
+                            {translateValue("action", item.suggestedAction)}
+                          </p>
                         </div>
-                        <CheckCircle2 size={18} aria-hidden />
+                        <CheckCircle2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </section>
               ) : null}
             </div>
           ) : null}
         </Panel>
       </div>
-    </>
+    </div>
   );
 }
