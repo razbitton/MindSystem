@@ -1705,6 +1705,37 @@ a.row-item:hover {
 .color-dot.pink { background: var(--note-pink); border-color: var(--note-pink-line); }
 .color-dot.violet { background: var(--note-violet); border-color: var(--note-violet-line); }
 
+.notes-compose-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.select.compact {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  max-width: 180px;
+}
+
+.note-color-bar {
+  flex: 0 0 auto;
+  width: 4px;
+  align-self: stretch;
+  min-height: 30px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+.note-color-bar.yellow { background: var(--note-yellow-line); }
+.note-color-bar.green { background: var(--note-green-line); }
+.note-color-bar.blue { background: var(--note-blue-line); }
+.note-color-bar.pink { background: var(--note-pink-line); }
+.note-color-bar.violet { background: var(--note-violet-line); }
+.note-color-bar.default { background: var(--line-strong); }
+
+
 /* ===================== Responsive ===================== */
 
 @media (max-width: 1180px) {
