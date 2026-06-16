@@ -36,7 +36,7 @@ export default function LoginView() {
     <div className="auth-card">
       <div className="auth-brand">
         <div className="auth-icon" aria-hidden>
-          <ShieldCheck size={24} />
+          <ShieldCheck size={25} />
         </div>
         <div>
           <h1>{t("auth.title")}</h1>
@@ -45,34 +45,34 @@ export default function LoginView() {
       </div>
 
       <form className="form-grid" onSubmit={submit}>
-        <label className="field-label" htmlFor="email">
-          {t("auth.email")}
-        </label>
-        <input
-          id="email"
-          className="input"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="local@personal-context-os.test"
-          required
-        />
-
-        <label className="field-label" htmlFor="password">
-          {t("auth.password")}
-        </label>
-        <div className="password-field">
-          <LockKeyhole size={17} aria-hidden />
+        <div className="form-row">
+          <label htmlFor="email">{t("auth.email")}</label>
           <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder={t("auth.passwordPlaceholder")}
+            id="email"
+            className="input"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="local@personal-context-os.test"
             required
           />
+        </div>
+
+        <div className="form-row">
+          <label htmlFor="password">{t("auth.password")}</label>
+          <div className="password-field">
+            <LockKeyhole size={17} aria-hidden />
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={t("auth.passwordPlaceholder")}
+              required
+            />
+          </div>
         </div>
 
         {error ? <div className="form-error">{error}</div> : null}
@@ -83,7 +83,10 @@ export default function LoginView() {
         </button>
       </form>
 
-      <p className="auth-note">{t("auth.deploymentNote")}</p>
+      <details className="advanced-details">
+        <summary>{t("auth.deploymentNote")}</summary>
+        <p className="auth-note">{t("auth.deploymentDetails")}</p>
+      </details>
     </div>
   );
 }

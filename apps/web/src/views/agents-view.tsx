@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { KeyRound, RefreshCw } from "lucide-react";
 import { agentScopeValues } from "@personal-context-os/shared";
 import { apiGet, apiPost, type AnyRecord } from "../lib/api";
-import { EmptyState, PageHeader, Panel } from "../components/page";
+import { EmptyState, PageHeader, Panel, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
 
 export default function AgentsView() {
@@ -41,31 +41,65 @@ export default function AgentsView() {
 
   return (
     <>
-      <PageHeader title={t("agents.title")} subtitle={t("agents.subtitle")} actions={<button className="button" onClick={load}><RefreshCw size={16} /> {t("common.refresh")}</button>} />
-      <div className="grid two">
+      <PageHeader
+        title={t("agents.title")}
+        subtitle={t("agents.subtitle")}
+        actions={
+          <button className="button" type="button" onClick={load}>
+            <RefreshCw size={16} aria-hidden /> {t("common.refresh")}
+          </button>
+        }
+      />
+      <div className="layout-grid">
         <Panel title={t("agents.createToken")}>
           <div className="form-grid">
-            <input className="input" dir="auto" value={name} onChange={(event) => setName(event.target.value)} placeholder={t("agents.defaultName")} />
-            <div className="grid two">
+            <div className="form-row">
+              <label htmlFor="agent-token-name">{t("common.title")}</label>
+              <input id="agent-token-name" className="input" dir="auto" value={name} onChange={(event) => setName(event.target.value)} placeholder={t("agents.defaultName")} />
+            </div>
+            <div className="toolbar">
+              <span className="badge info">{t("agents.selectedScopes")}: {scopes.length}</span>
+            </div>
+            <div className="scope-grid">
               {agentScopeValues.map((scope) => (
-                <label className="toolbar" key={scope} dir="ltr">
-                  <input type="checkbox" checked={scopes.includes(scope)} onChange={(event) => setScopes(event.target.checked ? [...scopes, scope] : scopes.filter((item) => item !== scope))} />
+                <label className="check-card" key={scope} dir="ltr">
+                  <input
+                    type="checkbox"
+                    checked={scopes.includes(scope)}
+                    onChange={(event) => setScopes(event.target.checked ? [...scopes, scope] : scopes.filter((item) => item !== scope))}
+                  />
                   <span>{scope}</span>
                 </label>
               ))}
             </div>
-            <button className="button primary" onClick={create}><KeyRound size={16} /> {t("agents.createToken")}</button>
-            {createdToken ? <pre className="code">{createdToken}</pre> : null}
+            <button className="button primary" type="button" onClick={create} disabled={!scopes.length}>
+              <KeyRound size={16} aria-hidden /> {t("agents.createToken")}
+            </button>
+            {createdToken ? (
+              <details className="advanced-details" open>
+                <summary>{t("agents.createdToken")}</summary>
+                <pre className="code">{createdToken}</pre>
+              </details>
+            ) : null}
           </div>
         </Panel>
-        <Panel title={t("agents.mcpConfiguration")}>
-          <pre className="code">{config}</pre>
-        </Panel>
-        <Panel title={t("agents.tokens")}>
-          <Rows rows={data.tokens ?? []} title={(row) => row.name} meta={(row) => <><span dir="ltr">{row.scopes?.join(", ")}</span> - {formatDate(row.createdAt ?? row.created_at)}</>} />
-        </Panel>
+
+        <div className="grid">
+          <Panel title={t("agents.mcpConfiguration")}>
+            <details className="advanced-details" open>
+              <summary>{t("agents.connectionDetails")}</summary>
+              <pre className="code">{config}</pre>
+            </details>
+          </Panel>
+          <Panel title={t("agents.tokens")}>
+            <Rows rows={data.tokens ?? []} title={(row) => row.name} meta={(row) => <><span dir="ltr">{row.scopes?.join(", ")}</span> - {formatDate(row.createdAt ?? row.created_at)}</>} />
+          </Panel>
+        </div>
+      </div>
+
+      <div className="grid two" style={{ marginTop: 16 }}>
         <Panel title={t("agents.agentRuns")}>
-          <Rows rows={data.runs ?? []} title={(row) => row.toolName ?? row.tool_name} meta={(row) => `${translateValue("status", row.status)} - ${formatDate(row.startedAt ?? row.started_at)}`} />
+          <Rows rows={data.runs ?? []} title={(row) => row.toolName ?? row.tool_name} meta={(row) => <><StatusBadge value={row.status} /> {formatDate(row.startedAt ?? row.started_at)}</>} />
         </Panel>
         <Panel title={t("agents.auditEvents")}>
           <Rows rows={data.auditEvents ?? []} title={(row) => translateValue("action", row.action)} meta={(row) => `${translateValue("actor", row.actorType ?? row.actor_type)} - ${formatDate(row.createdAt ?? row.created_at)}`} />
@@ -80,7 +114,7 @@ function Rows({ rows, title, meta }: { rows: AnyRecord[]; title: (row: AnyRecord
   if (!rows.length) return <EmptyState>{t("common.nothingRecorded")}</EmptyState>;
   return (
     <div className="row-list">
-      {rows.map((row) => (
+      {rows.slice(0, 8).map((row) => (
         <div className="row-item" key={row.id}>
           <div>
             <p className="row-title" dir="auto">{title(row)}</p>
