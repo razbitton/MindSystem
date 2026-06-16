@@ -1,11 +1,14 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 export type Locale = "en" | "he";
 export type Direction = "ltr" | "rtl";
+export type Theme = "light" | "dark";
 
 const localeStorageKey = "mindsystem.locale";
+const themeStorageKey = "mindsystem.theme";
 
 const englishDictionary = {
   "app.name": "MindSystem",
@@ -13,6 +16,9 @@ const englishDictionary = {
   "language.label": "Language",
   "language.en": "English",
   "language.he": "Hebrew",
+  "theme.toggle": "Toggle theme",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
   "nav.home": "Home",
   "nav.dashboard": "Home",
   "nav.inbox": "Capture",
@@ -192,6 +198,11 @@ const englishDictionary = {
   "notes.searchPlaceholder": "Search notes",
   "notes.allProjects": "All projects",
   "notes.preview": "Preview",
+  "notes.takeANote": "Take a note...",
+  "notes.titlePlaceholder": "Title",
+  "notes.bodyPlaceholder": "Take a note...",
+  "notes.color": "Note color",
+  "notes.count": "{count} notes",
   "documents.title": "Documents",
   "documents.subtitle": "Reference files, extracted text, and project attachments.",
   "documents.attachPanel": "Attach document",
@@ -309,6 +320,9 @@ const hebrewDictionary: Partial<Record<TranslationKey, string>> = {
   "app.name": "MindSystem",
   "app.tagline": "ללכוד, לחבר ולפעול על מה שחשוב",
   "language.label": "שפה",
+  "theme.toggle": "החלפת ערכת נושא",
+  "theme.light": "בהיר",
+  "theme.dark": "כהה",
   "nav.home": "בית",
   "nav.dashboard": "בית",
   "nav.inbox": "קליטה",
@@ -536,6 +550,9 @@ interface I18nContextValue {
   locale: Locale;
   direction: Direction;
   setLocale: (locale: Locale) => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
   t: (key: TranslationKey, replacements?: Replacements) => string;
   translateValue: (group: "status" | "priority" | "entity" | "intent" | "source" | "action" | "reviewReason" | "actor", value?: string | null) => string;
   formatDate: (value?: string | null) => string;
@@ -545,15 +562,21 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("en");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     const stored = window.localStorage.getItem(localeStorageKey);
     if (stored === "he" || stored === "en") {
       setLocaleState(stored);
-      return;
-    }
-    if (window.navigator.language.toLowerCase().startsWith("he")) {
+    } else if (window.navigator.language.toLowerCase().startsWith("he")) {
       setLocaleState("he");
+    }
+
+    const storedTheme = window.localStorage.getItem(themeStorageKey);
+    if (storedTheme === "dark" || storedTheme === "light") {
+      setThemeState(storedTheme);
+    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      setThemeState("dark");
     }
   }, []);
 
@@ -564,6 +587,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = direction;
     document.body.dir = direction;
   }, [direction, locale]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   const value = useMemo<I18nContextValue>(() => {
     const dictionary = locale === "he" ? hebrewDictionary : englishDictionary;
@@ -595,15 +622,27 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     return {
       locale,
       direction,
+      theme,
       t,
       translateValue,
       formatDate,
       setLocale(nextLocale: Locale) {
         window.localStorage.setItem(localeStorageKey, nextLocale);
         setLocaleState(nextLocale);
+      },
+      setTheme(nextTheme: Theme) {
+        window.localStorage.setItem(themeStorageKey, nextTheme);
+        setThemeState(nextTheme);
+      },
+      toggleTheme() {
+        setThemeState((current) => {
+          const next = current === "dark" ? "light" : "dark";
+          window.localStorage.setItem(themeStorageKey, next);
+          return next;
+        });
       }
     };
-  }, [direction, locale]);
+  }, [direction, locale, theme]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
@@ -626,6 +665,22 @@ export function LanguageSwitcher() {
         עב
       </button>
     </div>
+  );
+}
+
+export function ThemeToggle() {
+  const { theme, toggleTheme, t } = useI18n();
+  const isDark = theme === "dark";
+  return (
+    <button
+      className="icon-button theme-toggle"
+      type="button"
+      onClick={toggleTheme}
+      title={t("theme.toggle")}
+      aria-label={`${t("theme.toggle")}: ${isDark ? t("theme.light") : t("theme.dark")}`}
+    >
+      {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+    </button>
   );
 }
 
