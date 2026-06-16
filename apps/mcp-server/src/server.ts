@@ -3,6 +3,7 @@ import { createDb, ensureDefaultWorkspace, agentRuns, auditEvents, entityEdges }
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { authenticateAgent, requireToolScope, type AgentIdentity } from "./auth.js";
+import { isAcceptedClientNotification, type JsonRpcEnvelope } from "./protocol.js";
 import { getToolDefinition, toolDefinitions } from "./tools.js";
 
 const env = loadEnv();
@@ -15,7 +16,11 @@ const app = Fastify({ logger: true });
 app.get("/health", async () => ({ ok: true }));
 
 app.post("/mcp", async (request, reply) => {
-  const body = request.body as { id?: string | number | null; method?: string; params?: Record<string, unknown> };
+  const body = request.body as JsonRpcEnvelope;
+
+  if (isAcceptedClientNotification(body)) {
+    return reply.code(202).send();
+  }
 
   try {
     const result = await handleJsonRpc(body.method ?? "", body.params ?? {}, extractToken(request.headers));
