@@ -30,6 +30,7 @@ const englishDictionary = {
   "nav.search": "Search",
   "nav.agents": "Agents",
   "nav.schemas": "Schemas",
+  "nav.settings": "Settings",
   "nav.primary": "Primary navigation",
   "nav.workspace": "Workspace",
   "nav.library": "Library",
@@ -37,6 +38,22 @@ const englishDictionary = {
   "nav.admin": "Admin",
   "nav.mobileMenu": "Open navigation",
   "nav.closeMenu": "Close navigation",
+  "command.title": "Command menu",
+  "command.description": "Search and jump to anywhere in your workspace",
+  "command.placeholder": "Type a command or search…",
+  "command.empty": "No matches found.",
+  "command.actions": "Actions",
+  "command.navigate": "Go to",
+  "command.searchFor": "Search for \u201c{query}\u201d",
+  "command.hint": "Quick actions",
+  "settings.title": "Settings",
+  "settings.subtitle": "Manage preferences, connected apps, and your data model.",
+  "settings.preferences": "Preferences",
+  "settings.connections": "Connections",
+  "settings.dataModel": "Data model",
+  "settings.appearance": "Appearance",
+  "settings.appearanceHelp": "Choose how MindSystem looks on this device.",
+  "settings.languageHelp": "Set the language and reading direction.",
   "shell.globalSearch": "Search notes, tasks, projects",
   "shell.quickCapture": "Quick capture",
   "shell.searchHint": "Press Enter to search",
@@ -334,11 +351,28 @@ const hebrewDictionary: Partial<Record<TranslationKey, string>> = {
   "nav.search": "חיפוש",
   "nav.agents": "סוכנים",
   "nav.schemas": "סכמות",
+  "nav.settings": "הגדרות",
   "nav.primary": "ניווט ראשי",
   "nav.workspace": "מרחב עבודה",
   "nav.library": "ספרייה",
   "nav.automation": "אוטומציה",
   "nav.admin": "ניהול",
+  "command.title": "תפריט פקודות",
+  "command.description": "חיפוש ומעבר מהיר לכל מקום במרחב העבודה",
+  "command.placeholder": "הקלד פקודה או חיפוש…",
+  "command.empty": "לא נמצאו תוצאות.",
+  "command.actions": "פעולות",
+  "command.navigate": "מעבר אל",
+  "command.searchFor": "חיפוש \u201c{query}\u201d",
+  "command.hint": "פעולות מהירות",
+  "settings.title": "הגדרות",
+  "settings.subtitle": "ניהול העדפות, אפליקציות מחוברות ומודל הנתונים.",
+  "settings.preferences": "העדפות",
+  "settings.connections": "חיבורים",
+  "settings.dataModel": "מודל נתונים",
+  "settings.appearance": "מראה",
+  "settings.appearanceHelp": "בחר כיצד MindSystem ייראה במכשיר הזה.",
+  "settings.languageHelp": "הגדר שפה וכיוון קריאה.",
   "shell.globalSearch": "חיפוש בהערות, משימות ופרויקטים",
   "shell.quickCapture": "קליטה מהירה",
   "auth.title": "ברוכים השבים",
@@ -662,13 +696,26 @@ export function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
 
   return (
-    <div className="language-switcher" aria-label={t("language.label")}>
-      <button className={locale === "en" ? "language-button active" : "language-button"} type="button" onClick={() => setLocale("en")}>
-        EN
-      </button>
-      <button className={locale === "he" ? "language-button active" : "language-button"} type="button" onClick={() => setLocale("he")}>
-        עב
-      </button>
+    <div
+      className="inline-flex items-center rounded-lg border border-border bg-card p-0.5"
+      role="group"
+      aria-label={t("language.label")}
+    >
+      {(["en", "he"] as const).map((code) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setLocale(code)}
+          aria-pressed={locale === code}
+          className={
+            locale === code
+              ? "rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground"
+              : "rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          }
+        >
+          {code === "en" ? "EN" : "עב"}
+        </button>
+      ))}
     </div>
   );
 }
@@ -678,11 +725,11 @@ export function ThemeToggle() {
   const isDark = theme === "dark";
   return (
     <button
-      className="icon-button theme-toggle"
       type="button"
       onClick={toggleTheme}
       title={t("theme.toggle")}
       aria-label={`${t("theme.toggle")}: ${isDark ? t("theme.light") : t("theme.dark")}`}
+      className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
     >
       {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
     </button>
