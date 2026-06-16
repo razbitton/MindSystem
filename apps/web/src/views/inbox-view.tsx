@@ -6,10 +6,10 @@ import { apiPost, type AnyRecord } from "../lib/api";
 import { truncate } from "../lib/view-models";
 import { EmptyState, EntityBadge, PageHeader, Panel, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function InboxView() {
   const { t, translateValue } = useI18n();
@@ -38,21 +38,21 @@ export default function InboxView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t("inbox.title")} subtitle={t("inbox.subtitle")} />
+      <PageHeader eyebrow={t("shell.quickCapture")} title={t("inbox.title")} subtitle={t("inbox.subtitle")} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title={t("inbox.capturePanel")}>
           <div className="flex flex-col gap-3">
             <Textarea
               dir="auto"
-              rows={8}
+              rows={6}
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder={t("inbox.placeholder")}
             />
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">{t("home.captureHelp")}</p>
-              <Button onClick={submit} disabled={loading || !text.trim()}>
+              <Button type="button" size="sm" onClick={submit} disabled={loading || !text.trim()}>
                 <Send data-icon="inline-start" />
                 {loading ? t("common.loading") : t("common.capture")}
               </Button>
@@ -73,11 +73,11 @@ export default function InboxView() {
 
           {result ? (
             <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-4">
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex min-w-0 flex-col gap-0.5">
                     <p className="text-sm font-medium text-foreground">{t("inbox.rawItem")}</p>
-                    <p className="font-mono text-xs text-muted-foreground" dir="ltr">
+                    <p className="truncate text-xs text-muted-foreground" dir="ltr">
                       {result.rawItem?.id}
                     </p>
                   </div>
@@ -97,18 +97,18 @@ export default function InboxView() {
                 {!createdEntities.length ? (
                   <EmptyState>{t("common.nothingHere")}</EmptyState>
                 ) : (
-                  <div className="flex flex-col gap-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     {createdEntities.map((item: AnyRecord, index: number) => (
                       <div
                         key={item.entity?.id ?? index}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
+                        className="flex items-start justify-between gap-2 rounded-lg border border-border bg-card p-3"
                       >
                         <div className="flex min-w-0 flex-col gap-0.5">
                           <p className="truncate text-sm font-medium text-foreground" dir="auto">
                             {item.entity?.title}
                           </p>
                           <p className="text-xs text-muted-foreground" dir="auto">
-                            {truncate(item.entity?.summary ?? item.entity?.body, 140)}
+                            {truncate(item.entity?.summary ?? item.entity?.body, 120)}
                           </p>
                         </div>
                         <EntityBadge value={item.entity?.entityType} />
@@ -128,7 +128,7 @@ export default function InboxView() {
                     {reviewItems.map((item: AnyRecord) => (
                       <div
                         key={item.id}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"
+                        className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3"
                       >
                         <div className="flex min-w-0 flex-col gap-0.5">
                           <p className="text-sm font-medium text-foreground" dir="auto">
@@ -138,7 +138,7 @@ export default function InboxView() {
                             {translateValue("action", item.suggestedAction)}
                           </p>
                         </div>
-                        <CheckCircle2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <CheckCircle2 className="size-[18px] shrink-0 text-warning" aria-hidden />
                       </div>
                     ))}
                   </div>

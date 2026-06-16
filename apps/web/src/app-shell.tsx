@@ -8,9 +8,7 @@ import {
   LogOut,
   Menu,
   Search,
-  Settings,
-  Sparkles,
-  X
+  Sparkles
 } from "lucide-react";
 import { LanguageSwitcher, ThemeToggle, useI18n } from "./i18n";
 import { getCurrentSession, logout, type AnyRecord } from "./lib/api";

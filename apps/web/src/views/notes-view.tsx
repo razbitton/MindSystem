@@ -6,9 +6,22 @@ import { apiGet, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
 import { useI18n } from "../i18n";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 
 const preferenceKey = "mindsystem.notes.view";
 const viewModes = ["cards", "list"] as const;
+const NO_PROJECT = "__none__";
+const ALL_PROJECTS = "__all__";
 
 type NoteForm = {
   title: string;
@@ -124,161 +137,221 @@ export default function NotesView() {
   }, [notes, projectFilter, query]);
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={t("notes.title")}
         subtitle={t("notes.subtitle")}
         actions={
-          <button className="button" type="button" onClick={load}>
-            <RefreshCw size={16} aria-hidden /> {t("common.refresh")}
-          </button>
+          <Button variant="outline" size="sm" type="button" onClick={load}>
+            <RefreshCw data-icon="inline-start" />
+            {t("common.refresh")}
+          </Button>
         }
       />
 
       {composeOpen ? (
-        <div className="notes-compose" ref={composeRef}>
-          <input
-            className="notes-compose-title"
+        <div
+          ref={composeRef}
+          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-xs"
+        >
+          <Input
             dir="auto"
             autoFocus
+            className="border-0 px-1 text-base font-medium shadow-none focus-visible:ring-0"
             placeholder={t("notes.titlePlaceholder")}
             value={composeForm.title}
             onChange={(event) => setComposeForm({ ...composeForm, title: event.target.value })}
           />
-          <textarea
-            className="notes-compose-body"
+          <Textarea
             dir="auto"
             rows={3}
+            className="border-0 px-1 shadow-none focus-visible:ring-0"
             placeholder={t("notes.bodyPlaceholder")}
             value={composeForm.body}
             onChange={(event) => setComposeForm({ ...composeForm, body: event.target.value })}
           />
-          <div className="notes-compose-footer">
-            <div className="notes-compose-tools">
-              <select
-                className="select compact"
-                value={composeForm.projectId}
-                onChange={(event) => setComposeForm({ ...composeForm, projectId: event.target.value })}
-              >
-                <option value="">{t("common.noProject")}</option>
+          <div className="flex items-center justify-between gap-2">
+            <Select
+              value={composeForm.projectId || NO_PROJECT}
+              onValueChange={(value) =>
+                setComposeForm({ ...composeForm, projectId: value === NO_PROJECT ? "" : value })
+              }
+            >
+              <SelectTrigger size="sm" className="w-44">
+                <SelectValue placeholder={t("common.noProject")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_PROJECT}>{t("common.noProject")}</SelectItem>
                 {projects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    {project.name}
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
-            <button className="button primary" type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void submitCompose()}>
-              <Check size={16} aria-hidden /> {t("common.save")}
-            </button>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              size="sm"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => void submitCompose()}
+            >
+              <Check data-icon="inline-start" />
+              {t("common.save")}
+            </Button>
           </div>
         </div>
       ) : (
         <button
-          className="notes-compose-collapsed"
           type="button"
           onClick={() => {
             resetCompose();
             setComposeOpen(true);
           }}
+          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
         >
-          <Plus size={18} aria-hidden /> {t("notes.takeANote")}
+          <Plus className="size-[18px]" aria-hidden />
+          {t("notes.takeANote")}
         </button>
       )}
 
       <Panel>
-        <div className="filter-bar">
-          <div className="shell-search" style={{ flex: "1 1 260px" }}>
-            <Search size={16} aria-hidden />
-            <input dir="auto" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("notes.searchPlaceholder")} />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <Search
+                className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                dir="auto"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("notes.searchPlaceholder")}
+                className="ps-9"
+              />
+            </div>
+            <Select
+              value={projectFilter || ALL_PROJECTS}
+              onValueChange={(value) => setProjectFilter(value === ALL_PROJECTS ? "" : value)}
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder={t("notes.allProjects")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_PROJECTS}>{t("notes.allProjects")}</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <SegmentedControl
+              label={t("common.view")}
+              value={view}
+              onChange={changeView}
+              options={[
+                { value: "cards", label: t("common.cards"), icon: <LayoutGrid size={15} aria-hidden /> },
+                { value: "list", label: t("common.list"), icon: <List size={15} aria-hidden /> }
+              ]}
+            />
           </div>
-          <select className="select" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} style={{ maxWidth: 240 }}>
-            <option value="">{t("notes.allProjects")}</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>{project.name}</option>
-            ))}
-          </select>
-          <SegmentedControl
-            label={t("common.view")}
-            value={view}
-            onChange={changeView}
-            options={[
-              { value: "cards", label: t("common.cards"), icon: <LayoutGrid size={15} aria-hidden /> },
-              { value: "list", label: t("common.list"), icon: <List size={15} aria-hidden /> }
-            ]}
-          />
-        </div>
 
-        {!filteredNotes.length ? (
-          <EmptyState title={t("notes.empty")}>
-            {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
-          </EmptyState>
-        ) : view === "cards" ? (
-          <div className="notes-masonry">
-            {filteredNotes.map((note) => {
-              const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
-              return (
-                <div
-                  className="note-card"
-                  key={note.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openEdit(note)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openEdit(note);
-                    }
-                  }}
-                >
-                  {note.title ? <p className="note-card-title" dir="auto">{note.title}</p> : null}
-                  <p className="note-card-body" dir="auto">{note.body}</p>
-                  <div className="note-card-footer">
-                    <span className="note-chip">{linkedProject || t("common.noProject")}</span>
-                    <span>{formatDate(dateValue(note, "updatedAt"))}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="list-surface">
-            {filteredNotes.map((note) => {
-              const linkedProject = note.projectId || note.project_id ? projectName(projects, String(note.projectId ?? note.project_id)) : "";
-              return (
-                <div
-                  className="note-row"
-                  key={note.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openEdit(note)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openEdit(note);
-                    }
-                  }}
-                >
-                  <div className="note-row-content">
-                    <p className="row-title" dir="auto">{note.title || note.body}</p>
-                    {note.body && note.title ? <p className="note-row-body" dir="auto">{note.body}</p> : null}
-                    <div className="note-row-meta">
-                      <span className="note-chip">{linkedProject || t("common.noProject")}</span>
-                      <span className="row-meta">{formatDate(dateValue(note, "updatedAt"))}</span>
+          {!filteredNotes.length ? (
+            <EmptyState title={t("notes.empty")}>
+              {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
+            </EmptyState>
+          ) : view === "cards" ? (
+            <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
+              {filteredNotes.map((note) => {
+                const linkedProject =
+                  note.projectId || note.project_id
+                    ? projectName(projects, String(note.projectId ?? note.project_id))
+                    : "";
+                return (
+                  <div
+                    key={note.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEdit(note)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openEdit(note);
+                      }
+                    }}
+                    className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {note.title ? (
+                      <p className="text-sm font-semibold text-foreground" dir="auto">
+                        {note.title}
+                      </p>
+                    ) : null}
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground" dir="auto">
+                      {note.body}
+                    </p>
+                    <div className="flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
+                      <span className="rounded-full bg-muted px-2 py-0.5">
+                        {linkedProject || t("common.noProject")}
+                      </span>
+                      <span>{formatDate(dateValue(note, "updatedAt"))}</span>
                     </div>
                   </div>
-                  <IconButton
-                    label={t("common.edit")}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openEdit(note);
+                );
+              })}
+            </div>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border rounded-xl border border-border">
+              {filteredNotes.map((note) => {
+                const linkedProject =
+                  note.projectId || note.project_id
+                    ? projectName(projects, String(note.projectId ?? note.project_id))
+                    : "";
+                return (
+                  <li
+                    key={note.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEdit(note)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openEdit(note);
+                      }
                     }}
+                    className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Edit3 size={16} aria-hidden />
-                  </IconButton>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <p className="text-sm font-medium text-foreground" dir="auto">
+                        {note.title || note.body}
+                      </p>
+                      {note.body && note.title ? (
+                        <p className="line-clamp-2 text-sm text-muted-foreground" dir="auto">
+                          {note.body}
+                        </p>
+                      ) : null}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="rounded-full bg-muted px-2 py-0.5">
+                          {linkedProject || t("common.noProject")}
+                        </span>
+                        <span>{formatDate(dateValue(note, "updatedAt"))}</span>
+                      </div>
+                    </div>
+                    <IconButton
+                      label={t("common.edit")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEdit(note);
+                      }}
+                    >
+                      <Edit3 className="size-4" aria-hidden />
+                    </IconButton>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </Panel>
 
       <Drawer
@@ -288,31 +361,56 @@ export default function NotesView() {
         onClose={closeDrawer}
         footer={
           <>
-            <button className="button" type="button" onClick={closeDrawer}>{t("common.cancel")}</button>
-            <button className="button primary" type="button" onClick={save} disabled={!form.title.trim() && !form.body.trim()}>{t("common.save")}</button>
+            <Button variant="outline" type="button" onClick={closeDrawer}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="button" onClick={save} disabled={!form.title.trim() && !form.body.trim()}>
+              {t("common.save")}
+            </Button>
           </>
         }
       >
-        <div className="form-grid">
-          <div className="form-row">
-            <label htmlFor="note-title">{t("common.title")}</label>
-            <input id="note-title" className="input" dir="auto" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="note-title">{t("common.title")}</Label>
+            <Input
+              id="note-title"
+              dir="auto"
+              value={form.title}
+              onChange={(event) => setForm({ ...form, title: event.target.value })}
+            />
           </div>
-          <div className="form-row">
-            <label htmlFor="note-body">{t("common.body")}</label>
-            <textarea id="note-body" className="textarea" dir="auto" value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="note-body">{t("common.body")}</Label>
+            <Textarea
+              id="note-body"
+              dir="auto"
+              rows={8}
+              value={form.body}
+              onChange={(event) => setForm({ ...form, body: event.target.value })}
+            />
           </div>
-          <div className="form-row">
-            <label htmlFor="note-project">{t("common.project")}</label>
-            <select id="note-project" className="select" value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })}>
-              <option value="">{t("common.noProject")}</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.name}</option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="note-project">{t("common.project")}</Label>
+            <Select
+              value={form.projectId || NO_PROJECT}
+              onValueChange={(value) => setForm({ ...form, projectId: value === NO_PROJECT ? "" : value })}
+            >
+              <SelectTrigger id="note-project" className="w-full">
+                <SelectValue placeholder={t("common.noProject")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_PROJECT}>{t("common.noProject")}</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </Drawer>
-    </>
+    </div>
   );
 }
