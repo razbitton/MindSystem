@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle, RefreshCw } from "lucide-react";
-import { apiPost, type AnyRecord } from "../lib/api";
+import { useRouter } from "next/navigation";
+import { CheckCircle, RefreshCw, Trash2 } from "lucide-react";
+import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -11,17 +12,28 @@ import {
 } from "../lib/query-cache";
 import { dateValue, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { Disclosure, CodeBlock } from "../components/disclosure";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
+type DeleteTarget = {
+  type: "project" | "task" | "note";
+  id: string;
+  title: string;
+};
 
 export default function ProjectDetailView({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const { t, formatDate } = useI18n();
   const [data, setData] = useState<AnyRecord | null>(
     () => peekCachedQuery<AnyRecord>(`/api/projects/${projectId}/context`) ?? null
   );
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load(force = false) {
     setError(null);
@@ -40,6 +52,39 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     await apiPost(`/api/tasks/${id}/complete`, {});
     invalidateWorkspaceQueryCache();
     await load(true);
+  }
+
+  function requestDelete(type: DeleteTarget["type"], item: AnyRecord) {
+    setDeleteTarget({
+      type,
+      id: String(item.id),
+      title: String(item.title ?? item.name ?? t(`entity.${type}` as "entity.project" | "entity.task" | "entity.note"))
+    });
+  }
+
+  async function deleteSelected() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const path =
+        deleteTarget.type === "project"
+          ? `/api/projects/${deleteTarget.id}`
+          : deleteTarget.type === "task"
+            ? `/api/tasks/${deleteTarget.id}`
+            : `/api/notes/${deleteTarget.id}`;
+      await apiDelete(path);
+      setDeleteTarget(null);
+      invalidateWorkspaceQueryCache();
+      if (path.startsWith("/api/projects/")) {
+        router.push("/projects");
+      } else {
+        await load(true);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.failed"));
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const project = data?.project;
@@ -62,6 +107,18 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
               <RefreshCw data-icon="inline-start" />
               {t("common.refresh")}
             </Button>
+            {project ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => requestDelete("project", project)}
+              >
+                <Trash2 data-icon="inline-start" />
+                {t("common.delete")}
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -108,6 +165,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
                 formatDate={formatDate}
                 emptyText={t("projectDetail.noTasks")}
                 completeTask={completeTask}
+                deleteTask={(task) => requestDelete("task", task)}
               />
             </Panel>
             <Panel title={t("projectDetail.notes")}>
@@ -117,6 +175,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
                 bodyKey="body"
                 emptyText={t("projectDetail.nothingLinked")}
                 formatDate={formatDate}
+                deleteRow={(note) => requestDelete("note", note)}
               />
             </Panel>
           </div>
@@ -150,6 +209,31 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           </Panel>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={
+          deleteTarget?.type === "project"
+            ? t("projects.deleteProject")
+            : deleteTarget?.type === "task"
+              ? t("tasks.deleteTask")
+              : t("notes.deleteNote")
+        }
+        description={
+          deleteTarget?.type === "project"
+            ? t("projects.deleteConfirm", { title: deleteTarget.title })
+            : deleteTarget?.type === "task"
+              ? t("tasks.deleteConfirm", { title: deleteTarget.title })
+              : t("notes.deleteConfirm", { title: deleteTarget?.title ?? t("entity.note") })
+        }
+        confirmLabel={deleting ? t("common.deleting") : t("common.delete")}
+        destructive
+        loading={deleting}
+        onConfirm={() => void deleteSelected()}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
@@ -158,12 +242,14 @@ function TaskRows({
   tasks,
   formatDate,
   emptyText,
-  completeTask
+  completeTask,
+  deleteTask
 }: {
   tasks: AnyRecord[];
   formatDate: (value?: string | null) => string;
   emptyText: string;
   completeTask: (id: string) => void;
+  deleteTask: (task: AnyRecord) => void;
 }) {
   const { t } = useI18n();
   if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
@@ -187,6 +273,13 @@ function TaskRows({
                 <CheckCircle className="size-4" aria-hidden />
               </IconButton>
             ) : null}
+            <IconButton
+              label={t("common.delete")}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => deleteTask(task)}
+            >
+              <Trash2 className="size-4" aria-hidden />
+            </IconButton>
           </div>
         </li>
       ))}
@@ -199,14 +292,17 @@ function SimpleRows({
   titleKey,
   bodyKey,
   emptyText,
-  formatDate
+  formatDate,
+  deleteRow
 }: {
   rows: AnyRecord[];
   titleKey: string;
   bodyKey: string;
   emptyText: string;
   formatDate: (value?: string | null) => string;
+  deleteRow?: (row: AnyRecord) => void;
 }) {
+  const { t } = useI18n();
   if (!rows.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
     <ul className="flex flex-col gap-1">
@@ -215,13 +311,24 @@ function SimpleRows({
           ? formatDate(dateValue(row, bodyKey))
           : row[bodyKey] ?? row[bodyKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)];
         return (
-          <li key={row.id} className="flex flex-col gap-0.5 rounded-lg px-3 py-2.5 hover:bg-accent/40">
-            <p className="truncate text-sm font-medium text-foreground" dir="auto">
-              {row[titleKey] ?? row.name}
-            </p>
-            <p className="truncate text-xs text-muted-foreground" dir="auto">
-              {truncate(String(bodyValue ?? ""), 160)}
-            </p>
+          <li key={row.id} className="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/40">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className="truncate text-sm font-medium text-foreground" dir="auto">
+                {row[titleKey] ?? row.name}
+              </p>
+              <p className="truncate text-xs text-muted-foreground" dir="auto">
+                {truncate(String(bodyValue ?? ""), 160)}
+              </p>
+            </div>
+            {deleteRow ? (
+              <IconButton
+                label={t("common.delete")}
+                className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => deleteRow(row)}
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </IconButton>
+            ) : null}
           </li>
         );
       })}

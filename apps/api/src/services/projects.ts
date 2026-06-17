@@ -131,3 +131,20 @@ export async function patchProject(context: AppContext, id: string, input: z.inf
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: project.entityId, metadata: { entityType: "project" } });
   return { project };
 }
+
+export async function deleteProject(context: AppContext, id: string, actor: Actor) {
+  const { project } = await getProject(context, id);
+
+  await writeAuditEvent(context, {
+    ...actor,
+    action: "delete entity",
+    entityId: project.entityId,
+    metadata: { entityType: "project", projectId: id, title: project.name }
+  });
+
+  await context.db
+    .delete(entities)
+    .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, project.entityId)));
+
+  return { ok: true };
+}

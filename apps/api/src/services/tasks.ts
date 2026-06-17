@@ -144,3 +144,20 @@ export async function completeTask(context: AppContext, id: string, actor: Actor
   await writeAuditEvent(context, { ...actor, action: "task complete", entityId: task.entityId, metadata: { taskId: id } });
   return { task };
 }
+
+export async function deleteTask(context: AppContext, id: string, actor: Actor) {
+  const { task } = await getTask(context, id);
+
+  await writeAuditEvent(context, {
+    ...actor,
+    action: "delete entity",
+    entityId: task.entityId,
+    metadata: { entityType: "task", taskId: id, title: task.title }
+  });
+
+  await context.db
+    .delete(entities)
+    .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, task.entityId)));
+
+  return { ok: true };
+}

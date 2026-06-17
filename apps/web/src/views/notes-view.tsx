@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Edit3, Folder, LayoutGrid, List, PenSquare, RefreshCw, Search } from "lucide-react";
-import { apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import { Check, Edit3, Folder, LayoutGrid, List, PenSquare, RefreshCw, Search, Trash2 } from "lucide-react";
+import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -10,6 +10,7 @@ import {
 } from "../lib/query-cache";
 import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n, type Direction } from "../i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,8 @@ export default function NotesView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
+  const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load(force = false) {
     const [noteData, projectData] = await Promise.all([
@@ -158,6 +161,27 @@ export default function NotesView() {
       await load(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
+    }
+  }
+
+  function requestDelete(note: AnyRecord, event?: { stopPropagation: () => void }) {
+    event?.stopPropagation();
+    setDeleteTarget(note);
+  }
+
+  async function deleteSelectedNote() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/notes/${deleteTarget.id}`);
+      if (editingNote?.id === deleteTarget.id) closeDrawer();
+      setDeleteTarget(null);
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -280,7 +304,16 @@ export default function NotesView() {
                       <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
                         {linkedProject || t("common.noProject")}
                       </span>
-                      <span>{formatDate(dateValue(note, "updatedAt"))}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>{formatDate(dateValue(note, "updatedAt"))}</span>
+                        <IconButton
+                          label={t("common.delete")}
+                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={(event) => requestDelete(note, event)}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </IconButton>
+                      </div>
                     </div>
                   </div>
                 );
@@ -323,15 +356,24 @@ export default function NotesView() {
                         <span>{formatDate(dateValue(note, "updatedAt"))}</span>
                       </div>
                     </div>
-                    <IconButton
-                      label={t("common.edit")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openEdit(note);
-                      }}
-                    >
-                      <Edit3 className="size-4" aria-hidden />
-                    </IconButton>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <IconButton
+                        label={t("common.edit")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEdit(note);
+                        }}
+                      >
+                        <Edit3 className="size-4" aria-hidden />
+                      </IconButton>
+                      <IconButton
+                        label={t("common.delete")}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={(event) => requestDelete(note, event)}
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </IconButton>
+                    </div>
                   </li>
                 );
               })}
@@ -356,9 +398,25 @@ export default function NotesView() {
           onChange={setForm}
           onClose={closeDrawer}
           onSave={() => void save()}
+          {...(editingNote ? { onDelete: () => requestDelete(editingNote) } : {})}
           saveDisabled={!form.title.trim() && !form.body.trim()}
         />
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={t("notes.deleteNote")}
+        description={t("notes.deleteConfirm", {
+          title: String(deleteTarget?.title || deleteTarget?.body || t("entity.note"))
+        })}
+        confirmLabel={deleting ? t("common.deleting") : t("common.delete")}
+        destructive
+        loading={deleting}
+        onConfirm={() => void deleteSelectedNote()}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
@@ -372,6 +430,7 @@ function NoteEditorPanel({
   onExpand,
   onClose,
   onSave,
+  onDelete,
   saveDisabled = false
 }: {
   form: NoteForm;
@@ -382,6 +441,7 @@ function NoteEditorPanel({
   onExpand?: () => void;
   onClose?: () => void;
   onSave: () => void;
+  onDelete?: () => void;
   saveDisabled?: boolean;
 }) {
   const { t, direction } = useI18n();
@@ -470,6 +530,18 @@ function NoteEditorPanel({
           onChange={(projectId) => onChange({ ...form, projectId })}
         />
         <div className="flex items-center gap-2">
+          {mode === "edit" && onDelete ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 data-icon="inline-start" />
+              {t("common.delete")}
+            </Button>
+          ) : null}
           {mode === "edit" && onClose ? (
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               {t("common.cancel")}

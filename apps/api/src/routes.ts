@@ -36,12 +36,14 @@ import { ingestFreeText } from "./services/ingest.js";
 import { createDocument, getDocument, listDocuments } from "./services/documents.js";
 import {
   createNote,
+  deleteNote,
   getNote,
   listNotes,
   patchNote
 } from "./services/notes.js";
 import {
   createProject,
+  deleteProject,
   getProject,
   getProjectContext,
   listProjects,
@@ -56,6 +58,7 @@ import { searchMemory } from "./services/search.js";
 import {
   completeTask,
   createTask,
+  deleteTask,
   getTask,
   listTasks,
   patchTask
@@ -117,18 +120,21 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/projects" && method === "POST") return "projects:write";
   if (route === "/api/projects/:id" && method === "GET") return "projects:read";
   if (route === "/api/projects/:id" && method === "PATCH") return "projects:write";
+  if (route === "/api/projects/:id" && method === "DELETE") return "projects:write";
   if (route === "/api/projects/:id/context" && method === "GET") return "projects:read";
 
   if (route === "/api/tasks" && method === "GET") return "tasks:read";
   if (route === "/api/tasks" && method === "POST") return "tasks:write";
   if (route === "/api/tasks/:id" && method === "GET") return "tasks:read";
   if (route === "/api/tasks/:id" && method === "PATCH") return "tasks:write";
+  if (route === "/api/tasks/:id" && method === "DELETE") return "tasks:write";
   if (route === "/api/tasks/:id/complete" && method === "POST") return "tasks:write";
 
   if (route === "/api/notes" && method === "GET") return "memory:read";
   if (route === "/api/notes" && method === "POST") return "memory:write";
   if (route === "/api/notes/:id" && method === "GET") return "memory:read";
   if (route === "/api/notes/:id" && method === "PATCH") return "memory:write";
+  if (route === "/api/notes/:id" && method === "DELETE") return "memory:write";
 
   if (route === "/api/documents" && method === "GET") return "documents:read";
   if (route === "/api/documents" && method === "POST") return "documents:write";
@@ -230,6 +236,11 @@ export async function registerRoutes(app: FastifyInstance) {
     return patchProject(requestContext(app, request), id, input, actorFor(request));
   });
 
+  app.delete("/api/projects/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteProject(requestContext(app, request), id, actorFor(request));
+  });
+
   app.post("/api/tasks", async (request) => {
     const input = createTaskSchema.parse(request.body);
     return createTask(requestContext(app, request), input, actorFor(request));
@@ -246,6 +257,11 @@ export async function registerRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(request.params);
     const input = patchTaskSchema.parse(request.body);
     return patchTask(requestContext(app, request), id, input, actorFor(request));
+  });
+
+  app.delete("/api/tasks/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteTask(requestContext(app, request), id, actorFor(request));
   });
 
   app.post("/api/tasks/:id/complete", async (request) => {
@@ -269,6 +285,11 @@ export async function registerRoutes(app: FastifyInstance) {
     const { id } = idParam.parse(request.params);
     const input = patchNoteSchema.parse(request.body);
     return patchNote(requestContext(app, request), id, input, actorFor(request));
+  });
+
+  app.delete("/api/notes/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteNote(requestContext(app, request), id, actorFor(request));
   });
 
   app.post("/api/documents", async (request) => {

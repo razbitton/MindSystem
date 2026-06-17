@@ -84,7 +84,8 @@ export function buildOpenApiSpec() {
           summary: "Update a project",
           requestBody: { required: true, content: { "application/json": { schema: json(patchProjectSchema) } } },
           responses: { "200": { description: "Project" } }
-        }
+        },
+        delete: { summary: "Delete a project", responses: { "200": { description: "Deleted" } } }
       },
       "/projects/{id}/context": {
         get: { summary: "Get a project context pack", responses: { "200": { description: "Project context" } } }
@@ -103,7 +104,8 @@ export function buildOpenApiSpec() {
           summary: "Update a task",
           requestBody: { required: true, content: { "application/json": { schema: json(patchTaskSchema) } } },
           responses: { "200": { description: "Task" } }
-        }
+        },
+        delete: { summary: "Delete a task", responses: { "200": { description: "Deleted" } } }
       },
       "/tasks/{id}/complete": {
         post: { summary: "Complete a task", responses: { "200": { description: "Task" } } }
@@ -122,7 +124,8 @@ export function buildOpenApiSpec() {
           summary: "Update a note",
           requestBody: { required: true, content: { "application/json": { schema: json(patchNoteSchema) } } },
           responses: { "200": { description: "Note" } }
-        }
+        },
+        delete: { summary: "Delete a note", responses: { "200": { description: "Deleted" } } }
       },
       "/documents": {
         post: {

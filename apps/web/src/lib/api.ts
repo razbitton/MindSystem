@@ -38,6 +38,15 @@ export async function apiPatch<T = AnyRecord>(path: string, body: AnyRecord, opt
   return response.json();
 }
 
+export async function apiDelete<T = AnyRecord>(path: string, options: ApiOptions = {}): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    method: "DELETE",
+    credentials: "include"
+  });
+  await throwIfNotOk(response, options);
+  return response.json();
+}
+
 export async function login(email: string, password: string) {
   return apiPost<{ user: AnyRecord; expiresAt: string }>("/api/auth/login", { email, password }, { redirectOnUnauthorized: false });
 }

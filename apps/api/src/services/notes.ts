@@ -88,3 +88,20 @@ export async function patchNote(context: AppContext, id: string, input: z.infer<
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: note.entityId, metadata: { entityType: "note" } });
   return { note };
 }
+
+export async function deleteNote(context: AppContext, id: string, actor: Actor) {
+  const { note } = await getNote(context, id);
+
+  await writeAuditEvent(context, {
+    ...actor,
+    action: "delete entity",
+    entityId: note.entityId,
+    metadata: { entityType: "note", noteId: id, title: note.title }
+  });
+
+  await context.db
+    .delete(entities)
+    .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, note.entityId)));
+
+  return { ok: true };
+}

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle, Columns3, Edit3, List, Plus, RefreshCw, Search } from "lucide-react";
-import { apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import { CheckCircle, Columns3, Edit3, List, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -29,6 +29,7 @@ import {
   SegmentedControl,
   StatusBadge
 } from "../components/page";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 const statuses = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"] as const;
 const boardStatuses = ["inbox", "todo", "in_progress", "waiting", "done"] as const;
@@ -78,6 +80,8 @@ export default function TasksView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<TaskForm>(blankForm());
+  const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load(nextFilters = filters, force = false) {
     const [taskData, projectData] = await Promise.all([
@@ -153,6 +157,27 @@ export default function TasksView() {
     await apiPost(`/api/tasks/${id}/complete`, {});
     invalidateWorkspaceQueryCache();
     await load(filters, true);
+  }
+
+  function requestDelete(task: AnyRecord, event?: { stopPropagation: () => void }) {
+    event?.stopPropagation();
+    setDeleteTarget(task);
+  }
+
+  async function deleteSelectedTask() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/tasks/${deleteTarget.id}`);
+      if (editingTask?.id === deleteTarget.id) closeDrawer();
+      setDeleteTarget(null);
+      invalidateWorkspaceQueryCache();
+      await load(filters, true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function resetFilters() {
@@ -293,6 +318,7 @@ export default function TasksView() {
                           formatDate={formatDate}
                           onEdit={openEdit}
                           onComplete={complete}
+                          onDelete={requestDelete}
                         />
                       ))}
                     </div>
@@ -318,6 +344,13 @@ export default function TasksView() {
                     <IconButton label={t("common.edit")} onClick={() => openEdit(task)}>
                       <Edit3 className="size-4" aria-hidden />
                     </IconButton>
+                    <IconButton
+                      label={t("common.delete")}
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => requestDelete(task)}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </IconButton>
                     {task.status !== "done" ? (
                       <IconButton label={t("common.complete")} onClick={() => complete(task.id)}>
                         <CheckCircle className="size-4" aria-hidden />
@@ -337,14 +370,29 @@ export default function TasksView() {
         subtitle={editingTask ? formatDate(dateValue(editingTask, "updatedAt")) : t("tasks.subtitle")}
         onClose={closeDrawer}
         footer={
-          <>
-            <Button variant="outline" type="button" onClick={closeDrawer}>
-              {t("common.cancel")}
-            </Button>
-            <Button type="button" onClick={save} disabled={!form.title.trim()}>
-              {t("common.save")}
-            </Button>
-          </>
+          <div className="flex w-full items-center justify-between gap-2">
+            <div>
+              {editingTask ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => requestDelete(editingTask)}
+                >
+                  <Trash2 data-icon="inline-start" />
+                  {t("common.delete")}
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" type="button" onClick={closeDrawer}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="button" onClick={save} disabled={!form.title.trim()}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </div>
         }
       >
         <div className="flex flex-col gap-4">
@@ -461,6 +509,21 @@ export default function TasksView() {
           </div>
         </div>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={t("tasks.deleteTask")}
+        description={t("tasks.deleteConfirm", {
+          title: String(deleteTarget?.title || t("entity.task"))
+        })}
+        confirmLabel={deleting ? t("common.deleting") : t("common.delete")}
+        destructive
+        loading={deleting}
+        onConfirm={() => void deleteSelectedTask()}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
@@ -470,13 +533,15 @@ function TaskCard({
   projects,
   formatDate,
   onEdit,
-  onComplete
+  onComplete,
+  onDelete
 }: {
   task: AnyRecord;
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
   onEdit: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
+  onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
   const { t } = useI18n();
   return (
@@ -490,9 +555,18 @@ function TaskCard({
             {truncate(task.description, 120) || t("common.noDescription")}
           </p>
         </div>
-        <IconButton label={t("common.edit")} onClick={() => onEdit(task)}>
-          <Edit3 className="size-[15px]" aria-hidden />
-        </IconButton>
+        <div className="flex shrink-0 items-center gap-1">
+          <IconButton label={t("common.edit")} onClick={() => onEdit(task)}>
+            <Edit3 className="size-[15px]" aria-hidden />
+          </IconButton>
+          <IconButton
+            label={t("common.delete")}
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={(event) => onDelete(task, event)}
+          >
+            <Trash2 className="size-[15px]" aria-hidden />
+          </IconButton>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <PriorityBadge value={task.priority} />

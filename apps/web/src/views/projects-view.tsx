@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Edit3, FolderKanban, Plus, RefreshCw, Search } from "lucide-react";
-import { apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import { Edit3, FolderKanban, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -11,6 +11,7 @@ import {
 } from "../lib/query-cache";
 import { dateValue, fromDateTimeInput, matchesQuery, toDateTimeInput, truncate } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 const priorities = ["low", "medium", "high", "urgent"] as const;
 const statuses = ["active", "paused", "completed", "archived"] as const;
@@ -47,6 +49,8 @@ export default function ProjectsView() {
   const [editingProject, setEditingProject] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<ProjectForm>(blankForm());
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load(force = false) {
     setError(null);
@@ -105,6 +109,27 @@ export default function ProjectsView() {
     closeDrawer();
     invalidateWorkspaceQueryCache();
     await load(true);
+  }
+
+  function requestDelete(project: AnyRecord, event?: { stopPropagation: () => void }) {
+    event?.stopPropagation();
+    setDeleteTarget(project);
+  }
+
+  async function deleteSelectedProject() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/projects/${deleteTarget.id}`);
+      if (editingProject?.id === deleteTarget.id) closeDrawer();
+      setDeleteTarget(null);
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.failed"));
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const filteredProjects = useMemo(
@@ -172,9 +197,18 @@ export default function ProjectsView() {
                         {project.name}
                       </p>
                     </Link>
-                    <IconButton label={t("common.edit")} onClick={() => openEdit(project)}>
-                      <Edit3 className="size-4" aria-hidden />
-                    </IconButton>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <IconButton label={t("common.edit")} onClick={() => openEdit(project)}>
+                        <Edit3 className="size-4" aria-hidden />
+                      </IconButton>
+                      <IconButton
+                        label={t("common.delete")}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={(event) => requestDelete(project, event)}
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                      </IconButton>
+                    </div>
                   </div>
                   <p className="line-clamp-3 text-sm text-muted-foreground" dir="auto">
                     {truncate(project.description || project.goal, 180) || t("common.noDescription")}
@@ -208,14 +242,29 @@ export default function ProjectsView() {
         subtitle={editingProject ? formatDate(dateValue(editingProject, "updatedAt")) : t("projects.subtitle")}
         onClose={closeDrawer}
         footer={
-          <>
-            <Button variant="outline" type="button" onClick={closeDrawer}>
-              {t("common.cancel")}
-            </Button>
-            <Button type="button" onClick={save} disabled={!form.name.trim()}>
-              {t("common.save")}
-            </Button>
-          </>
+          <div className="flex w-full items-center justify-between gap-2">
+            <div>
+              {editingProject ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => requestDelete(editingProject)}
+                >
+                  <Trash2 data-icon="inline-start" />
+                  {t("common.delete")}
+                </Button>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" type="button" onClick={closeDrawer}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="button" onClick={save} disabled={!form.name.trim()}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </div>
         }
       >
         <div className="flex flex-col gap-4">
@@ -291,6 +340,21 @@ export default function ProjectsView() {
           </div>
         </div>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={t("projects.deleteProject")}
+        description={t("projects.deleteConfirm", {
+          title: String(deleteTarget?.name || t("entity.project"))
+        })}
+        confirmLabel={deleting ? t("common.deleting") : t("common.delete")}
+        destructive
+        loading={deleting}
+        onConfirm={() => void deleteSelectedProject()}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
