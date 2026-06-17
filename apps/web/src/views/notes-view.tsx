@@ -204,7 +204,7 @@ export default function NotesView() {
                 <SelectItem value={ALL_PROJECTS}>{t("notes.allProjects")}</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={String(project.id)}>
-                    {project.name}
+                    <span dir="auto">{project.name}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -252,7 +252,7 @@ export default function NotesView() {
                       {note.body}
                     </p>
                     <div className="flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir="auto">
                         {linkedProject || t("common.noProject")}
                       </span>
                       <span>{formatDate(dateValue(note, "updatedAt"))}</span>
@@ -290,7 +290,7 @@ export default function NotesView() {
                         </p>
                       ) : null}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir="auto">
                           {linkedProject || t("common.noProject")}
                         </span>
                         <span>{formatDate(dateValue(note, "updatedAt"))}</span>
@@ -396,7 +396,7 @@ function NoteEditorPanel({
             placeholder={t("notes.titlePlaceholder")}
             value={form.title}
             onChange={(event) => onChange({ ...form, title: event.target.value })}
-            className="h-auto rounded-none border-0 bg-transparent px-1 py-0 pe-10 text-base font-semibold shadow-none focus-visible:border-transparent focus-visible:ring-0 md:text-base"
+            className="h-auto rounded-none border-0 bg-transparent px-1 py-0 pe-10 text-start text-base font-semibold shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent md:text-base"
           />
         ) : null}
 
@@ -412,7 +412,7 @@ function NoteEditorPanel({
             onFocus={expandIfNeeded}
             onChange={(event) => onChange({ ...form, body: event.target.value })}
             className={cn(
-              "min-h-11 resize-none overflow-hidden rounded-none border-0 bg-transparent px-1 py-0 text-sm leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0",
+              "min-h-11 resize-none overflow-hidden rounded-none border-0 bg-transparent px-1 py-0 text-start text-sm leading-relaxed text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent",
               !expanded && "pe-10 text-muted-foreground"
             )}
           />
@@ -477,7 +477,7 @@ function ProjectPillSelect({
     <Select value={value || NO_PROJECT} onValueChange={(next) => onChange(next === NO_PROJECT ? "" : next)}>
       <SelectTrigger
         size="sm"
-        className="max-w-[14rem] rounded-full border-border bg-muted/60 px-3 text-xs shadow-none transition-colors hover:bg-muted"
+        className="max-w-[14rem] rounded-full border-border bg-transparent px-3 text-xs shadow-none transition-colors hover:bg-accent/50 dark:bg-transparent dark:hover:bg-accent/50"
       >
         <Folder className="size-3.5" aria-hidden />
         <SelectValue placeholder={t("common.noProject")} />
