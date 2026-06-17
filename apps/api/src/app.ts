@@ -10,9 +10,11 @@ export async function createApp() {
   const env = loadEnv();
   const app = Fastify({ logger: true });
   const database = createDb(env.DATABASE_URL);
+  const syncBootstrapAccount = isLocalUrl(env.APP_BASE_URL);
   const bootstrap = await ensureDefaultWorkspace(database.db, {
     userEmail: env.BOOTSTRAP_USER_EMAIL,
-    userDisplayName: env.BOOTSTRAP_USER_NAME
+    userDisplayName: env.BOOTSTRAP_USER_NAME,
+    syncExistingUser: syncBootstrapAccount
   });
   const baseContext = {
     db: database.db,
@@ -21,7 +23,9 @@ export async function createApp() {
     workspaceId: bootstrap.workspace.id,
     userId: bootstrap.user?.id ?? null
   };
-  await ensureBootstrapPassword(baseContext, env.BOOTSTRAP_USER_PASSWORD);
+  await ensureBootstrapPassword(baseContext, env.BOOTSTRAP_USER_PASSWORD, {
+    resetExisting: syncBootstrapAccount
+  });
 
   await app.register(cors, {
     origin: [env.APP_BASE_URL, "http://localhost:3000"],
@@ -41,6 +45,15 @@ export async function createApp() {
 
   await registerRoutes(app);
   return app;
+}
+
+function isLocalUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname;
+    return ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(hostname);
+  } catch {
+    return false;
+  }
 }
 
 declare module "fastify" {

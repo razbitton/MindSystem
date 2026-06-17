@@ -3,7 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
-import { apiGet, type AnyRecord } from "../lib/api";
+import type { AnyRecord } from "../lib/api";
+import { cachedApiGet, peekCachedQuery } from "../lib/query-cache";
 import { dateValue, truncate } from "../lib/view-models";
 import { EmptyState, EntityBadge, PageHeader, StatusBadge } from "../components/page";
 import { Button } from "@/components/ui/button";
@@ -17,16 +18,33 @@ const entityTypes = ["project", "task", "note", "document", "reminder", "decisio
 export default function SearchView() {
   const { t, formatDate, translateValue } = useI18n();
   const searchParams = useSearchParams();
-  const [filters, setFilters] = useState({ q: "", entity_type: "", status: "" });
-  const [results, setResults] = useState<AnyRecord[]>([]);
-  const [mode, setMode] = useState<string>("");
-  const [searched, setSearched] = useState(false);
+  const initialFilters = { q: searchParams.get("q") ?? "", entity_type: "", status: "" };
+  const cachedSearch = initialFilters.q
+    ? peekCachedQuery<{ results: AnyRecord[]; retrieval: AnyRecord }>("/api/search", initialFilters)
+    : undefined;
+  const [filters, setFilters] = useState(initialFilters);
+  const [results, setResults] = useState<AnyRecord[]>(() => cachedSearch?.results ?? []);
+  const [mode, setMode] = useState<string>(() => cachedSearch?.retrieval?.mode ?? "");
+  const [searched, setSearched] = useState(Boolean(cachedSearch));
   const [loading, setLoading] = useState(false);
 
-  async function runSearch(nextFilters = filters) {
-    setLoading(true);
+  async function runSearch(nextFilters = filters, force = false) {
+    const cached = peekCachedQuery<{ results: AnyRecord[]; retrieval: AnyRecord }>(
+      "/api/search",
+      nextFilters
+    );
+    if (cached) {
+      setResults(cached.results);
+      setMode(cached.retrieval?.mode ?? "");
+      setSearched(true);
+    }
+    setLoading(!cached);
     try {
-      const data = await apiGet<{ results: AnyRecord[]; retrieval: AnyRecord }>("/api/search", nextFilters);
+      const data = await cachedApiGet<{ results: AnyRecord[]; retrieval: AnyRecord }>(
+        "/api/search",
+        nextFilters,
+        { force }
+      );
       setResults(data.results);
       setMode(data.retrieval?.mode ?? "");
       setSearched(true);

@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, KeyRound, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { agentScopeValues } from "@personal-context-os/shared";
-import { apiGet, apiPost, type AnyRecord } from "../lib/api";
+import { apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateCachedQueries,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { EmptyState, PageHeader, Panel, StatusBadge } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
 import { Button } from "@/components/ui/button";
@@ -16,14 +21,16 @@ import { useI18n } from "../i18n";
 
 export default function AgentsView({ embedded = false }: { embedded?: boolean }) {
   const { t, formatDate, translateValue } = useI18n();
-  const [data, setData] = useState<AnyRecord>({ tokens: [], runs: [], auditEvents: [] });
+  const [data, setData] = useState<AnyRecord>(
+    () => peekCachedQuery<AnyRecord>("/api/agents") ?? { tokens: [], runs: [], auditEvents: [] }
+  );
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<string[]>(["memory:read", "projects:read", "tasks:read"]);
   const [createdToken, setCreatedToken] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
-  async function load() {
-    setData(await apiGet("/api/agents"));
+  async function load(force = false) {
+    setData(await cachedApiGet("/api/agents", undefined, { force }));
   }
 
   useEffect(() => {
@@ -37,7 +44,8 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
     });
     setCreatedToken(response.plaintextToken);
     toast.success(t("agents.createdToken"));
-    await load();
+    invalidateCachedQueries("GET /api/agents");
+    await load(true);
   }
 
   async function copyToken() {
@@ -74,7 +82,7 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
           title={t("agents.title")}
           subtitle={t("agents.subtitle")}
           actions={
-            <Button variant="outline" size="sm" onClick={load}>
+            <Button variant="outline" size="sm" onClick={() => load(true)}>
               <RefreshCw aria-hidden /> {t("common.refresh")}
             </Button>
           }

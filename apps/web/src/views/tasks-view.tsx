@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle, Columns3, Edit3, List, Plus, RefreshCw, Search } from "lucide-react";
-import { apiGet, apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import { apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import {
   dateValue,
   fromDateTimeInput,
@@ -45,6 +50,7 @@ const preferenceKey = "mindsystem.tasks.view";
 const taskViewModes = ["board", "list"] as const;
 const ANY = "__any__";
 const NO_PROJECT = "__none__";
+const defaultTaskFilters = { status: "", project_id: "", priority: "" };
 
 type TaskForm = {
   title: string;
@@ -60,19 +66,23 @@ type TaskForm = {
 
 export default function TasksView() {
   const { t, formatDate, translateValue } = useI18n();
-  const [tasks, setTasks] = useState<AnyRecord[]>([]);
-  const [projects, setProjects] = useState<AnyRecord[]>([]);
-  const [filters, setFilters] = useState({ status: "", project_id: "", priority: "" });
+  const [tasks, setTasks] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ tasks: AnyRecord[] }>("/api/tasks", defaultTaskFilters)?.tasks ?? []
+  );
+  const [projects, setProjects] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
+  );
+  const [filters, setFilters] = useState(defaultTaskFilters);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<TaskViewMode>("board");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<TaskForm>(blankForm());
 
-  async function load(nextFilters = filters) {
+  async function load(nextFilters = filters, force = false) {
     const [taskData, projectData] = await Promise.all([
-      apiGet<{ tasks: AnyRecord[] }>("/api/tasks", nextFilters),
-      apiGet<{ projects: AnyRecord[] }>("/api/projects")
+      cachedApiGet<{ tasks: AnyRecord[] }>("/api/tasks", nextFilters, { force }),
+      cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force })
     ]);
     setTasks(taskData.tasks);
     setProjects(projectData.projects);
@@ -135,19 +145,21 @@ export default function TasksView() {
       await apiPost("/api/tasks", payload);
     }
     closeDrawer();
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(filters, true);
   }
 
   async function complete(id: string) {
     await apiPost(`/api/tasks/${id}/complete`, {});
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(filters, true);
   }
 
   async function resetFilters() {
-    const nextFilters = { status: "", project_id: "", priority: "" };
+    const nextFilters = defaultTaskFilters;
     setFilters(nextFilters);
     setQuery("");
-    await load(nextFilters);
+    await load(nextFilters, true);
   }
 
   const filteredTasks = useMemo(
@@ -162,7 +174,7 @@ export default function TasksView() {
         subtitle={t("tasks.subtitle")}
         actions={
           <>
-            <Button variant="outline" size="sm" type="button" onClick={() => load()}>
+            <Button variant="outline" size="sm" type="button" onClick={() => load(filters, true)}>
               <RefreshCw data-icon="inline-start" />
               {t("common.refresh")}
             </Button>

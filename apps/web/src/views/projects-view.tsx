@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Edit3, FolderKanban, Plus, RefreshCw, Search } from "lucide-react";
-import { apiGet, apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import { apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { dateValue, fromDateTimeInput, matchesQuery, toDateTimeInput, truncate } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
@@ -34,17 +39,19 @@ type ProjectForm = {
 
 export default function ProjectsView() {
   const { t, formatDate, translateValue } = useI18n();
-  const [projects, setProjects] = useState<AnyRecord[]>([]);
+  const [projects, setProjects] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
+  );
   const [query, setQuery] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<ProjectForm>(blankForm());
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  async function load(force = false) {
     setError(null);
     try {
-      const data = await apiGet<{ projects: AnyRecord[] }>("/api/projects");
+      const data = await cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force });
       setProjects(data.projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("projects.loadError"));
@@ -96,7 +103,8 @@ export default function ProjectsView() {
       await apiPost("/api/projects", payload);
     }
     closeDrawer();
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(true);
   }
 
   const filteredProjects = useMemo(
@@ -111,7 +119,7 @@ export default function ProjectsView() {
         subtitle={t("projects.subtitle")}
         actions={
           <>
-            <Button variant="outline" size="sm" type="button" onClick={load}>
+            <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
               <RefreshCw data-icon="inline-start" />
               {t("common.refresh")}
             </Button>

@@ -11,7 +11,12 @@ import {
   Send,
   type LucideIcon
 } from "lucide-react";
-import { apiGet, apiPost, type AnyRecord } from "../lib/api";
+import { apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { dateValue, truncate } from "../lib/view-models";
 import {
   EmptyState,
@@ -28,19 +33,23 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function DashboardView() {
   const { t, formatDate, translateValue } = useI18n();
-  const [data, setData] = useState<AnyRecord | null>(null);
-  const [notes, setNotes] = useState<AnyRecord[]>([]);
+  const [data, setData] = useState<AnyRecord | null>(
+    () => peekCachedQuery<AnyRecord>("/api/dashboard/today") ?? null
+  );
+  const [notes, setNotes] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes.slice(0, 4) ?? []
+  );
   const [captureText, setCaptureText] = useState("");
   const [captureResult, setCaptureResult] = useState<AnyRecord | null>(null);
   const [loadingCapture, setLoadingCapture] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  async function load(force = false) {
     setError(null);
     try {
       const [dashboardData, noteData] = await Promise.all([
-        apiGet<AnyRecord>("/api/dashboard/today"),
-        apiGet<{ notes: AnyRecord[] }>("/api/notes")
+        cachedApiGet<AnyRecord>("/api/dashboard/today", undefined, { force }),
+        cachedApiGet<{ notes: AnyRecord[] }>("/api/notes", undefined, { force })
       ]);
       setData(dashboardData);
       setNotes(noteData.notes.slice(0, 4));
@@ -61,7 +70,8 @@ export default function DashboardView() {
       const result = await apiPost("/api/ingest/free-text", { text: captureText, sourceType: "manual" });
       setCaptureResult(result);
       setCaptureText("");
-      await load();
+      invalidateWorkspaceQueryCache();
+      await load(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("inbox.captureFailed"));
     } finally {
@@ -75,7 +85,7 @@ export default function DashboardView() {
         title={t("home.title")}
         subtitle={t("home.subtitle")}
         actions={
-          <Button variant="outline" size="sm" type="button" onClick={load}>
+          <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
             <RefreshCw data-icon="inline-start" />
             {t("common.refresh")}
           </Button>

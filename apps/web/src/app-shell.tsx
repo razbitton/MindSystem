@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,6 +15,8 @@ import {
 import { LanguageSwitcher, ThemeToggle, useI18n } from "./i18n";
 import { getCurrentSession, logout, type AnyRecord } from "./lib/api";
 import { navSections, settingsNav } from "./lib/navigation";
+import { warmWorkspaceQueryCache } from "./lib/query-cache";
+import { sessionAuthenticatedEvent } from "./lib/session-events";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -347,6 +349,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isLoginRoute = pathname.startsWith("/login");
   const [user, setUser] = useState<AnyRecord | null>(null);
   const [checkingSession, setCheckingSession] = useState(!isLoginRoute);
+  const sessionVerified = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -359,8 +362,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!user || isLoginRoute) return;
+    void warmWorkspaceQueryCache();
+  }, [isLoginRoute, user]);
+
+  useEffect(() => {
+    function handleSessionAuthenticated(event: Event) {
+      const user = (event as CustomEvent<{ user?: AnyRecord }>).detail?.user;
+      if (!user) return;
+
+      sessionVerified.current = true;
+      setUser(user);
+      setCheckingSession(false);
+    }
+
+    window.addEventListener(sessionAuthenticatedEvent, handleSessionAuthenticated);
+    return () => {
+      window.removeEventListener(sessionAuthenticatedEvent, handleSessionAuthenticated);
+    };
+  }, []);
+
+  useEffect(() => {
     if (isLoginRoute) {
       setCheckingSession(false);
+      return;
+    }
+
+    if (user) {
+      setCheckingSession(false);
+      return;
+    }
+
+    if (sessionVerified.current) {
+      setCheckingSession(false);
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       return;
     }
 
@@ -369,11 +404,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     getCurrentSession()
       .then((session) => {
         if (!active) return;
+        sessionVerified.current = true;
         setUser(session.user);
         setCheckingSession(false);
       })
       .catch(() => {
         if (!active) return;
+        sessionVerified.current = true;
         setUser(null);
         setCheckingSession(false);
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
@@ -382,10 +419,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [isLoginRoute, pathname, router]);
+  }, [isLoginRoute, pathname, router, user]);
 
   async function handleLogout() {
     await logout().catch(() => null);
+    sessionVerified.current = true;
     setUser(null);
     router.replace("/login");
   }

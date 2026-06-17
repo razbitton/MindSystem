@@ -19,8 +19,8 @@ Open:
 
 Local Docker login:
 
-- Email: `local@personal-context-os.test`
-- Password: `local-dev-password`
+- Email: `admin@me.com`
+- Password: `admin123`
 
 For host-only development, copy `.env.example` to `.env`, start Postgres/Redis/MinIO, then run:
 
@@ -72,7 +72,7 @@ Login and store the browser session cookie:
 ```bash
 curl -c cookies.txt -X POST http://localhost:4000/api/auth/login \
   -H "content-type: application/json" \
-  -d '{"email":"local@personal-context-os.test","password":"local-dev-password"}'
+  -d '{"email":"admin@me.com","password":"admin123"}'
 ```
 
 Capture free-form text:

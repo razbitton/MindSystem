@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiGet, type AnyRecord } from "../lib/api";
+import type { AnyRecord } from "../lib/api";
+import { cachedApiGet, peekCachedQuery } from "../lib/query-cache";
 import { EmptyState, EntityBadge, PageHeader, Panel } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
 import { useI18n } from "../i18n";
@@ -10,10 +11,12 @@ const entityTypes = ["project", "task", "note", "document", "decision", "reminde
 
 export default function SchemasView({ embedded = false }: { embedded?: boolean }) {
   const { t, translateValue } = useI18n();
-  const [openapi, setOpenapi] = useState<AnyRecord | null>(null);
+  const [openapi, setOpenapi] = useState<AnyRecord | null>(
+    () => peekCachedQuery<AnyRecord>("/api/openapi.json") ?? null
+  );
 
   useEffect(() => {
-    apiGet<AnyRecord>("/api/openapi.json").then(setOpenapi).catch(() => setOpenapi(null));
+    cachedApiGet<AnyRecord>("/api/openapi.json").then(setOpenapi).catch(() => setOpenapi(null));
   }, []);
 
   return (

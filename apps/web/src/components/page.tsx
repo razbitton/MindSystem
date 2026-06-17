@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -165,10 +165,7 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-/**
- * Drawer (now built on shadcn Sheet). Slides from the inline-end edge,
- * respects RTL automatically via the Sheet side handling.
- */
+/** Shared edit surface. Opens as a centered floating modal with a scrollable body. */
 export function Drawer({
   open,
   title,
@@ -185,21 +182,18 @@ export function Drawer({
   footer?: React.ReactNode;
 }) {
   return (
-    <Sheet open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
-      <SheetContent
-        side="right"
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
-      >
-        <SheetHeader className="border-b border-border">
-          <SheetTitle dir="auto">{title}</SheetTitle>
-          {subtitle ? <SheetDescription dir="auto">{subtitle}</SheetDescription> : null}
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
+      <DialogContent className="flex max-h-[min(46rem,calc(100svh_-_2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pe-12 sm:px-5">
+          <DialogTitle dir="auto">{title}</DialogTitle>
+          {subtitle ? <DialogDescription dir="auto">{subtitle}</DialogDescription> : null}
+        </DialogHeader>
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">{children}</div>
         {footer ? (
-          <SheetFooter className="border-t border-border">{footer}</SheetFooter>
+          <DialogFooter className="shrink-0 border-t border-border px-4 py-3 sm:px-5">{footer}</DialogFooter>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

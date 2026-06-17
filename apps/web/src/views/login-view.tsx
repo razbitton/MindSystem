@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LockKeyhole, LogIn, Mail } from "lucide-react";
 import { login } from "../lib/api";
+import { emitSessionAuthenticated } from "../lib/session-events";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,8 @@ export default function LoginView() {
     setError(null);
 
     try {
-      await login(email.trim(), password);
+      const session = await login(email.trim(), password);
+      emitSessionAuthenticated(session.user);
       router.replace(safeNextPath(searchParams.get("next")));
       router.refresh();
     } catch (err) {

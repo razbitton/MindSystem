@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { Check, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
-import { apiGet, apiPost, type AnyRecord } from "../lib/api";
+import { apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { EmptyState, PageHeader, Panel, StatusBadge } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -16,16 +21,20 @@ type Decision = { id: string; action: "approve" | "reject" } | null;
 
 export default function ReviewView() {
   const { t, formatDate, translateValue } = useI18n();
-  const [items, setItems] = useState<AnyRecord[]>([]);
+  const cachedReview = peekCachedQuery<{ items: AnyRecord[] }>("/api/review-queue");
+  const [items, setItems] = useState<AnyRecord[]>(() => cachedReview?.items ?? []);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedReview);
   const [pending, setPending] = useState<Decision>(null);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  async function load(force = false) {
     setError(null);
+    if (!items.length && !peekCachedQuery("/api/review-queue")) {
+      setLoading(true);
+    }
     try {
-      const data = await apiGet<{ items: AnyRecord[] }>("/api/review-queue");
+      const data = await cachedApiGet<{ items: AnyRecord[] }>("/api/review-queue", undefined, { force });
       setItems(data.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("review.loadError"));
@@ -45,7 +54,8 @@ export default function ReviewView() {
       await apiPost(`/api/review-queue/${pending.id}/${pending.action}`, {});
       toast.success(pending.action === "approve" ? t("review.approved") : t("review.rejected"));
       setPending(null);
-      await load();
+      invalidateWorkspaceQueryCache();
+      await load(true);
     } catch {
       toast.error(t("review.actionError"));
     } finally {
@@ -61,7 +71,7 @@ export default function ReviewView() {
         title={t("review.title")}
         subtitle={t("review.subtitle")}
         actions={
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading}>
             <RefreshCw aria-hidden /> {t("common.refresh")}
           </Button>
         }

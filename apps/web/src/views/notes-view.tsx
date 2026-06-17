@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Edit3, LayoutGrid, List, Plus, RefreshCw, Search } from "lucide-react";
-import { apiGet, apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import { apiPatch, apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
 import { useI18n } from "../i18n";
@@ -31,8 +36,12 @@ type NoteForm = {
 
 export default function NotesView() {
   const { t, formatDate } = useI18n();
-  const [notes, setNotes] = useState<AnyRecord[]>([]);
-  const [projects, setProjects] = useState<AnyRecord[]>([]);
+  const [notes, setNotes] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes ?? []
+  );
+  const [projects, setProjects] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
+  );
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
@@ -45,10 +54,10 @@ export default function NotesView() {
   const [editingNote, setEditingNote] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
 
-  async function load() {
+  async function load(force = false) {
     const [noteData, projectData] = await Promise.all([
-      apiGet<{ notes: AnyRecord[] }>("/api/notes"),
-      apiGet<{ projects: AnyRecord[] }>("/api/projects")
+      cachedApiGet<{ notes: AnyRecord[] }>("/api/notes", undefined, { force }),
+      cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force })
     ]);
     setNotes(noteData.notes);
     setProjects(projectData.projects);
@@ -84,7 +93,8 @@ export default function NotesView() {
     await apiPost("/api/notes", payload);
     setComposeOpen(false);
     resetCompose();
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(true);
   }
 
   useEffect(() => {
@@ -125,7 +135,8 @@ export default function NotesView() {
       projectId: form.projectId || null
     });
     closeDrawer();
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(true);
   }
 
   const filteredNotes = useMemo(() => {
@@ -142,7 +153,7 @@ export default function NotesView() {
         title={t("notes.title")}
         subtitle={t("notes.subtitle")}
         actions={
-          <Button variant="outline" size="sm" type="button" onClick={load}>
+          <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
             <RefreshCw data-icon="inline-start" />
             {t("common.refresh")}
           </Button>

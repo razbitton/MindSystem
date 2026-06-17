@@ -61,10 +61,14 @@ export async function verifyPassword(password: string, passwordHash: string | nu
   return expected.length === key.length && timingSafeEqual(expected, key);
 }
 
-export async function ensureBootstrapPassword(context: AppContext, password?: string) {
+export async function ensureBootstrapPassword(
+  context: AppContext,
+  password?: string,
+  options: { resetExisting?: boolean } = {}
+) {
   if (!password || !context.userId) return;
   const [user] = await context.db.select().from(users).where(eq(users.id, context.userId)).limit(1);
-  if (!user || user.passwordHash) return;
+  if (!user || (user.passwordHash && !options.resetExisting)) return;
   await context.db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, user.id));
 }
 

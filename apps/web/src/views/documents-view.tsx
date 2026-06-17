@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { FileText, Plus, RefreshCw } from "lucide-react";
-import { apiGet, apiPost, type AnyRecord } from "../lib/api";
+import { apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { dateValue, projectName, truncate } from "../lib/view-models";
 import { Drawer, EmptyState, PageHeader, Panel } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
@@ -31,15 +36,19 @@ type DocumentForm = {
 
 export default function DocumentsView() {
   const { t, formatDate } = useI18n();
-  const [documents, setDocuments] = useState<AnyRecord[]>([]);
-  const [projects, setProjects] = useState<AnyRecord[]>([]);
+  const [documents, setDocuments] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ documents: AnyRecord[] }>("/api/documents")?.documents ?? []
+  );
+  const [projects, setProjects] = useState<AnyRecord[]>(
+    () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<DocumentForm>(blankForm());
 
-  async function load() {
+  async function load(force = false) {
     const [documentData, projectData] = await Promise.all([
-      apiGet<{ documents: AnyRecord[] }>("/api/documents"),
-      apiGet<{ projects: AnyRecord[] }>("/api/projects")
+      cachedApiGet<{ documents: AnyRecord[] }>("/api/documents", undefined, { force }),
+      cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force })
     ]);
     setDocuments(documentData.documents);
     setProjects(projectData.projects);
@@ -58,7 +67,8 @@ export default function DocumentsView() {
     if (!form.title.trim()) return;
     await apiPost("/api/documents", { ...form, projectId: form.projectId || null });
     closeDrawer();
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(true);
   }
 
   return (
@@ -68,7 +78,7 @@ export default function DocumentsView() {
         subtitle={t("documents.subtitle")}
         actions={
           <>
-            <Button variant="outline" size="sm" type="button" onClick={load}>
+            <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
               <RefreshCw data-icon="inline-start" />
               {t("common.refresh")}
             </Button>

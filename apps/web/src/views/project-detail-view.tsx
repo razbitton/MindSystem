@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle, RefreshCw } from "lucide-react";
-import { apiGet, apiPost, type AnyRecord } from "../lib/api";
+import { apiPost, type AnyRecord } from "../lib/api";
+import {
+  cachedApiGet,
+  invalidateWorkspaceQueryCache,
+  peekCachedQuery
+} from "../lib/query-cache";
 import { dateValue, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
@@ -13,13 +18,15 @@ import { Button } from "@/components/ui/button";
 
 export default function ProjectDetailView({ projectId }: { projectId: string }) {
   const { t, formatDate } = useI18n();
-  const [data, setData] = useState<AnyRecord | null>(null);
+  const [data, setData] = useState<AnyRecord | null>(
+    () => peekCachedQuery<AnyRecord>(`/api/projects/${projectId}/context`) ?? null
+  );
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  async function load(force = false) {
     setError(null);
     try {
-      setData(await apiGet(`/api/projects/${projectId}/context`));
+      setData(await cachedApiGet(`/api/projects/${projectId}/context`, undefined, { force }));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("projectDetail.loadError"));
     }
@@ -31,7 +38,8 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
 
   async function completeTask(id: string) {
     await apiPost(`/api/tasks/${id}/complete`, {});
-    await load();
+    invalidateWorkspaceQueryCache();
+    await load(true);
   }
 
   const project = data?.project;
@@ -50,7 +58,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             <Button asChild variant="ghost" size="sm">
               <Link href="/projects">{t("projects.title")}</Link>
             </Button>
-            <Button variant="outline" size="sm" type="button" onClick={load}>
+            <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
               <RefreshCw data-icon="inline-start" />
               {t("common.refresh")}
             </Button>
