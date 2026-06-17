@@ -264,7 +264,7 @@ export default function TasksView() {
                 return (
                   <section
                     key={status}
-                    className="flex min-h-60 flex-col gap-2 overflow-hidden rounded-xl bg-muted/40 p-2.5 [max-block-size:min(32rem,calc(100svh_-_15rem))]"
+                    className="flex min-h-60 flex-col gap-2 overflow-hidden rounded-xl bg-muted/40 p-2.5 [max-block-size:min(48rem,calc(100svh_-_10rem))]"
                   >
                     <div className="flex shrink-0 items-center justify-between gap-2 px-1">
                       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -289,7 +289,7 @@ export default function TasksView() {
               })}
             </div>
           ) : (
-            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(36rem,calc(100svh_-_15rem))]">
+            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(54rem,calc(100svh_-_10rem))]">
               {filteredTasks.map((task) => (
                 <li key={task.id} className="flex items-start justify-between gap-3 px-4 py-3">
                   <div className="flex min-w-0 flex-col gap-0.5">
