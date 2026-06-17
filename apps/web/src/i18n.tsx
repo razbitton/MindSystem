@@ -38,6 +38,8 @@ const englishDictionary = {
   "nav.admin": "Admin",
   "nav.mobileMenu": "Open navigation",
   "nav.closeMenu": "Close navigation",
+  "nav.collapseSidebar": "Collapse sidebar",
+  "nav.expandSidebar": "Expand sidebar",
   "command.title": "Command menu",
   "command.description": "Search and jump to anywhere in your workspace",
   "command.placeholder": "Type a command or search…",
