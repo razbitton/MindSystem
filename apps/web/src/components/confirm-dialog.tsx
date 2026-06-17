@@ -21,6 +21,7 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
+  loading?: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }
@@ -32,6 +33,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   destructive = false,
+  loading = false,
   onConfirm,
   onOpenChange
 }: ConfirmDialogProps) {
@@ -46,13 +48,17 @@ export function ConfirmDialog({
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{cancelLabel ?? t("common.cancel")}</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{cancelLabel ?? t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
+            disabled={loading}
             className={cn(
               destructive &&
                 buttonVariants({ variant: "destructive" })
             )}
-            onClick={onConfirm}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
           >
             {confirmLabel ?? t("common.approve")}
           </AlertDialogAction>
