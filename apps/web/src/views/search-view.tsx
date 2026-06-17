@@ -114,11 +114,11 @@ export default function SearchView() {
           </EmptyState>
         </div>
       ) : (
-        <div className="bounded-scroll mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [max-block-size:min(44rem,calc(100svh_-_14rem))]">
+        <div className="bounded-scroll mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [max-block-size:min(64rem,calc(100svh_-_10rem))]">
           {results.map((result) => (
             <article
               key={result.id}
-              className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/20 [max-block-size:min(24rem,calc(100svh_-_14rem))]"
+              className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/20 [max-block-size:min(36rem,calc(100svh_-_10rem))]"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium leading-snug text-foreground" dir="auto">

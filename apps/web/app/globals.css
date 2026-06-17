@@ -81,9 +81,9 @@
   --chart-5: oklch(0.62 0.16 12);
 
   /* Component size limits */
-  --surface-max-block: min(34rem, calc(100svh - 8rem));
-  --surface-max-block-tight: min(24rem, calc(100svh - 10rem));
-  --surface-max-block-tall: min(44rem, calc(100svh - 8rem));
+  --surface-max-block: min(48rem, calc(100svh - 4rem));
+  --surface-max-block-tight: min(34rem, calc(100svh - 6rem));
+  --surface-max-block-tall: min(64rem, calc(100svh - 4rem));
 }
 
 [data-theme="dark"] {

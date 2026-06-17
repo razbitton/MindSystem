@@ -252,7 +252,7 @@ function MetricCard({
   tone?: "primary" | "warning";
 }) {
   return (
-    <section className="bounded-scroll flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(14rem,calc(100svh_-_14rem))]">
+    <section className="bounded-scroll flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(22rem,calc(100svh_-_10rem))]">
       <div className="flex flex-col gap-0.5">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="text-2xl font-semibold tabular-nums text-foreground">{value}</p>

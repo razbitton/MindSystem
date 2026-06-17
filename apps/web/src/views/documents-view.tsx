@@ -88,7 +88,7 @@ export default function DocumentsView() {
             {documents.map((document) => (
               <article
                 key={document.id}
-                className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(26rem,calc(100svh_-_14rem))]"
+                className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(38rem,calc(100svh_-_10rem))]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-col gap-0.5">

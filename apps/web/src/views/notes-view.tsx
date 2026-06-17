@@ -262,7 +262,7 @@ export default function NotesView() {
               {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
             </EmptyState>
           ) : view === "cards" ? (
-            <div className="bounded-scroll columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid [max-block-size:min(42rem,calc(100svh_-_14rem))]">
+            <div className="bounded-scroll columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid [max-block-size:min(62rem,calc(100svh_-_10rem))]">
               {filteredNotes.map((note) => {
                 const linkedProject =
                   note.projectId || note.project_id
@@ -280,7 +280,7 @@ export default function NotesView() {
                         openEdit(note);
                       }
                     }}
-                    className="bounded-scroll flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [max-block-size:min(26rem,calc(100svh_-_14rem))]"
+                    className="bounded-scroll flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [max-block-size:min(40rem,calc(100svh_-_10rem))]"
                   >
                     {note.title ? (
                       <p className="text-sm font-semibold text-foreground" dir="auto">
@@ -301,7 +301,7 @@ export default function NotesView() {
               })}
             </div>
           ) : (
-            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(38rem,calc(100svh_-_14rem))]">
+            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(56rem,calc(100svh_-_10rem))]">
               {filteredNotes.map((note) => {
                 const linkedProject =
                   note.projectId || note.project_id
