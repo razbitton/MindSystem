@@ -94,11 +94,11 @@ export default function ReviewView() {
           </EmptyState>
         </Panel>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="bounded-scroll grid gap-4 sm:grid-cols-2 xl:grid-cols-3 [max-block-size:min(44rem,calc(100svh_-_11rem))]">
           {items.map((item) => (
             <article
               key={item.id}
-              className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs"
+              className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(28rem,calc(100svh_-_13rem))]"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium leading-snug text-foreground" dir="auto">

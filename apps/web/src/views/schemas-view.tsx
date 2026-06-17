@@ -25,7 +25,7 @@ export default function SchemasView({ embedded = false }: { embedded?: boolean }
           {entityTypes.map((type) => (
             <article
               key={type}
-              className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
+              className="bounded-scroll flex flex-col gap-2 rounded-lg border border-border bg-card p-3 [max-block-size:min(18rem,calc(100svh_-_14rem))]"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-foreground">{translateValue("entity", type)}</p>

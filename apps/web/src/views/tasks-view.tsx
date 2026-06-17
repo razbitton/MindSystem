@@ -262,14 +262,17 @@ export default function TasksView() {
               {boardStatuses.map((status) => {
                 const columnTasks = filteredTasks.filter((task) => task.status === status);
                 return (
-                  <section key={status} className="flex flex-col gap-2 rounded-xl bg-muted/40 p-2.5">
-                    <div className="flex items-center justify-between gap-2 px-1">
+                  <section
+                    key={status}
+                    className="flex min-h-60 flex-col gap-2 overflow-hidden rounded-xl bg-muted/40 p-2.5 [max-block-size:min(32rem,calc(100svh_-_15rem))]"
+                  >
+                    <div className="flex shrink-0 items-center justify-between gap-2 px-1">
                       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {translateValue("status", status)}
                       </h2>
                       <Badge variant="secondary">{columnTasks.length}</Badge>
                     </div>
-                    <div className="flex flex-col gap-2">
+                    <div className="bounded-scroll flex flex-col gap-2">
                       {columnTasks.map((task) => (
                         <TaskCard
                           key={task.id}
@@ -286,7 +289,7 @@ export default function TasksView() {
               })}
             </div>
           ) : (
-            <ul className="flex flex-col divide-y divide-border rounded-xl border border-border">
+            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(36rem,calc(100svh_-_15rem))]">
               {filteredTasks.map((task) => (
                 <li key={task.id} className="flex items-start justify-between gap-3 px-4 py-3">
                   <div className="flex min-w-0 flex-col gap-0.5">
@@ -465,7 +468,7 @@ function TaskCard({
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-xs transition-shadow hover:shadow-md">
+    <div className="bounded-scroll flex flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-xs transition-shadow hover:shadow-md [max-block-size:min(18rem,calc(100svh_-_18rem))]">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="text-sm font-medium text-foreground" dir="auto">

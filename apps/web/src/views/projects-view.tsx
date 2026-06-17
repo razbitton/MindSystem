@@ -152,7 +152,7 @@ export default function ProjectsView() {
               {filteredProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md"
+                  className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md [max-block-size:min(24rem,calc(100svh_-_14rem))]"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <Link
