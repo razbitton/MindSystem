@@ -514,7 +514,7 @@ const hebrewDictionary: Partial<Record<TranslationKey, string>> = {
   "tasks.anyStatus": "כל סטטוס",
   "tasks.anyPriority": "כל עדיפות",
   "tasks.anyProject": "כל פרויקט",
-  "tasks.empty": "אי�� משימות מתאימות.",
+  "tasks.empty": "אין משימות מתאימות.",
   "tasks.newTask": "משימה חדשה",
   "tasks.editTask": "עריכת משימה",
   "tasks.searchPlaceholder": "חיפוש משימות",

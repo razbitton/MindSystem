@@ -56,7 +56,7 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
             "personal-context-os": {
               url: "http://localhost:4100/mcp",
               headers: {
-                Authorization: `Bearer ${createdToken || "pcos_created_token"}`
+                Authorization: `Bearer ${createdToken || "<create_an_agent_token_first>"}`
               }
             }
           }
