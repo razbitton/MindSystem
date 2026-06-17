@@ -1,5 +1,4 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS vector;
 
 DO $$ BEGIN
   CREATE TYPE source_type AS ENUM ('web', 'whatsapp', 'openclaw', 'codex', 'api', 'manual');
@@ -190,7 +189,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   entity_id uuid NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   chunk_text text NOT NULL,
   chunk_index integer NOT NULL DEFAULT 0,
-  embedding vector(1536),
+  embedding text,
   fts tsvector GENERATED ALWAYS AS (to_tsvector('english', chunk_text)) STORED,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
