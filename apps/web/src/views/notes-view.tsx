@@ -10,11 +10,12 @@ import {
 } from "../lib/query-cache";
 import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
-import { useI18n } from "../i18n";
+import { useI18n, type Direction } from "../i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -34,8 +35,19 @@ type NoteForm = {
   projectId: string;
 };
 
+const rtlTextPattern = /[\u0590-\u08FF\uFB1D-\uFEFC]/;
+const ltrTextPattern = /[A-Za-z\u00C0-\u024F]/;
+
+function resolveTextDirection(value: string, fallback: Direction): Direction {
+  const text = value.trim();
+  if (!text) return fallback;
+  if (rtlTextPattern.test(text)) return "rtl";
+  if (ltrTextPattern.test(text)) return "ltr";
+  return fallback;
+}
+
 export default function NotesView() {
-  const { t, formatDate } = useI18n();
+  const { t, formatDate, direction } = useI18n();
   const [notes, setNotes] = useState<AnyRecord[]>(
     () => peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes ?? []
   );
@@ -90,11 +102,15 @@ export default function NotesView() {
       body: body || title,
       projectId: composeForm.projectId || null
     };
-    await apiPost("/api/notes", payload);
-    setComposeOpen(false);
-    resetCompose();
-    invalidateWorkspaceQueryCache();
-    await load(true);
+    try {
+      await apiPost("/api/notes", payload);
+      setComposeOpen(false);
+      resetCompose();
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    }
   }
 
   useEffect(() => {
@@ -131,14 +147,18 @@ export default function NotesView() {
     if (!editingNote || (!form.title.trim() && !form.body.trim())) return;
     const title = form.title.trim();
     const body = form.body.trim();
-    await apiPatch(`/api/notes/${editingNote.id}`, {
-      title: title || body.slice(0, 60),
-      body: body || title,
-      projectId: form.projectId || null
-    });
-    closeDrawer();
-    invalidateWorkspaceQueryCache();
-    await load(true);
+    try {
+      await apiPatch(`/api/notes/${editingNote.id}`, {
+        title: title || body.slice(0, 60),
+        body: body || title,
+        projectId: form.projectId || null
+      });
+      closeDrawer();
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    }
   }
 
   const filteredNotes = useMemo(() => {
@@ -202,11 +222,14 @@ export default function NotesView() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_PROJECTS}>{t("notes.allProjects")}</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    <span dir="auto">{project.name}</span>
-                  </SelectItem>
-                ))}
+                {projects.map((project) => {
+                  const projectNameText = String(project.name ?? "");
+                  return (
+                    <SelectItem key={project.id} value={String(project.id)}>
+                      <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <SegmentedControl
@@ -229,6 +252,8 @@ export default function NotesView() {
               {filteredNotes.map((note) => {
                 const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
                 const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
+                const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
+                const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
                 return (
                   <div
                     key={note.id}
@@ -244,15 +269,15 @@ export default function NotesView() {
                     className="bounded-scroll flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [max-block-size:min(40rem,calc(100svh_-_10rem))]"
                   >
                     {note.title ? (
-                      <p className="text-sm font-semibold text-foreground" dir="auto">
+                      <p className="text-start text-sm font-semibold text-foreground" dir={noteDirection}>
                         {note.title}
                       </p>
                     ) : null}
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground" dir="auto">
+                    <p className="whitespace-pre-wrap text-start text-sm leading-relaxed text-muted-foreground" dir={noteDirection}>
                       {note.body}
                     </p>
                     <div className="flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir="auto">
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
                         {linkedProject || t("common.noProject")}
                       </span>
                       <span>{formatDate(dateValue(note, "updatedAt"))}</span>
@@ -266,6 +291,8 @@ export default function NotesView() {
               {filteredNotes.map((note) => {
                 const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
                 const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
+                const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
+                const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
                 return (
                   <li
                     key={note.id}
@@ -281,16 +308,16 @@ export default function NotesView() {
                     className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex min-w-0 flex-col gap-1">
-                      <p className="text-sm font-medium text-foreground" dir="auto">
+                      <p className="text-start text-sm font-medium text-foreground" dir={noteDirection}>
                         {note.title || note.body}
                       </p>
                       {note.body && note.title ? (
-                        <p className="line-clamp-2 text-sm text-muted-foreground" dir="auto">
+                        <p className="line-clamp-2 text-start text-sm text-muted-foreground" dir={noteDirection}>
                           {note.body}
                         </p>
                       ) : null}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir="auto">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
                           {linkedProject || t("common.noProject")}
                         </span>
                         <span>{formatDate(dateValue(note, "updatedAt"))}</span>
@@ -357,8 +384,10 @@ function NoteEditorPanel({
   onSave: () => void;
   saveDisabled?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, direction } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const titleDirection = resolveTextDirection(form.title || form.body, direction);
+  const bodyDirection = resolveTextDirection(form.body || form.title, direction);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -392,7 +421,7 @@ function NoteEditorPanel({
           <Input
             aria-label={t("common.title")}
             autoFocus={mode === "edit"}
-            dir="auto"
+            dir={titleDirection}
             placeholder={t("notes.titlePlaceholder")}
             value={form.title}
             onChange={(event) => onChange({ ...form, title: event.target.value })}
@@ -404,7 +433,7 @@ function NoteEditorPanel({
           <Textarea
             ref={textareaRef}
             aria-label={t("common.body")}
-            dir="auto"
+            dir={bodyDirection}
             rows={expanded ? (mode === "edit" ? 8 : 3) : 1}
             placeholder={expanded ? t("notes.bodyPlaceholder") : t("notes.takeANote")}
             value={form.body}
@@ -471,7 +500,7 @@ function ProjectPillSelect({
   projects: AnyRecord[];
   onChange: (projectId: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, direction } = useI18n();
 
   return (
     <Select value={value || NO_PROJECT} onValueChange={(next) => onChange(next === NO_PROJECT ? "" : next)}>
@@ -483,12 +512,15 @@ function ProjectPillSelect({
         <SelectValue placeholder={t("common.noProject")} />
       </SelectTrigger>
       <SelectContent position="popper" align="end" className="min-w-48 rounded-xl">
-        <SelectItem value={NO_PROJECT}>{t("common.noProject")}</SelectItem>
+        <SelectItem value={NO_PROJECT}>
+          <span dir={direction}>{t("common.noProject")}</span>
+        </SelectItem>
         {projects.map((project) => {
           const projectId = String(project.id);
+          const projectNameText = String(project.name ?? "");
           return (
             <SelectItem key={projectId} value={projectId}>
-              <span dir="auto">{project.name}</span>
+              <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
             </SelectItem>
           );
         })}

@@ -8,6 +8,7 @@ const hopByHopHeaders = new Set([
   "connection",
   "content-encoding",
   "content-length",
+  "expect",
   "keep-alive",
   "proxy-authenticate",
   "proxy-authorization",
@@ -38,14 +39,16 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 }
 
 async function proxyApiRequest(request: NextRequest, context: RouteContext) {
-  const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:4000";
+  const apiBaseUrl = process.env.API_BASE_URL ?? "http://127.0.0.1:4000";
   const { path = [] } = await context.params;
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}`, apiBaseUrl);
   target.search = request.nextUrl.search;
 
   const headers = new Headers(request.headers);
+  for (const header of hopByHopHeaders) {
+    headers.delete(header);
+  }
   headers.delete("host");
-  headers.delete("content-length");
 
   const init: RequestInit = {
     method: request.method,
