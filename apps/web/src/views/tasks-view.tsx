@@ -468,7 +468,7 @@ function TaskCard({
 }) {
   const { t } = useI18n();
   return (
-    <div className="bounded-scroll flex flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-xs transition-shadow hover:shadow-md [max-block-size:min(18rem,calc(100svh_-_18rem))]">
+    <div className="flex min-h-52 shrink-0 flex-col gap-2 overflow-auto overscroll-contain rounded-lg border border-border bg-card p-3 shadow-xs transition-shadow hover:shadow-md [max-block-size:min(18rem,calc(100svh_-_18rem))]">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="text-sm font-medium text-foreground" dir="auto">
