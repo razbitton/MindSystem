@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { apiGet, type AnyRecord } from "../lib/api";
 import { EmptyState, EntityBadge, PageHeader, Panel } from "../components/page";
+import { Disclosure, CodeBlock } from "../components/disclosure";
 import { useI18n } from "../i18n";
 
 const entityTypes = ["project", "task", "note", "document", "decision", "reminder", "person", "goal"] as const;
 
-export default function SchemasView() {
+export default function SchemasView({ embedded = false }: { embedded?: boolean }) {
   const { t, translateValue } = useI18n();
   const [openapi, setOpenapi] = useState<AnyRecord | null>(null);
 
@@ -16,38 +17,48 @@ export default function SchemasView() {
   }, []);
 
   return (
-    <>
-      <PageHeader title={t("schemas.title")} subtitle={t("schemas.subtitle")} />
-      <div className="layout-grid">
-        <Panel title={t("schemas.entityModel")}>
-          <div className="cards-grid">
-            {entityTypes.map((type) => (
-              <article className="item-card" key={type}>
-                <div className="item-card-header">
-                  <p className="item-card-title">{translateValue("entity", type)}</p>
-                  <EntityBadge value={type} />
-                </div>
-                <p className="item-card-body">{t("schemas.entityDescription")}</p>
-              </article>
-            ))}
-          </div>
-        </Panel>
-        <div className="grid">
-          <Panel title={t("schemas.openapi")}>
-            {openapi ? (
-              <details className="advanced-details" open>
-                <summary>{openapi.info?.title ?? t("schemas.openapi")}</summary>
-                <pre className="code">{JSON.stringify({ title: openapi.info?.title, paths: Object.keys(openapi.paths ?? {}) }, null, 2)}</pre>
-              </details>
-            ) : (
-              <EmptyState>{t("schemas.openapiUnavailable")}</EmptyState>
-            )}
-          </Panel>
-          <Panel title={t("schemas.projectOverrides")}>
-            <EmptyState>{t("schemas.noOverrides")}</EmptyState>
-          </Panel>
+    <div className="flex flex-col gap-6">
+      {!embedded ? <PageHeader title={t("schemas.title")} subtitle={t("schemas.subtitle")} /> : null}
+
+      <Panel title={t("schemas.entityModel")}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {entityTypes.map((type) => (
+            <article
+              key={type}
+              className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">{translateValue("entity", type)}</p>
+                <EntityBadge value={type} />
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {t("schemas.entityDescription")}
+              </p>
+            </article>
+          ))}
         </div>
+      </Panel>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title={t("schemas.openapi")}>
+          {openapi ? (
+            <Disclosure label={openapi.info?.title ?? t("schemas.openapi")} defaultOpen>
+              <CodeBlock>
+                {JSON.stringify(
+                  { title: openapi.info?.title, paths: Object.keys(openapi.paths ?? {}) },
+                  null,
+                  2
+                )}
+              </CodeBlock>
+            </Disclosure>
+          ) : (
+            <EmptyState>{t("schemas.openapiUnavailable")}</EmptyState>
+          )}
+        </Panel>
+        <Panel title={t("schemas.projectOverrides")}>
+          <EmptyState>{t("schemas.noOverrides")}</EmptyState>
+        </Panel>
       </div>
-    </>
+    </div>
   );
 }

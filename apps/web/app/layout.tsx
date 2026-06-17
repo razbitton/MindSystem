@@ -33,7 +33,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem("mindsystem.them
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" dir="ltr" data-theme="light" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="en" dir="ltr" data-theme="light" className={`${inter.variable} ${jetbrainsMono.variable} bg-background`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
