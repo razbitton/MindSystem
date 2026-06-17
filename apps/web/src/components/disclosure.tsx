@@ -47,7 +47,7 @@ export function Disclosure({
 export function CodeBlock({ children }: { children: React.ReactNode }) {
   return (
     <pre
-      className="max-h-80 overflow-auto rounded-lg border border-border bg-muted/50 p-3 font-mono text-xs leading-relaxed text-muted-foreground"
+      className="bounded-scroll max-h-[min(20rem,calc(100svh_-_12rem))] rounded-lg border border-border bg-muted/50 p-3 font-mono text-xs leading-relaxed text-muted-foreground"
       dir="ltr"
     >
       {children}

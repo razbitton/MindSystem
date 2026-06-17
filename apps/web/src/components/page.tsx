@@ -74,12 +74,12 @@ export function Panel({
   return (
     <section
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-xs",
+        "bounded-surface flex flex-col rounded-xl border border-border bg-card text-card-foreground shadow-xs",
         className
       )}
     >
       {title || action ? (
-        <div className="flex items-center justify-between gap-3 px-4 pt-4 sm:px-5">
+        <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-4 sm:px-5">
           {title ? (
             <h2 className="text-sm font-medium text-foreground" dir="auto">
               {title}
@@ -90,7 +90,7 @@ export function Panel({
           {action ? <div className="flex items-center gap-2">{action}</div> : null}
         </div>
       ) : null}
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="bounded-scroll p-4 sm:p-5">{children}</div>
     </section>
   );
 }

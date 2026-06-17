@@ -152,7 +152,7 @@ export default function NotesView() {
       {composeOpen ? (
         <div
           ref={composeRef}
-          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-xs"
+          className="bounded-surface bounded-surface-tight flex flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-xs"
         >
           <Input
             dir="auto"
@@ -170,7 +170,7 @@ export default function NotesView() {
             value={composeForm.body}
             onChange={(event) => setComposeForm({ ...composeForm, body: event.target.value })}
           />
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex shrink-0 items-center justify-between gap-2">
             <Select
               value={composeForm.projectId || NO_PROJECT}
               onValueChange={(value) =>
@@ -262,7 +262,7 @@ export default function NotesView() {
               {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
             </EmptyState>
           ) : view === "cards" ? (
-            <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
+            <div className="bounded-scroll columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid [max-block-size:min(42rem,calc(100svh_-_14rem))]">
               {filteredNotes.map((note) => {
                 const linkedProject =
                   note.projectId || note.project_id
@@ -280,7 +280,7 @@ export default function NotesView() {
                         openEdit(note);
                       }
                     }}
-                    className="flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="bounded-scroll flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [max-block-size:min(26rem,calc(100svh_-_14rem))]"
                   >
                     {note.title ? (
                       <p className="text-sm font-semibold text-foreground" dir="auto">
@@ -301,7 +301,7 @@ export default function NotesView() {
               })}
             </div>
           ) : (
-            <ul className="flex flex-col divide-y divide-border rounded-xl border border-border">
+            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(38rem,calc(100svh_-_14rem))]">
               {filteredNotes.map((note) => {
                 const linkedProject =
                   note.projectId || note.project_id

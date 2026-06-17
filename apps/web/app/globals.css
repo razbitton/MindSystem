@@ -79,6 +79,11 @@
   --chart-3: oklch(0.65 0.13 155);
   --chart-4: oklch(0.72 0.14 70);
   --chart-5: oklch(0.62 0.16 12);
+
+  /* Component size limits */
+  --surface-max-block: min(34rem, calc(100svh - 8rem));
+  --surface-max-block-tight: min(24rem, calc(100svh - 10rem));
+  --surface-max-block-tall: min(44rem, calc(100svh - 8rem));
 }
 
 [data-theme="dark"] {
@@ -248,5 +253,27 @@
     border: 3px solid transparent;
     background-clip: padding-box;
     border-radius: 999px;
+  }
+}
+
+@layer utilities {
+  .bounded-surface {
+    min-block-size: 0;
+    max-block-size: var(--surface-max-block);
+    overflow: hidden;
+  }
+
+  .bounded-surface-tight {
+    max-block-size: var(--surface-max-block-tight);
+  }
+
+  .bounded-surface-tall {
+    max-block-size: var(--surface-max-block-tall);
+  }
+
+  .bounded-scroll {
+    min-block-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 }
