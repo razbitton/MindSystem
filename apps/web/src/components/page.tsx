@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +22,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export function PageHeader({
   eyebrow,
   title,
-  subtitle,
   actions
 }: {
   eyebrow?: string;
@@ -45,11 +43,6 @@ export function PageHeader({
         >
           {title}
         </h1>
-        {subtitle ? (
-          <p className="max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground" dir="auto">
-            {subtitle}
-          </p>
-        ) : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
@@ -169,10 +162,13 @@ export function SegmentedControl<T extends string>({
 export function Drawer({
   open,
   title,
-  subtitle,
   onClose,
   children,
-  footer
+  footer,
+  hideHeader = false,
+  contentClassName,
+  bodyClassName,
+  footerClassName
 }: {
   open: boolean;
   title: string;
@@ -180,17 +176,31 @@ export function Drawer({
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  hideHeader?: boolean;
+  contentClassName?: string;
+  bodyClassName?: string;
+  footerClassName?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
-      <DialogContent className="flex max-h-[min(46rem,calc(100svh_-_2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pe-12 sm:px-5">
-          <DialogTitle dir="auto">{title}</DialogTitle>
-          {subtitle ? <DialogDescription dir="auto">{subtitle}</DialogDescription> : null}
-        </DialogHeader>
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5">{children}</div>
+      <DialogContent
+        className={cn(
+          "flex max-h-[min(46rem,calc(100svh_-_2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl",
+          contentClassName
+        )}
+      >
+        {hideHeader ? (
+          <DialogTitle className="sr-only" dir="auto">{title}</DialogTitle>
+        ) : (
+          <DialogHeader className="shrink-0 border-b border-border px-4 py-4 pe-12 sm:px-5">
+            <DialogTitle dir="auto">{title}</DialogTitle>
+          </DialogHeader>
+        )}
+        <div className={cn("flex-1 overflow-y-auto p-4 sm:p-5", bodyClassName)}>{children}</div>
         {footer ? (
-          <DialogFooter className="shrink-0 border-t border-border px-4 py-3 sm:px-5">{footer}</DialogFooter>
+          <DialogFooter className={cn("shrink-0 border-t border-border px-4 py-3 sm:px-5", footerClassName)}>
+            {footer}
+          </DialogFooter>
         ) : null}
       </DialogContent>
     </Dialog>

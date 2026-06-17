@@ -13,7 +13,6 @@ import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } f
 import { useI18n } from "../i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -368,8 +367,10 @@ export default function NotesView() {
       <Drawer
         open={drawerOpen}
         title={t("notes.editNote")}
-        subtitle={editingNote ? formatDate(dateValue(editingNote, "updatedAt")) : t("notes.subtitle")}
         onClose={closeDrawer}
+        hideHeader
+        bodyClassName="p-0 sm:p-0"
+        footerClassName="border-t-0 bg-background px-4 pb-4 pt-2 sm:px-5"
         footer={
           <>
             <Button variant="outline" type="button" onClick={closeDrawer}>
@@ -381,33 +382,34 @@ export default function NotesView() {
           </>
         }
       >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="note-title">{t("common.title")}</Label>
+        <div className="flex min-h-[min(34rem,calc(100svh_-_9rem))] flex-col bg-card">
+          <div className="flex flex-1 flex-col px-4 pb-4 pt-10 sm:px-6">
             <Input
               id="note-title"
+              aria-label={t("common.title")}
               dir="auto"
+              placeholder={t("notes.titlePlaceholder")}
+              className="h-auto rounded-none border-0 bg-transparent px-0 py-0 pe-10 text-xl font-semibold shadow-none focus-visible:border-transparent focus-visible:ring-0 md:text-xl"
               value={form.title}
               onChange={(event) => setForm({ ...form, title: event.target.value })}
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="note-body">{t("common.body")}</Label>
             <Textarea
               id="note-body"
+              aria-label={t("common.body")}
               dir="auto"
-              rows={8}
+              rows={14}
+              placeholder={t("notes.bodyPlaceholder")}
+              className="mt-4 min-h-72 resize-none rounded-none border-0 bg-transparent px-0 py-0 text-base leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 md:text-base"
               value={form.body}
               onChange={(event) => setForm({ ...form, body: event.target.value })}
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="note-project">{t("common.project")}</Label>
+          <div className="border-t border-border px-4 py-3 sm:px-6">
             <Select
               value={form.projectId || NO_PROJECT}
               onValueChange={(value) => setForm({ ...form, projectId: value === NO_PROJECT ? "" : value })}
             >
-              <SelectTrigger id="note-project" className="w-full">
+              <SelectTrigger id="note-project" size="sm" className="w-full border-0 bg-muted/60 shadow-none sm:w-56">
                 <SelectValue placeholder={t("common.noProject")} />
               </SelectTrigger>
               <SelectContent>
