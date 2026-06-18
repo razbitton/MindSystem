@@ -31,20 +31,20 @@ export function PageHeader({
 }) {
   return (
     <header className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-      <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 flex-col gap-1">
         {eyebrow ? (
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {eyebrow}
           </p>
         ) : null}
         <h1
-          className="text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+          className="min-w-0 text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
           dir="auto"
         >
           {title}
         </h1>
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }
@@ -67,23 +67,23 @@ export function Panel({
   return (
     <section
       className={cn(
-        "bounded-surface flex flex-col rounded-xl border border-border bg-card text-card-foreground shadow-xs",
+        "bounded-surface flex min-w-0 max-w-full flex-col rounded-xl border border-border bg-card text-card-foreground shadow-xs",
         className
       )}
     >
       {title || action ? (
-        <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-4 sm:px-5">
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 px-4 pt-4 sm:px-5">
           {title ? (
-            <h2 className="text-sm font-medium text-foreground" dir="auto">
+            <h2 className="min-w-0 text-sm font-medium text-foreground" dir="auto">
               {title}
             </h2>
           ) : (
             <span />
           )}
-          {action ? <div className="flex items-center gap-2">{action}</div> : null}
+          {action ? <div className="flex min-w-0 items-center gap-2">{action}</div> : null}
         </div>
       ) : null}
-      <div className="bounded-scroll p-4 sm:p-5">{children}</div>
+      <div className="bounded-scroll min-w-0 max-w-full p-4 sm:p-5">{children}</div>
     </section>
   );
 }

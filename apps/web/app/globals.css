@@ -226,6 +226,7 @@
   html,
   body {
     @apply bg-background text-foreground;
+    overflow-x: clip;
   }
 
   body {
@@ -233,6 +234,14 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     text-align: start;
+  }
+
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
   }
 
   ::selection {

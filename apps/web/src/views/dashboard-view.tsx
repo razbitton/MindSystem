@@ -80,7 +80,7 @@ export default function DashboardView() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 max-w-full flex-col gap-6">
       <PageHeader
         title={t("home.title")}
         subtitle={t("home.subtitle")}
@@ -98,10 +98,10 @@ export default function DashboardView() {
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
+      <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <Panel title={t("home.captureTitle")}>
-            <div className="flex flex-col gap-3">
+            <div className="flex min-w-0 max-w-full flex-col gap-3">
               <Textarea
                 dir="auto"
                 rows={3}
@@ -109,8 +109,8 @@ export default function DashboardView() {
                 onChange={(event) => setCaptureText(event.target.value)}
                 placeholder={t("home.capturePlaceholder")}
               />
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">{t("home.captureHelp")}</p>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <p className="min-w-0 flex-1 break-words text-xs text-muted-foreground">{t("home.captureHelp")}</p>
                 <Button
                   type="button"
                   size="sm"
@@ -122,10 +122,10 @@ export default function DashboardView() {
                 </Button>
               </div>
               {captureResult ? (
-                <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                  <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <div className="flex min-w-0 flex-col gap-0.5">
                     <p className="text-sm font-medium text-foreground">{t("home.captureSuccess")}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="break-words text-sm text-muted-foreground">
                       {t("inbox.appliedReview", {
                         applied: captureResult.applied ?? 0,
                         review: captureResult.requiresReview ?? 0
@@ -138,7 +138,7 @@ export default function DashboardView() {
             </div>
           </Panel>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid min-w-0 max-w-full gap-4 sm:grid-cols-3">
             <MetricCard
               label={t("home.today")}
               value={data?.todayTasks?.length ?? 0}
@@ -160,7 +160,7 @@ export default function DashboardView() {
             />
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid min-w-0 max-w-full gap-6 md:grid-cols-2">
             <Panel title={t("home.urgentTasks")}>
               <TaskRows tasks={data?.urgentTasks ?? []} emptyText={t("home.noUrgentTasks")} formatDate={formatDate} />
             </Panel>
@@ -175,12 +175,12 @@ export default function DashboardView() {
               {!notes.length ? (
                 <EmptyState>{t("home.noRecentNotes")}</EmptyState>
               ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex min-w-0 flex-col gap-1">
                   {notes.map((note) => (
                     <li key={note.id}>
                       <Link
                         href="/notes"
-                        className="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
+                        className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
                       >
                         <div className="flex min-w-0 flex-col gap-0.5">
                           <p className="truncate text-sm font-medium text-foreground" dir="auto">
@@ -190,7 +190,9 @@ export default function DashboardView() {
                             {truncate(note.body, 90)} · {formatDate(dateValue(note, "updatedAt"))}
                           </p>
                         </div>
-                        <EntityBadge value="note" />
+                        <div className="shrink-0">
+                          <EntityBadge value="note" />
+                        </div>
                       </Link>
                     </li>
                   ))}
@@ -200,7 +202,7 @@ export default function DashboardView() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Panel
             title={t("home.activeProjects")}
             action={
@@ -225,16 +227,16 @@ export default function DashboardView() {
             {!data?.recentCapturedItems?.length ? (
               <EmptyState>{t("common.nothingHere")}</EmptyState>
             ) : (
-              <ul className="flex flex-col gap-1">
+              <ul className="flex min-w-0 flex-col gap-1">
                 {(data?.recentCapturedItems ?? []).slice(0, 6).map((item: AnyRecord) => (
                   <li
                     key={item.id}
-                    className="flex flex-col gap-0.5 rounded-lg px-3 py-2.5 hover:bg-accent/40"
+                    className="flex min-w-0 flex-col gap-0.5 rounded-lg px-3 py-2.5 hover:bg-accent/40"
                   >
-                    <p className="text-sm text-foreground" dir="auto">
+                    <p className="break-words text-sm text-foreground" dir="auto">
                       {truncate(item.raw_text, 110)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="break-words text-xs text-muted-foreground">
                       {translateValue("source", item.source_type)} · {formatDate(item.created_at)}
                     </p>
                   </li>
@@ -262,11 +264,11 @@ function MetricCard({
   tone?: "primary" | "warning";
 }) {
   return (
-    <section className="bounded-scroll flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(22rem,calc(100svh_-_10rem))]">
-      <div className="flex flex-col gap-0.5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+    <section className="bounded-scroll flex min-w-0 max-w-full items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(22rem,calc(100svh_-_10rem))]">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="break-words text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="text-2xl font-semibold tabular-nums text-foreground">{value}</p>
-        <p className="text-xs text-muted-foreground">{help}</p>
+        <p className="break-words text-xs text-muted-foreground">{help}</p>
       </div>
       <span
         className={
@@ -293,12 +295,12 @@ function TaskRows({
 }) {
   if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex min-w-0 flex-col gap-1">
       {tasks.slice(0, 5).map((task) => (
         <li key={task.id}>
           <Link
             href="/tasks"
-            className="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
+            className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">
@@ -308,7 +310,7 @@ function TaskRows({
                 {truncate(task.description, 90)} · {formatDate(dateValue(task, "dueAt") ?? dateValue(task, "scheduledFor"))}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
               <PriorityBadge value={task.priority} />
               <StatusBadge value={task.status} />
             </div>
@@ -330,12 +332,12 @@ function ProjectRows({
 }) {
   if (!projects.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex min-w-0 flex-col gap-1">
       {projects.slice(0, 6).map((project) => (
         <li key={project.id}>
           <Link
             href={`/projects/${project.id}`}
-            className="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
+            className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">
@@ -345,7 +347,9 @@ function ProjectRows({
                 {truncate(project.description || project.goal, 90)} · {formatDate(dateValue(project, "updatedAt"))}
               </p>
             </div>
-            <PriorityBadge value={project.priority} />
+            <div className="shrink-0">
+              <PriorityBadge value={project.priority} />
+            </div>
           </Link>
         </li>
       ))}
