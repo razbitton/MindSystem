@@ -1,6 +1,6 @@
 import { reviewQueue } from "@personal-context-os/db";
 import { desc, eq, and } from "drizzle-orm";
-import type { reviewDecisionSchema } from "@personal-context-os/shared";
+import { createTaskSchema, type reviewDecisionSchema } from "@personal-context-os/shared";
 import type { z } from "zod";
 import { createNote } from "./notes.js";
 import { createProject } from "./projects.js";
@@ -33,7 +33,7 @@ export async function approveReviewItem(context: AppContext, id: string, input: 
   let applied: unknown = null;
 
   if (item.suggestedAction === "create_task" && typeof payload.title === "string") {
-    applied = await createTask(context, { title: payload.title, description: stringOrUndefined(payload.description) }, actor);
+    applied = await createTask(context, createTaskSchema.parse(payload), actor);
   }
   if (item.suggestedAction === "create_note" && typeof payload.title === "string") {
     applied = await createNote(context, { title: payload.title, body: stringOrUndefined(payload.body) ?? payload.title }, actor);

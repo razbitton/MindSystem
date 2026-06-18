@@ -14,6 +14,9 @@ describe("buildSearchSql", () => {
     expect(built.sql).toContain("plainto_tsquery");
     expect(built.sql).toContain("e.entity_type");
     expect(built.sql).toContain("t.project_id");
+    expect(built.sql).toContain("task_id");
+    expect(built.sql).toContain('"taskId"');
+    expect(built.sql).toContain("typed_id");
     expect(built.params).toContain("launch");
   });
 });

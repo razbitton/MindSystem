@@ -27,6 +27,15 @@ export const relationTypeSchema = z.enum([
   "related_to"
 ]);
 
+const metadataTagPrefixPattern = /^\s*\[[^\]\r\n]{1,40}\]\s*/;
+const taskTitleSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((title) => !metadataTagPrefixPattern.test(title), {
+    message: "Task title must not start with bracketed metadata; use assignee, status, project, or notes fields instead."
+  });
+
 export const normalizedRelationshipSchema = z.object({
   fromTitle: z.string().min(1),
   fromType: entityTypeSchema,
@@ -48,7 +57,7 @@ export const normalizedProjectSchema = z.object({
 });
 
 export const normalizedTaskSchema = z.object({
-  title: z.string().min(1),
+  title: taskTitleSchema,
   description: z.string().optional(),
   projectTitle: z.string().optional(),
   status: taskStatusSchema.default("todo"),
@@ -130,7 +139,7 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export const patchProjectSchema = createProjectSchema.partial();
 
 export const createTaskSchema = z.object({
-  title: z.string().min(1),
+  title: taskTitleSchema,
   description: z.string().optional(),
   projectId: z.string().uuid().nullable().optional(),
   status: taskStatusSchema.default("todo"),

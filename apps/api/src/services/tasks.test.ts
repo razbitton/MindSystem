@@ -10,6 +10,12 @@ describe("task service validation", () => {
     expect(parsed.priority).toBe("medium");
   });
 
+  it("rejects bracketed metadata in task titles", () => {
+    expect(() => createTaskSchema.parse({ title: "[Raz] Draft review notes" })).toThrow(
+      "Task title must not start with bracketed metadata"
+    );
+  });
+
   it("parses task filters", () => {
     const filters = parseTaskFilters({ status: "in_progress", priority: "urgent" });
 

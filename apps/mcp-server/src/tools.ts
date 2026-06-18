@@ -13,10 +13,28 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
   required
 });
 
+const taskStatusValues = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"];
+const priorityValues = ["low", "medium", "high", "urgent"];
+const taskProperties = {
+  title: {
+    type: "string",
+    description: "Clean human-readable task title. Do not prefix metadata such as [owner] or [status]."
+  },
+  description: { type: "string" },
+  projectId: { type: "string", description: "Project table id, not project entity id." },
+  status: { type: "string", enum: taskStatusValues, default: "todo" },
+  priority: { type: "string", enum: priorityValues, default: "medium" },
+  dueAt: { type: "string", description: "ISO 8601 datetime." },
+  scheduledFor: { type: "string", description: "ISO 8601 datetime." },
+  estimateMinutes: { type: "number" },
+  assignee: { type: "string", description: "Owner or assignee name." },
+  dependsOnTaskId: { type: "string", description: "Task table id for a dependency." }
+};
+
 export const toolDefinitions: ToolDefinition[] = [
   {
     name: "search_memory",
-    description: "Search projects, tasks, notes, documents, reminders, and other entities.",
+    description: "Search projects, tasks, notes, documents, reminders, and other entities. Results include entityId plus typedId/taskId/projectId fields when available.",
     requiredScope: "memory:read",
     inputSchema: objectSchema({
       q: { type: "string" },
@@ -42,19 +60,22 @@ export const toolDefinitions: ToolDefinition[] = [
     name: "create_task",
     description: "Create a task.",
     requiredScope: "tasks:write",
-    inputSchema: objectSchema({ title: { type: "string" }, description: { type: "string" }, projectId: { type: "string" }, priority: { type: "string" }, dueAt: { type: "string" } }, ["title"])
+    inputSchema: objectSchema(taskProperties, ["title"])
   },
   {
     name: "update_task",
-    description: "Update a task.",
+    description: "Update a task. The id accepts task.id; entityId from search results is also accepted for compatibility. Prefer taskId when present.",
     requiredScope: "tasks:write",
-    inputSchema: objectSchema({ id: { type: "string" }, title: { type: "string" }, status: { type: "string" }, priority: { type: "string" }, dueAt: { type: "string" } }, ["id"])
+    inputSchema: objectSchema({
+      id: { type: "string", description: "Task table id. entityId is accepted for compatibility; prefer taskId from search_memory." },
+      ...taskProperties
+    }, ["id"])
   },
   {
     name: "complete_task",
     description: "Mark a task complete.",
     requiredScope: "tasks:write",
-    inputSchema: objectSchema({ id: { type: "string" } }, ["id"])
+    inputSchema: objectSchema({ id: { type: "string", description: "Task table id. entityId is accepted for compatibility; prefer taskId from search_memory." } }, ["id"])
   },
   {
     name: "get_project_context",

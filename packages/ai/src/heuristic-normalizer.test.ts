@@ -27,4 +27,14 @@ Remind me to send status update tomorrow`,
     expect(output.confidence).toBeLessThan(0.75);
     expect(output.uncertainties.length).toBeGreaterThan(0);
   });
+
+  it("extracts leading task metadata tags into structured fields", async () => {
+    const normalizer = new HeuristicNormalizer();
+    const output = await normalizer.normalize({ text: "Task: [Raz] [ממתין] [מעקב] call supplier tomorrow" });
+
+    expect(output.tasks[0]?.title).toBe("call supplier");
+    expect(output.tasks[0]?.assignee).toBe("Raz");
+    expect(output.tasks[0]?.status).toBe("waiting");
+    expect(output.tasks[0]?.customFields.taskType).toBe("follow_up");
+  });
 });

@@ -1,6 +1,6 @@
 import { entities, entityEdges, projects, tasks } from "@personal-context-os/db";
 import { createTaskSchema, patchTaskSchema, prioritySchema, taskStatusSchema } from "@personal-context-os/shared";
-import { and, desc, eq, lte, type SQL } from "drizzle-orm";
+import { and, desc, eq, lte, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { createGenericEntity } from "./entities.js";
 import { writeAuditEvent } from "./audit.js";
@@ -86,7 +86,7 @@ export async function getTask(context: AppContext, id: string) {
   const [task] = await context.db
     .select()
     .from(tasks)
-    .where(and(eq(tasks.workspaceId, context.workspaceId), eq(tasks.id, id)))
+    .where(and(eq(tasks.workspaceId, context.workspaceId), taskIdentityWhere(id)))
     .limit(1);
 
   if (!task) throw new Error("Task not found");
@@ -110,7 +110,7 @@ export async function patchTask(context: AppContext, id: string, input: z.infer<
   const [task] = await context.db
     .update(tasks)
     .set(updates)
-    .where(and(eq(tasks.workspaceId, context.workspaceId), eq(tasks.id, id)))
+    .where(and(eq(tasks.workspaceId, context.workspaceId), taskIdentityWhere(id)))
     .returning();
 
   if (!task) throw new Error("Task not found");
@@ -122,6 +122,7 @@ export async function patchTask(context: AppContext, id: string, input: z.infer<
       summary: task.description ?? null,
       body: task.description ?? null,
       status: task.status,
+      canonical: taskCanonical(task),
       updatedAt: new Date()
     })
     .where(eq(entities.id, task.entityId));
@@ -135,13 +136,16 @@ export async function completeTask(context: AppContext, id: string, actor: Actor
   const [task] = await context.db
     .update(tasks)
     .set({ status: "done", completedAt, updatedAt: completedAt })
-    .where(and(eq(tasks.workspaceId, context.workspaceId), eq(tasks.id, id)))
+    .where(and(eq(tasks.workspaceId, context.workspaceId), taskIdentityWhere(id)))
     .returning();
 
   if (!task) throw new Error("Task not found");
 
-  await context.db.update(entities).set({ status: "done", updatedAt: new Date() }).where(eq(entities.id, task.entityId));
-  await writeAuditEvent(context, { ...actor, action: "task complete", entityId: task.entityId, metadata: { taskId: id } });
+  await context.db
+    .update(entities)
+    .set({ status: "done", canonical: taskCanonical(task), updatedAt: new Date() })
+    .where(eq(entities.id, task.entityId));
+  await writeAuditEvent(context, { ...actor, action: "task complete", entityId: task.entityId, metadata: { taskId: task.id } });
   return { task };
 }
 
@@ -160,4 +164,24 @@ export async function deleteTask(context: AppContext, id: string, actor: Actor) 
     .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, task.entityId)));
 
   return { ok: true };
+}
+
+function taskIdentityWhere(id: string): SQL {
+  return or(eq(tasks.id, id), eq(tasks.entityId, id)) ?? eq(tasks.id, id);
+}
+
+function taskCanonical(task: typeof tasks.$inferSelect) {
+  return {
+    title: task.title,
+    description: task.description ?? undefined,
+    projectId: task.projectId ?? undefined,
+    status: task.status,
+    priority: task.priority,
+    dueAt: task.dueAt?.toISOString(),
+    scheduledFor: task.scheduledFor?.toISOString(),
+    estimateMinutes: task.estimateMinutes ?? undefined,
+    assignee: task.assignee ?? undefined,
+    dependsOnTaskId: task.dependsOnTaskId ?? undefined,
+    completedAt: task.completedAt?.toISOString()
+  };
 }

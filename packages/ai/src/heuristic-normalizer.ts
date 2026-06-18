@@ -1,11 +1,50 @@
 import { normalizerOutputSchema, type NormalizerOutput } from "@personal-context-os/shared";
 import type { FreeTextNormalizer } from "./normalizer.js";
 
-const taskPrefixes = /^(?:[-*]\s*)?(?:\[ \]\s*)?(todo|task|next|follow up|fix|write|call|email|ship|build|review|prepare|send|create)\b[:\-\s]*/i;
+const taskPrefixes = /^(?:[-*]\s*)?(?:\[ \]\s*)?(?:(todo|task|next|follow up|fix|write|call|email|ship|build|review|prepare|send|create)\b|(?:משימה|לבצע|לעשות|מעקב))[:\-\s]*/i;
 const projectPattern = /\b(?:project|proj)\s*[:\-]\s*([A-Za-z0-9][^\n.;]+)/i;
 const explicitNotePattern = /\b(?:note|remember|idea)\s*[:\-]\s*(.+)$/i;
 const decisionPattern = /\bdecision\s*[:\-]\s*(.+)$/i;
 const reminderPattern = /\bremind(?:er)?\s+(?:me\s+)?(?:to\s+)?(.+?)(?:\s+(tomorrow|today|next week|on \d{4}-\d{2}-\d{2}|at \d{1,2}:\d{2}))?$/i;
+
+type TaskStatus = NormalizerOutput["tasks"][number]["status"];
+type TaskPriority = NormalizerOutput["tasks"][number]["priority"];
+
+const statusTags = new Map<string, TaskStatus>([
+  ["todo", "todo"],
+  ["to do", "todo"],
+  ["לביצוע", "todo"],
+  ["בוצע", "done"],
+  ["done", "done"],
+  ["complete", "done"],
+  ["completed", "done"],
+  ["ממתין", "waiting"],
+  ["waiting", "waiting"],
+  ["בתהליך", "in_progress"],
+  ["in progress", "in_progress"],
+  ["cancelled", "cancelled"],
+  ["canceled", "cancelled"],
+  ["בוטל", "cancelled"]
+]);
+const priorityTags = new Map<string, TaskPriority>([
+  ["low", "low"],
+  ["נמוך", "low"],
+  ["medium", "medium"],
+  ["רגיל", "medium"],
+  ["high", "high"],
+  ["גבוה", "high"],
+  ["urgent", "urgent"],
+  ["דחוף", "urgent"]
+]);
+const taskTypeTags = new Map<string, string>([
+  ["follow up", "follow_up"],
+  ["follow-up", "follow_up"],
+  ["מעקב", "follow_up"],
+  ["personal", "personal"],
+  ["אישי", "personal"],
+  ["project", "project"],
+  ["פרויקט", "project"]
+]);
 
 export class HeuristicNormalizer implements FreeTextNormalizer {
   async normalize(input: { text: string; now?: Date; projectHint?: string }): Promise<NormalizerOutput> {
@@ -66,17 +105,19 @@ export class HeuristicNormalizer implements FreeTextNormalizer {
 
       const taskMatch = taskPrefixes.exec(line);
       if (taskMatch) {
-        const title = cleanTitle(line.replace(taskPrefixes, ""));
+        const metadata = extractTaskMetadata(line.replace(taskPrefixes, ""));
+        const title = cleanTitle(metadata.title);
         if (title) {
           tasks.push({
             title,
             description: line,
             projectTitle,
-            status: "todo",
-            priority: inferPriority(line),
+            status: metadata.status ?? "todo",
+            priority: metadata.priority ?? inferPriority(line),
             dueAt: inferDate(line, now),
+            assignee: metadata.assignee,
             confidence: 0.82,
-            customFields: {}
+            customFields: metadata.customFields
           });
         }
         continue;
@@ -168,6 +209,50 @@ function cleanTitle(value: string): string {
     .replace(/\s+/g, " ")
     .replace(/[.;,]$/, "")
     .trim();
+}
+
+function extractTaskMetadata(value: string): {
+  title: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assignee?: string;
+  customFields: Record<string, unknown>;
+} {
+  let remaining = value.trim();
+  const unknownTags: string[] = [];
+  let status: TaskStatus | undefined;
+  let priority: TaskPriority | undefined;
+  let assignee: string | undefined;
+  let taskType: string | undefined;
+
+  while (true) {
+    const match = /^\[([^\]\r\n]{1,40})\]\s*/.exec(remaining);
+    if (!match?.[1]) break;
+    const tag = match[1].trim();
+    const normalized = tag.toLowerCase();
+    const nextStatus = statusTags.get(normalized);
+    const nextPriority = priorityTags.get(normalized);
+    const nextType = taskTypeTags.get(normalized);
+
+    if (nextStatus) status = nextStatus;
+    else if (nextPriority) priority = nextPriority;
+    else if (nextType) taskType = nextType;
+    else if (!assignee) assignee = tag;
+    else unknownTags.push(tag);
+
+    remaining = remaining.slice(match[0].length).trimStart();
+  }
+
+  return {
+    title: remaining,
+    ...(status ? { status } : {}),
+    ...(priority ? { priority } : {}),
+    ...(assignee ? { assignee } : {}),
+    customFields: {
+      ...(taskType ? { taskType } : {}),
+      ...(unknownTags.length ? { metadataTags: unknownTags } : {})
+    }
+  };
 }
 
 function summarize(text: string): string {
