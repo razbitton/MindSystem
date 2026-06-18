@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, KeyRound, RefreshCw } from "lucide-react";
+import { Check, Copy, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { agentScopeValues } from "@personal-context-os/shared";
 import { apiPost, type AnyRecord } from "../lib/api";
@@ -81,11 +81,6 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
         <PageHeader
           title={t("agents.title")}
           subtitle={t("agents.subtitle")}
-          actions={
-            <Button variant="outline" size="sm" onClick={() => load(true)}>
-              <RefreshCw aria-hidden /> {t("common.refresh")}
-            </Button>
-          }
         />
       ) : null}
 

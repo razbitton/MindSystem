@@ -236,6 +236,17 @@
     text-align: start;
   }
 
+  html[dir="rtl"] input:not([dir="ltr"]),
+  html[dir="rtl"] textarea:not([dir="ltr"]) {
+    direction: rtl;
+    text-align: right;
+  }
+
+  html[dir="rtl"] input:not([dir="ltr"])::placeholder,
+  html[dir="rtl"] textarea:not([dir="ltr"])::placeholder {
+    text-align: right;
+  }
+
   @media (pointer: coarse) {
     input,
     textarea,

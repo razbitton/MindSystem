@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { Check, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiPost, type AnyRecord } from "../lib/api";
 import {
@@ -67,15 +67,7 @@ export default function ReviewView() {
 
   return (
     <>
-      <PageHeader
-        title={t("review.title")}
-        subtitle={t("review.subtitle")}
-        actions={
-          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading}>
-            <RefreshCw aria-hidden /> {t("common.refresh")}
-          </Button>
-        }
-      />
+      <PageHeader title={t("review.title")} subtitle={t("review.subtitle")} />
 
       {error ? (
         <Panel>

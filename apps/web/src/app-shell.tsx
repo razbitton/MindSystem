@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -9,7 +9,6 @@ import {
   ChevronsUpDown,
   LogOut,
   Menu,
-  Search,
   Sparkles
 } from "lucide-react";
 import { LanguageSwitcher, ThemeToggle, useI18n } from "./i18n";
@@ -19,7 +18,6 @@ import { warmWorkspaceQueryCache } from "./lib/query-cache";
 import { sessionAuthenticatedEvent } from "./lib/session-events";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
@@ -67,7 +65,8 @@ function NavLink({
   icon: Icon,
   label,
   collapsed,
-  tooltipSide
+  tooltipSide,
+  onNavigate
 }: {
   href: string;
   active: boolean;
@@ -75,10 +74,12 @@ function NavLink({
   label: string;
   collapsed: boolean;
   tooltipSide: "left" | "right";
+  onNavigate?: () => void;
 }) {
   const link = (
     <Link
       href={href}
+      onClick={() => onNavigate?.()}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={cn(
@@ -114,8 +115,6 @@ function SidebarContent({
 }) {
   const { t, direction } = useI18n();
   const pathname = usePathname();
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
   const tooltipSide = direction === "rtl" ? "left" : "right";
   const toggleLabel = collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar");
   const ToggleIcon = collapsed
@@ -128,13 +127,6 @@ function SidebarContent({
 
   function isActive(href: string) {
     return pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
-  }
-
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const q = searchQuery.trim();
-    onNavigate?.();
-    router.push(q ? `/search?q=${encodeURIComponent(q)}` : "/search");
   }
 
   return (
@@ -191,53 +183,6 @@ function SidebarContent({
         </SidebarTooltip>
       ) : null}
 
-      <div className={cn("flex flex-col gap-2", collapsed && "items-center")}>
-        {collapsed ? (
-          <>
-            <SidebarTooltip label={t("shell.globalSearch")} side={tooltipSide}>
-              <Button
-                asChild
-                variant="ghost"
-                size="icon"
-                aria-label={t("shell.globalSearch")}
-                className="text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-              >
-                <Link href="/search" onClick={() => onNavigate?.()}>
-                  <Search aria-hidden />
-                </Link>
-              </Button>
-            </SidebarTooltip>
-            <SidebarTooltip label={t("shell.quickCapture")} side={tooltipSide}>
-              <Button asChild size="icon" aria-label={t("shell.quickCapture")}>
-                <Link href="/inbox" onClick={() => onNavigate?.()}>
-                  <Sparkles aria-hidden />
-                </Link>
-              </Button>
-            </SidebarTooltip>
-          </>
-        ) : (
-          <>
-            <form onSubmit={submitSearch} className="relative" title={t("shell.searchHint")}>
-              <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground" aria-hidden />
-              <Input
-                dir="auto"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={t("shell.globalSearch")}
-                aria-label={t("shell.globalSearch")}
-                className="ps-9"
-              />
-            </form>
-            <Button asChild className="w-full justify-start gap-2">
-              <Link href="/inbox" onClick={() => onNavigate?.()}>
-                <Sparkles aria-hidden />
-                {t("shell.quickCapture")}
-              </Link>
-            </Button>
-          </>
-        )}
-      </div>
-
       <nav
         className={cn(
           "flex flex-1 flex-col overflow-y-auto",
@@ -264,6 +209,7 @@ function SidebarContent({
                 label={t(item.labelKey as never)}
                 collapsed={collapsed}
                 tooltipSide={tooltipSide}
+                {...(onNavigate ? { onNavigate } : {})}
               />
             ))}
           </div>
@@ -343,7 +289,7 @@ function UserMenu({
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { t } = useI18n();
+  const { t, direction } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const isLoginRoute = pathname.startsWith("/login");
@@ -494,7 +440,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile slide-in */}
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetContent side="left" className="w-[300px] gap-0 bg-sidebar p-0" showCloseButton={false}>
+          <SheetContent
+            side={direction === "rtl" ? "right" : "left"}
+            className="w-[300px] gap-0 bg-sidebar p-0"
+            showCloseButton={false}
+          >
             <div className="flex h-full flex-col">
               <div className="flex-1 overflow-hidden">
                 <SidebarContent onNavigate={() => setMenuOpen(false)} />

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Edit3, FolderKanban, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Edit3, FolderKanban, Plus, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -143,16 +143,10 @@ export default function ProjectsView() {
         title={t("projects.title")}
         subtitle={t("projects.subtitle")}
         actions={
-          <>
-            <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
-              <RefreshCw data-icon="inline-start" />
-              {t("common.refresh")}
-            </Button>
-            <Button size="sm" type="button" onClick={openCreate}>
-              <Plus data-icon="inline-start" />
-              {t("projects.newProject")}
-            </Button>
-          </>
+          <Button size="sm" type="button" onClick={openCreate}>
+            <Plus data-icon="inline-start" />
+            {t("projects.newProject")}
+          </Button>
         }
       />
 

@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ClipboardList,
   Inbox,
-  RefreshCw,
   Search,
   Send,
   type LucideIcon
@@ -81,16 +80,7 @@ export default function DashboardView() {
 
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-6">
-      <PageHeader
-        title={t("home.title")}
-        subtitle={t("home.subtitle")}
-        actions={
-          <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
-            <RefreshCw data-icon="inline-start" />
-            {t("common.refresh")}
-          </Button>
-        }
-      />
+      <PageHeader title={t("home.title")} subtitle={t("home.subtitle")} />
 
       {error ? (
         <Alert variant="destructive">

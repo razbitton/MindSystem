@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle, Columns3, Edit3, List, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { CheckCircle, Columns3, Edit3, List, Plus, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -198,16 +198,10 @@ export default function TasksView() {
         title={t("tasks.title")}
         subtitle={t("tasks.subtitle")}
         actions={
-          <>
-            <Button variant="outline" size="sm" type="button" onClick={() => load(filters, true)}>
-              <RefreshCw data-icon="inline-start" />
-              {t("common.refresh")}
-            </Button>
-            <Button size="sm" type="button" onClick={openCreate}>
-              <Plus data-icon="inline-start" />
-              {t("tasks.newTask")}
-            </Button>
-          </>
+          <Button size="sm" type="button" onClick={openCreate}>
+            <Plus data-icon="inline-start" />
+            {t("tasks.newTask")}
+          </Button>
         }
       />
 

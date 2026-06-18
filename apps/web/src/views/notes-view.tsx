@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Edit3, Folder, LayoutGrid, List, PenSquare, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Check, Edit3, Folder, LayoutGrid, List, PenSquare, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -195,16 +195,7 @@ export default function NotesView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("notes.title")}
-        subtitle={t("notes.subtitle")}
-        actions={
-          <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
-            <RefreshCw data-icon="inline-start" />
-            {t("common.refresh")}
-          </Button>
-        }
-      />
+      <PageHeader title={t("notes.title")} subtitle={t("notes.subtitle")} />
 
       <div ref={composeRef} className="mx-auto w-full max-w-xl">
         <NoteEditorPanel

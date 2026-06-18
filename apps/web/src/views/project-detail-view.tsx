@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle, RefreshCw, Trash2 } from "lucide-react";
+import { CheckCircle, Trash2 } from "lucide-react";
 import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -102,10 +102,6 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           <>
             <Button asChild variant="ghost" size="sm">
               <Link href="/projects">{t("projects.title")}</Link>
-            </Button>
-            <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
-              <RefreshCw data-icon="inline-start" />
-              {t("common.refresh")}
             </Button>
             {project ? (
               <Button

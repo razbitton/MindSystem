@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus, RefreshCw } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -77,16 +77,10 @@ export default function DocumentsView() {
         title={t("documents.title")}
         subtitle={t("documents.subtitle")}
         actions={
-          <>
-            <Button variant="outline" size="sm" type="button" onClick={() => load(true)}>
-              <RefreshCw data-icon="inline-start" />
-              {t("common.refresh")}
-            </Button>
-            <Button size="sm" type="button" onClick={() => setDrawerOpen(true)}>
-              <Plus data-icon="inline-start" />
-              {t("documents.newDocument")}
-            </Button>
-          </>
+          <Button size="sm" type="button" onClick={() => setDrawerOpen(true)}>
+            <Plus data-icon="inline-start" />
+            {t("documents.newDocument")}
+          </Button>
         }
       />
 
