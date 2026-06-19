@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Edit3, Folder, LayoutGrid, List, PenSquare, Search, Trash2 } from "lucide-react";
+import { Check, Folder, PenSquare, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
   peekCachedQuery
 } from "../lib/query-cache";
-import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
-import { Drawer, EmptyState, IconButton, PageHeader, SegmentedControl } from "../components/page";
+import { dateValue, matchesQuery, projectName } from "../lib/view-models";
+import { Drawer, EmptyState, IconButton, PageHeader } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n, type Direction } from "../i18n";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,6 @@ import {
   SelectValue
 } from "@/components/ui/select";
 
-const preferenceKey = "mindsystem.notes.view";
-const viewModes = ["cards", "list"] as const;
 const NO_PROJECT = "__none__";
 const ALL_PROJECTS = "__all__";
 
@@ -57,7 +55,6 @@ export default function NotesView() {
   );
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
-  const [view, setView] = useState<ViewMode>("cards");
 
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeForm, setComposeForm] = useState<NoteForm>({ title: "", body: "", projectId: "" });
@@ -79,14 +76,8 @@ export default function NotesView() {
   }
 
   useEffect(() => {
-    setView(loadPreference(preferenceKey, "cards", viewModes));
     void load();
   }, []);
-
-  function changeView(nextView: ViewMode) {
-    setView(nextView);
-    savePreference(preferenceKey, nextView);
-  }
 
   function resetCompose() {
     setComposeForm({ title: "", body: "", projectId: projectFilter });
@@ -195,7 +186,27 @@ export default function NotesView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={t("notes.title")} subtitle={t("notes.subtitle")} />
+      <header className="hidden items-center justify-between gap-6 border-b border-border pb-4 md:flex">
+        <h1
+          className="min-w-0 text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+          dir="auto"
+        >
+          {t("notes.title")}
+        </h1>
+
+        <NotesSearchProjectFilter
+          query={query}
+          projectFilter={projectFilter}
+          projects={projects}
+          onQueryChange={setQuery}
+          onProjectFilterChange={setProjectFilter}
+          className="w-[34rem]"
+        />
+      </header>
+
+      <div className="md:hidden">
+        <PageHeader title={t("notes.title")} subtitle={t("notes.subtitle")} />
+      </div>
 
       <div ref={composeRef} className="mx-auto w-full max-w-xl">
         <NoteEditorPanel
@@ -213,57 +224,20 @@ export default function NotesView() {
       </div>
 
       <section className="flex flex-col gap-4">
-        <div className="grid items-center gap-2 border-b border-border pb-4 md:grid-cols-[minmax(14rem,1fr)_13rem_auto]">
-          <div className="relative min-w-0">
-            <Search
-              className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              dir="auto"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("notes.searchPlaceholder")}
-              className="ps-9"
-            />
-          </div>
-          <Select
-            value={projectFilter || ALL_PROJECTS}
-            onValueChange={(value) => setProjectFilter(value === ALL_PROJECTS ? "" : value)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={t("notes.allProjects")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_PROJECTS}>{t("notes.allProjects")}</SelectItem>
-              {projects.map((project) => {
-                const projectNameText = String(project.name ?? "");
-                return (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <div className="justify-self-start md:justify-self-end">
-            <SegmentedControl
-              label={t("common.view")}
-              value={view}
-              onChange={changeView}
-              options={[
-                { value: "cards", label: t("common.cards"), icon: <LayoutGrid size={15} aria-hidden /> },
-                { value: "list", label: t("common.list"), icon: <List size={15} aria-hidden /> }
-              ]}
-            />
-          </div>
-        </div>
+        <NotesSearchProjectFilter
+          query={query}
+          projectFilter={projectFilter}
+          projects={projects}
+          onQueryChange={setQuery}
+          onProjectFilterChange={setProjectFilter}
+          className="md:hidden"
+        />
 
         {!filteredNotes.length ? (
           <EmptyState title={t("notes.empty")}>
             {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
           </EmptyState>
-        ) : view === "cards" ? (
+        ) : (
           <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
             {filteredNotes.map((note) => {
               const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
@@ -311,65 +285,6 @@ export default function NotesView() {
               );
             })}
           </div>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border border-y border-border">
-            {filteredNotes.map((note) => {
-              const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
-              const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
-              const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
-              const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
-              return (
-                <li
-                  key={note.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openEdit(note)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openEdit(note);
-                    }
-                  }}
-                  className="flex cursor-pointer items-start justify-between gap-3 overflow-hidden px-1 py-3 transition-colors hover:bg-accent/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-2"
-                >
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <p className="line-clamp-2 break-words text-start text-sm font-medium text-foreground" dir={noteDirection}>
-                      {note.title || note.body}
-                    </p>
-                    {note.body && note.title ? (
-                      <p className="line-clamp-2 break-words text-start text-sm text-muted-foreground" dir={noteDirection}>
-                        {note.body}
-                      </p>
-                    ) : null}
-                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                      <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
-                        <span className="truncate">{linkedProject || t("common.noProject")}</span>
-                      </span>
-                      <span className="shrink-0">{formatDate(dateValue(note, "updatedAt"))}</span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <IconButton
-                      label={t("common.edit")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openEdit(note);
-                      }}
-                    >
-                      <Edit3 className="size-4" aria-hidden />
-                    </IconButton>
-                    <IconButton
-                      label={t("common.delete")}
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={(event) => requestDelete(note, event)}
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </IconButton>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         )}
       </section>
 
@@ -408,6 +323,80 @@ export default function NotesView() {
           if (!open && !deleting) setDeleteTarget(null);
         }}
       />
+    </div>
+  );
+}
+
+function NotesSearchProjectFilter({
+  query,
+  projectFilter,
+  projects,
+  onQueryChange,
+  onProjectFilterChange,
+  className
+}: {
+  query: string;
+  projectFilter: string;
+  projects: AnyRecord[];
+  onQueryChange: (query: string) => void;
+  onProjectFilterChange: (projectId: string) => void;
+  className?: string;
+}) {
+  const { t, direction } = useI18n();
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-3",
+        className
+      )}
+      dir="ltr"
+    >
+      <Select
+        value={projectFilter || ALL_PROJECTS}
+        onValueChange={(value) => onProjectFilterChange(value === ALL_PROJECTS ? "" : value)}
+      >
+        <SelectTrigger
+          aria-label={t("common.project")}
+          className={cn(
+            "h-9 w-[8.75rem] min-w-0 shrink-0 rounded-lg border-border bg-secondary/70 px-2 text-xs shadow-none focus:ring-0 focus-visible:ring-0 sm:w-[9.5rem]",
+            projectFilter && "text-primary"
+          )}
+        >
+          <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <SelectValue placeholder={t("notes.allProjects")} />
+        </SelectTrigger>
+        <SelectContent position="popper" align="end" className="min-w-48 rounded-xl">
+          <SelectItem value={ALL_PROJECTS}>
+            <span dir={direction}>{t("notes.allProjects")}</span>
+          </SelectItem>
+          {projects.map((project) => {
+            const projectNameText = String(project.name ?? "");
+            return (
+              <SelectItem key={project.id} value={String(project.id)}>
+                <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+
+      <div className="relative min-w-0 flex-1 md:w-72 md:flex-none">
+        <Search
+          className="pointer-events-none absolute start-3 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          dir={direction}
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={`${t("notes.searchPlaceholder")}...`}
+          className={cn(
+            "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+            direction === "rtl" ? "text-right" : "text-left"
+          )}
+        />
+      </div>
     </div>
   );
 }

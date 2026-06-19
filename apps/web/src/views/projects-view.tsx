@@ -13,6 +13,7 @@ import { dateValue, fromDateTimeInput, matchesQuery, toDateTimeInput, truncate }
 import { Drawer, EmptyState, IconButton, PageHeader, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ type ProjectForm = {
 };
 
 export default function ProjectsView() {
-  const { t, formatDate, translateValue } = useI18n();
+  const { t, formatDate, translateValue, direction } = useI18n();
   const [projects, setProjects] = useState<AnyRecord[]>(
     () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
   );
@@ -139,19 +140,53 @@ export default function ProjectsView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title={t("projects.title")}
-        subtitle={t("projects.subtitle")}
-        actions={
-          <Button size="sm" type="button" onClick={openCreate}>
+      <header className="hidden items-center justify-between gap-6 border-b border-border pb-4 md:flex">
+        <h1
+          className="min-w-0 text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+          dir="auto"
+        >
+          {t("projects.title")}
+        </h1>
+
+        <div className="flex min-w-0 items-center gap-3" dir="ltr">
+          <Button dir={direction} size="sm" type="button" onClick={openCreate}>
             <Plus data-icon="inline-start" />
             {t("projects.newProject")}
           </Button>
-        }
-      />
+          <div className="relative w-72 min-w-0">
+            <Search
+              className="pointer-events-none absolute start-3 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              dir={direction}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`${t("projects.searchPlaceholder")}...`}
+              className={cn(
+                "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+                direction === "rtl" ? "text-right" : "text-left"
+              )}
+            />
+          </div>
+        </div>
+      </header>
+
+      <div className="md:hidden">
+        <PageHeader
+          title={t("projects.title")}
+          subtitle={t("projects.subtitle")}
+          actions={
+            <Button size="sm" type="button" onClick={openCreate}>
+              <Plus data-icon="inline-start" />
+              {t("projects.newProject")}
+            </Button>
+          }
+        />
+      </div>
 
       <section className="flex flex-col gap-4">
-          <div className="relative max-w-md">
+          <div className="relative max-w-md md:hidden">
             <Search
               className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
               aria-hidden

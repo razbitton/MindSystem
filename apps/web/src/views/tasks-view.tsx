@@ -181,7 +181,10 @@ export default function TasksView() {
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-6 pb-10">
       <header className="hidden items-center justify-between gap-6 border-b border-border pb-4 md:flex">
-        <h1 className="text-xl font-bold tracking-tight text-foreground" dir="auto">
+        <h1
+          className="min-w-0 text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+          dir="auto"
+        >
           {t("tasks.title")}
         </h1>
 
