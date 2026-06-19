@@ -36,6 +36,20 @@ const dateTimeSchema = (description = "ISO 8601 datetime.") => ({ type: "string"
 const taskStatusValues = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"];
 const projectStatusValues = ["active", "paused", "completed", "archived"];
 const priorityValues = ["low", "medium", "high", "urgent"];
+const entityTypeValues = ["project", "task", "note", "document", "decision", "reminder", "person", "goal"];
+const sourceTypeValues = ["web", "whatsapp", "openclaw", "codex", "api", "manual"];
+const reviewStatusValues = ["pending", "approved", "rejected", "all"];
+const purgeDataTypeValues = [
+  "raw_items",
+  "entities",
+  "review_queue",
+  "audit_events",
+  "agent_runs",
+  "retrieval_logs",
+  "schema_definitions",
+  "project_schema_overrides",
+  "agent_tokens"
+];
 
 const projectProperties = {
   name: { type: "string" },
@@ -76,6 +90,14 @@ const documentProperties = {
   extractedText: { type: "string" }
 };
 
+const reminderProperties = {
+  title: { type: "string" },
+  projectId: nullableStringSchema("Project table id."),
+  remindAt: nullableStringSchema("ISO 8601 datetime."),
+  recurrenceRule: nullableStringSchema("Recurrence rule."),
+  status: { type: "string", default: "scheduled" }
+};
+
 const taskFilterProperties = {
   status: { type: "string", enum: taskStatusValues },
   project_id: { type: "string", description: "Project table id." },
@@ -85,6 +107,25 @@ const taskFilterProperties = {
 
 const noteFilterProperties = {
   project_id: { type: "string", description: "Project table id." }
+};
+
+const rawItemFilterProperties = {
+  source_type: { type: "string", enum: sourceTypeValues },
+  limit: { type: "number", default: 50 }
+};
+
+const entityFilterProperties = {
+  entity_type: { type: "string", enum: entityTypeValues },
+  status: { type: "string" },
+  raw_item_id: { type: "string", description: "Raw item id." },
+  limit: { type: "number", default: 100 }
+};
+
+const reminderFilterProperties = {
+  project_id: { type: "string", description: "Project table id." },
+  status: { type: "string" },
+  due_before: dateTimeSchema("Return reminders due on or before this ISO 8601 datetime."),
+  limit: { type: "number", default: 100 }
 };
 
 const withoutKeys = (args: Record<string, unknown>, keys: string[]) => {
@@ -126,6 +167,68 @@ export const mcpRestTools: RestToolDefinition[] = [
     path: "/api/ingest/free-text",
     body: (args) => ({ sourceType: "codex", ...args }),
     inputSchema: objectSchema({ text: { type: "string" }, sourceType: { type: "string", default: "codex" }, projectId: { type: "string" } }, ["text"])
+  },
+  {
+    name: "list_raw_items",
+    description: "List immutable raw captures.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: "/api/raw-items",
+    inputSchema: objectSchema(rawItemFilterProperties)
+  },
+  {
+    name: "get_raw_item",
+    description: "Get a raw capture by id.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: idPath("/api/raw-items"),
+    inputSchema: objectSchema({ id: idSchema("Raw item id.") }, ["id"])
+  },
+  {
+    name: "delete_raw_item",
+    description: "Delete a raw capture. Optionally delete entities that were derived from that capture.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: (args) => `/api/raw-items/${String(args.id)}/delete`,
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Raw item id."),
+      deleteDerivedEntities: { type: "boolean", default: false }
+    }, ["id"])
+  },
+  {
+    name: "clear_raw_items",
+    description: "Delete all raw captures in the workspace. Optionally delete entities derived from raw captures.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: "/api/raw-items/clear",
+    inputSchema: objectSchema({
+      deleteDerivedEntities: { type: "boolean", default: false }
+    })
+  },
+  {
+    name: "list_entities",
+    description: "List generic entities across all structured memory types.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: "/api/entities",
+    inputSchema: objectSchema(entityFilterProperties)
+  },
+  {
+    name: "get_entity",
+    description: "Get a generic entity by id.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: idPath("/api/entities"),
+    inputSchema: objectSchema({ id: idSchema("Entity id.") }, ["id"])
+  },
+  {
+    name: "delete_entity",
+    description: "Delete a generic entity by id. Typed rows such as project, task, note, document, or reminder cascade from the entity.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: idPath("/api/entities"),
+    inputSchema: objectSchema({ id: idSchema("Entity id.") }, ["id"])
   },
   {
     name: "list_projects",
@@ -305,6 +408,64 @@ export const mcpRestTools: RestToolDefinition[] = [
     inputSchema: objectSchema({ id: idSchema("Document table id.") }, ["id"])
   },
   {
+    name: "update_document",
+    description: "Update document metadata or extracted text.",
+    requiredScope: "documents:write",
+    method: "PATCH",
+    path: idPath("/api/documents"),
+    body: omitIdBody,
+    inputSchema: objectSchema({ id: idSchema("Document table id."), ...documentProperties }, ["id"])
+  },
+  {
+    name: "delete_document",
+    description: "Delete a document.",
+    requiredScope: "documents:write",
+    method: "DELETE",
+    path: idPath("/api/documents"),
+    inputSchema: objectSchema({ id: idSchema("Document table id.") }, ["id"])
+  },
+  {
+    name: "list_reminders",
+    description: "List reminders with REST-supported filters.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: "/api/reminders",
+    inputSchema: objectSchema(reminderFilterProperties)
+  },
+  {
+    name: "create_reminder",
+    description: "Create a reminder.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: "/api/reminders",
+    inputSchema: objectSchema(reminderProperties, ["title"])
+  },
+  {
+    name: "get_reminder",
+    description: "Get a reminder by id.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: idPath("/api/reminders"),
+    inputSchema: objectSchema({ id: idSchema("Reminder table id.") }, ["id"])
+  },
+  {
+    name: "update_reminder",
+    description: "Update a reminder.",
+    requiredScope: "memory:write",
+    method: "PATCH",
+    path: idPath("/api/reminders"),
+    body: omitIdBody,
+    inputSchema: objectSchema({ id: idSchema("Reminder table id."), ...reminderProperties }, ["id"])
+  },
+  {
+    name: "delete_reminder",
+    description: "Delete a reminder.",
+    requiredScope: "memory:write",
+    method: "DELETE",
+    path: idPath("/api/reminders"),
+    inputSchema: objectSchema({ id: idSchema("Reminder table id.") }, ["id"])
+  },
+  {
     name: "get_project_context",
     description: "Get a project context pack.",
     requiredScope: "projects:read",
@@ -339,11 +500,11 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "list_review_queue",
-    description: "List pending review queue items.",
+    description: "List review queue items.",
     requiredScope: "admin",
     method: "GET",
     path: "/api/review-queue",
-    inputSchema: objectSchema({})
+    inputSchema: objectSchema({ status: { type: "string", enum: reviewStatusValues, default: "pending" } })
   },
   {
     name: "approve_review_item",
@@ -367,6 +528,23 @@ export const mcpRestTools: RestToolDefinition[] = [
     inputSchema: objectSchema({ id: idSchema("Review queue item id.") }, ["id"])
   },
   {
+    name: "delete_review_item",
+    description: "Hard-delete a review queue item.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: idPath("/api/review-queue"),
+    inputSchema: objectSchema({ id: idSchema("Review queue item id.") }, ["id"])
+  },
+  {
+    name: "clear_review_queue",
+    description: "Hard-delete all review queue items.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/review-queue/clear",
+    body: emptyBody,
+    inputSchema: objectSchema({})
+  },
+  {
     name: "list_agents",
     description: "List agent tokens and recent agent activity.",
     requiredScope: "admin",
@@ -387,12 +565,156 @@ export const mcpRestTools: RestToolDefinition[] = [
     }, ["name", "scopes"])
   },
   {
+    name: "revoke_agent_token",
+    description: "Revoke an agent token without deleting its record.",
+    requiredScope: "admin",
+    method: "POST",
+    path: (args) => `/api/agents/tokens/${String(args.id)}/revoke`,
+    body: emptyBody,
+    inputSchema: objectSchema({ id: idSchema("Agent token id.") }, ["id"])
+  },
+  {
+    name: "delete_agent_token",
+    description: "Delete an agent token record.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: (args) => `/api/agents/tokens/${String(args.id)}`,
+    inputSchema: objectSchema({ id: idSchema("Agent token id.") }, ["id"])
+  },
+  {
+    name: "delete_agent_run",
+    description: "Delete an agent run history row.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: (args) => `/api/agents/runs/${String(args.id)}`,
+    inputSchema: objectSchema({ id: idSchema("Agent run id.") }, ["id"])
+  },
+  {
+    name: "clear_agent_runs",
+    description: "Delete all agent run history rows.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/agents/runs/clear",
+    body: emptyBody,
+    inputSchema: objectSchema({})
+  },
+  {
     name: "list_audit_events",
     description: "List recent audit events.",
     requiredScope: "admin",
     method: "GET",
     path: "/api/audit-events",
     inputSchema: objectSchema({})
+  },
+  {
+    name: "delete_audit_event",
+    description: "Delete an audit event.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: idPath("/api/audit-events"),
+    inputSchema: objectSchema({ id: idSchema("Audit event id.") }, ["id"])
+  },
+  {
+    name: "clear_audit_events",
+    description: "Delete all audit events.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/audit-events/clear",
+    body: emptyBody,
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "list_retrieval_logs",
+    description: "List search/retrieval history rows.",
+    requiredScope: "admin",
+    method: "GET",
+    path: "/api/retrieval-logs",
+    inputSchema: objectSchema({ limit: { type: "number", default: 100 } })
+  },
+  {
+    name: "delete_retrieval_log",
+    description: "Delete a search/retrieval history row.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: idPath("/api/retrieval-logs"),
+    inputSchema: objectSchema({ id: idSchema("Retrieval log id.") }, ["id"])
+  },
+  {
+    name: "clear_retrieval_logs",
+    description: "Delete all search/retrieval history rows.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/retrieval-logs/clear",
+    body: emptyBody,
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "list_schema_definitions",
+    description: "List schema definition rows.",
+    requiredScope: "admin",
+    method: "GET",
+    path: "/api/schema-definitions",
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "delete_schema_definition",
+    description: "Delete a schema definition row.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: idPath("/api/schema-definitions"),
+    inputSchema: objectSchema({ id: idSchema("Schema definition id.") }, ["id"])
+  },
+  {
+    name: "clear_schema_definitions",
+    description: "Delete all schema definition rows.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/schema-definitions/clear",
+    body: emptyBody,
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "list_project_schema_overrides",
+    description: "List project schema override rows.",
+    requiredScope: "admin",
+    method: "GET",
+    path: "/api/project-schema-overrides",
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "delete_project_schema_override",
+    description: "Delete a project schema override row.",
+    requiredScope: "admin",
+    method: "DELETE",
+    path: idPath("/api/project-schema-overrides"),
+    inputSchema: objectSchema({ id: idSchema("Project schema override id.") }, ["id"])
+  },
+  {
+    name: "clear_project_schema_overrides",
+    description: "Delete all project schema override rows.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/project-schema-overrides/clear",
+    body: emptyBody,
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "get_data_inventory",
+    description: "Get counts for each workspace-owned data table.",
+    requiredScope: "admin",
+    method: "GET",
+    path: "/api/admin/data-inventory",
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "purge_workspace_data",
+    description: "Bulk-delete selected workspace-owned data categories. Agent tokens are excluded unless explicitly requested.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/admin/purge-data",
+    inputSchema: objectSchema({
+      types: { type: "array", items: { type: "string", enum: purgeDataTypeValues } }
+    })
   }
 ];
 

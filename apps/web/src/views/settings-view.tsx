@@ -6,6 +6,7 @@ import { useI18n } from "../i18n";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AgentsView from "./agents-view";
+import DataManagementView from "./data-management-view";
 import SchemasView from "./schemas-view";
 
 export default function SettingsView({ initialTab = "preferences" }: { initialTab?: string }) {
@@ -59,7 +60,8 @@ export default function SettingsView({ initialTab = "preferences" }: { initialTa
           <AgentsView embedded />
         </TabsContent>
 
-        <TabsContent value="data">
+        <TabsContent value="data" className="flex flex-col gap-6">
+          <DataManagementView />
           <SchemasView embedded />
         </TabsContent>
       </Tabs>

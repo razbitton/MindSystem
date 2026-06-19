@@ -5,12 +5,15 @@ import {
   createDocumentSchema,
   createNoteSchema,
   createProjectSchema,
+  createReminderSchema,
   createTaskSchema,
   ingestFreeTextSchema,
   hasScope,
   loginSchema,
+  patchDocumentSchema,
   patchNoteSchema,
   patchProjectSchema,
+  patchReminderSchema,
   patchTaskSchema,
   reviewDecisionSchema,
   searchQuerySchema,
@@ -18,8 +21,16 @@ import {
 } from "@personal-context-os/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { createAgentToken, listAgentState } from "./services/agents.js";
-import { listAuditEvents } from "./services/audit.js";
+import {
+  clearAgentRuns,
+  createAgentToken,
+  deleteAgentRun,
+  deleteAgentToken,
+  listAgentState,
+  revokeAgentToken
+} from "./services/agents.js";
+import { clearAuditEvents, deleteAuditEvent, listAuditEvents } from "./services/audit.js";
+import { getDataInventory, purgeWorkspaceData } from "./services/data-management.js";
 import {
   authenticateAgentBearer,
   authenticateSessionToken,
@@ -33,7 +44,8 @@ import {
 } from "./services/auth.js";
 import { getDashboard } from "./services/dashboard.js";
 import { ingestFreeText } from "./services/ingest.js";
-import { createDocument, getDocument, listDocuments } from "./services/documents.js";
+import { createDocument, deleteDocument, getDocument, listDocuments, patchDocument } from "./services/documents.js";
+import { deleteEntity, getEntity, listEntities } from "./services/entities.js";
 import {
   createNote,
   deleteNote,
@@ -49,11 +61,24 @@ import {
   listProjects,
   patchProject
 } from "./services/projects.js";
+import { clearRawItems, deleteRawItem, getRawItem, listRawItems } from "./services/raw-items.js";
+import { createReminder, deleteReminder, getReminder, listReminders, patchReminder } from "./services/reminders.js";
+import { clearRetrievalLogs, deleteRetrievalLog, listRetrievalLogs } from "./services/retrieval-logs.js";
 import {
   approveReviewItem,
+  clearReviewQueue,
+  deleteReviewItem,
   listReviewQueue,
   rejectReviewItem
 } from "./services/review.js";
+import {
+  clearProjectSchemaOverrides,
+  clearSchemaDefinitions,
+  deleteProjectSchemaOverride,
+  deleteSchemaDefinition,
+  listProjectSchemaOverrides,
+  listSchemaDefinitions
+} from "./services/schemas.js";
 import { searchMemory } from "./services/search.js";
 import {
   completeTask,
@@ -116,6 +141,16 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/ingest/free-text" && method === "POST") return "memory:write";
   if (route === "/api/dashboard/today" && method === "GET") return "memory:read";
 
+  if (route === "/api/raw-items" && method === "GET") return "memory:read";
+  if (route === "/api/raw-items/clear" && method === "POST") return "memory:write";
+  if (route === "/api/raw-items/:id" && method === "GET") return "memory:read";
+  if (route === "/api/raw-items/:id" && method === "DELETE") return "memory:write";
+  if (route === "/api/raw-items/:id/delete" && method === "POST") return "memory:write";
+
+  if (route === "/api/entities" && method === "GET") return "memory:read";
+  if (route === "/api/entities/:id" && method === "GET") return "memory:read";
+  if (route === "/api/entities/:id" && method === "DELETE") return "admin";
+
   if (route === "/api/projects" && method === "GET") return "projects:read";
   if (route === "/api/projects" && method === "POST") return "projects:write";
   if (route === "/api/projects/:id" && method === "GET") return "projects:read";
@@ -139,8 +174,21 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/documents" && method === "GET") return "documents:read";
   if (route === "/api/documents" && method === "POST") return "documents:write";
   if (route === "/api/documents/:id" && method === "GET") return "documents:read";
+  if (route === "/api/documents/:id" && method === "PATCH") return "documents:write";
+  if (route === "/api/documents/:id" && method === "DELETE") return "documents:write";
 
-  if (route === "/api/agents" || route === "/api/agents/tokens" || route === "/api/audit-events") return "admin";
+  if (route === "/api/reminders" && method === "GET") return "memory:read";
+  if (route === "/api/reminders" && method === "POST") return "memory:write";
+  if (route === "/api/reminders/:id" && method === "GET") return "memory:read";
+  if (route === "/api/reminders/:id" && method === "PATCH") return "memory:write";
+  if (route === "/api/reminders/:id" && method === "DELETE") return "memory:write";
+
+  if (route.startsWith("/api/admin")) return "admin";
+  if (route.startsWith("/api/agents")) return "admin";
+  if (route.startsWith("/api/audit-events")) return "admin";
+  if (route.startsWith("/api/retrieval-logs")) return "admin";
+  if (route.startsWith("/api/schema-definitions")) return "admin";
+  if (route.startsWith("/api/project-schema-overrides")) return "admin";
   if (route.startsWith("/api/review-queue")) return "admin";
 
   return null;
@@ -211,6 +259,37 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/api/search", async (request) => {
     const query = searchQuerySchema.parse(request.query);
     return searchMemory(requestContext(app, request), query);
+  });
+
+  app.get("/api/raw-items", async (request) => listRawItems(requestContext(app, request), request.query));
+
+  app.get("/api/raw-items/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return getRawItem(requestContext(app, request), id);
+  });
+
+  app.delete("/api/raw-items/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteRawItem(requestContext(app, request), id, {}, actorFor(request));
+  });
+
+  app.post("/api/raw-items/:id/delete", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteRawItem(requestContext(app, request), id, request.body ?? {}, actorFor(request));
+  });
+
+  app.post("/api/raw-items/clear", async (request) => clearRawItems(requestContext(app, request), request.body ?? {}, actorFor(request)));
+
+  app.get("/api/entities", async (request) => listEntities(requestContext(app, request), request.query));
+
+  app.get("/api/entities/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return getEntity(requestContext(app, request), id);
+  });
+
+  app.delete("/api/entities/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteEntity(requestContext(app, request), id, actorFor(request));
   });
 
   app.post("/api/projects", async (request) => {
@@ -304,9 +383,43 @@ export async function registerRoutes(app: FastifyInstance) {
     return getDocument(requestContext(app, request), id);
   });
 
+  app.patch("/api/documents/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    const input = patchDocumentSchema.parse(request.body);
+    return patchDocument(requestContext(app, request), id, input, actorFor(request));
+  });
+
+  app.delete("/api/documents/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteDocument(requestContext(app, request), id, actorFor(request));
+  });
+
+  app.post("/api/reminders", async (request) => {
+    const input = createReminderSchema.parse(request.body);
+    return createReminder(requestContext(app, request), input, actorFor(request));
+  });
+
+  app.get("/api/reminders", async (request) => listReminders(requestContext(app, request), request.query));
+
+  app.get("/api/reminders/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return getReminder(requestContext(app, request), id);
+  });
+
+  app.patch("/api/reminders/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    const input = patchReminderSchema.parse(request.body);
+    return patchReminder(requestContext(app, request), id, input, actorFor(request));
+  });
+
+  app.delete("/api/reminders/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteReminder(requestContext(app, request), id, actorFor(request));
+  });
+
   app.get("/api/dashboard/today", async (request) => getDashboard(requestContext(app, request)));
 
-  app.get("/api/review-queue", async (request) => listReviewQueue(requestContext(app, request)));
+  app.get("/api/review-queue", async (request) => listReviewQueue(requestContext(app, request), request.query));
 
   app.post("/api/review-queue/:id/approve", async (request) => {
     const { id } = idParam.parse(request.params);
@@ -319,6 +432,13 @@ export async function registerRoutes(app: FastifyInstance) {
     return rejectReviewItem(requestContext(app, request), id, actorFor(request));
   });
 
+  app.delete("/api/review-queue/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteReviewItem(requestContext(app, request), id, actorFor(request));
+  });
+
+  app.post("/api/review-queue/clear", async (request) => clearReviewQueue(requestContext(app, request), actorFor(request)));
+
   app.get("/api/agents", async (request) => listAgentState(requestContext(app, request)));
 
   app.post("/api/agents/tokens", async (request) => {
@@ -327,5 +447,60 @@ export async function registerRoutes(app: FastifyInstance) {
     return createAgentToken(requestContext(app, request), { ...input, scopes }, actorFor(request));
   });
 
+  app.post("/api/agents/tokens/:id/revoke", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return revokeAgentToken(requestContext(app, request), id, actorFor(request));
+  });
+
+  app.delete("/api/agents/tokens/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteAgentToken(requestContext(app, request), id, actorFor(request));
+  });
+
+  app.delete("/api/agents/runs/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteAgentRun(requestContext(app, request), id);
+  });
+
+  app.post("/api/agents/runs/clear", async (request) => clearAgentRuns(requestContext(app, request)));
+
   app.get("/api/audit-events", async (request) => listAuditEvents(requestContext(app, request)));
+
+  app.delete("/api/audit-events/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteAuditEvent(requestContext(app, request), id);
+  });
+
+  app.post("/api/audit-events/clear", async (request) => clearAuditEvents(requestContext(app, request)));
+
+  app.get("/api/retrieval-logs", async (request) => listRetrievalLogs(requestContext(app, request), request.query));
+
+  app.delete("/api/retrieval-logs/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteRetrievalLog(requestContext(app, request), id);
+  });
+
+  app.post("/api/retrieval-logs/clear", async (request) => clearRetrievalLogs(requestContext(app, request)));
+
+  app.get("/api/schema-definitions", async (request) => listSchemaDefinitions(requestContext(app, request)));
+
+  app.delete("/api/schema-definitions/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteSchemaDefinition(requestContext(app, request), id);
+  });
+
+  app.post("/api/schema-definitions/clear", async (request) => clearSchemaDefinitions(requestContext(app, request)));
+
+  app.get("/api/project-schema-overrides", async (request) => listProjectSchemaOverrides(requestContext(app, request)));
+
+  app.delete("/api/project-schema-overrides/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return deleteProjectSchemaOverride(requestContext(app, request), id);
+  });
+
+  app.post("/api/project-schema-overrides/clear", async (request) => clearProjectSchemaOverrides(requestContext(app, request)));
+
+  app.get("/api/admin/data-inventory", async (request) => getDataInventory(requestContext(app, request)));
+
+  app.post("/api/admin/purge-data", async (request) => purgeWorkspaceData(requestContext(app, request), request.body ?? {}, actorFor(request)));
 }

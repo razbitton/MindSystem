@@ -174,6 +174,53 @@ export const createDocumentSchema = z.object({
 });
 export type CreateDocumentInput = z.infer<typeof createDocumentSchema>;
 
+export const patchDocumentSchema = createDocumentSchema.partial();
+
+export const createReminderSchema = z.object({
+  title: z.string().min(1),
+  projectId: z.string().uuid().nullable().optional(),
+  remindAt: z.string().datetime().nullable().optional(),
+  recurrenceRule: z.string().nullable().optional(),
+  status: z.string().min(1).default("scheduled")
+});
+export type CreateReminderInput = z.infer<typeof createReminderSchema>;
+
+export const patchReminderSchema = createReminderSchema.partial();
+
+export const deleteRawItemSchema = z.object({
+  deleteDerivedEntities: z.boolean().default(false)
+});
+
+export const clearRawItemsSchema = deleteRawItemSchema;
+
+export const purgeDataTypeSchema = z.enum([
+  "raw_items",
+  "entities",
+  "review_queue",
+  "audit_events",
+  "agent_runs",
+  "retrieval_logs",
+  "schema_definitions",
+  "project_schema_overrides",
+  "agent_tokens"
+]);
+export type PurgeDataType = z.infer<typeof purgeDataTypeSchema>;
+
+export const defaultPurgeDataTypes: PurgeDataType[] = [
+  "raw_items",
+  "entities",
+  "review_queue",
+  "audit_events",
+  "agent_runs",
+  "retrieval_logs",
+  "schema_definitions",
+  "project_schema_overrides"
+];
+
+export const purgeWorkspaceDataSchema = z.object({
+  types: z.array(purgeDataTypeSchema).min(1).default(defaultPurgeDataTypes)
+});
+
 export const createAgentTokenSchema = z.object({
   name: z.string().min(1),
   scopes: z.array(z.string()).min(1),

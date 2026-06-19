@@ -101,7 +101,9 @@ The plaintext token is returned once.
 
 ## MCP Examples
 
-The MCP server aims for REST parity for scoped agent operations. It exposes explicit tools for project, task, note, document, review queue, audit, and agent-token routes, while browser-session-only auth routes stay REST/browser-only. Destructive tools such as `delete_task`, `delete_project`, and `delete_note` are available, but they are explicit tools and require the matching write scope. Grant agent tokens the least scopes needed for the job.
+The MCP server aims for REST parity for scoped agent operations. It exposes explicit tools for project, task, note, document, reminder, raw capture, review queue, audit, retrieval-log, schema, and agent-token routes, while browser-session-only auth routes stay REST/browser-only. Destructive tools such as `delete_task`, `delete_project`, `delete_note`, `delete_document`, `delete_reminder`, and `delete_raw_item` are available, but they are explicit tools and require the matching write or admin scope. Grant agent tokens the least scopes needed for the job.
+
+Admin tokens can also inspect `data-inventory://workspace` and call `purge_workspace_data` to delete selected workspace-owned categories: `raw_items`, `entities`, `review_queue`, `audit_events`, `agent_runs`, `retrieval_logs`, `schema_definitions`, `project_schema_overrides`, and, only when explicitly requested, `agent_tokens`.
 
 List tools:
 
@@ -253,7 +255,7 @@ Pipeline order:
 - Agent tokens are stored as SHA-256 hashes.
 - MCP tools mirror concrete REST routes where feasible and require matching scopes such as `memory:read`, `memory:write`, `projects:write`, `tasks:write`, or `documents:write`.
 - `admin` grants all scopes.
-- Destructive MCP actions are explicit and scoped; there is no generic arbitrary REST-path MCP tool.
+- Destructive MCP actions are explicit and scoped; there is no generic arbitrary REST-path MCP tool. Generic entity deletion and bulk purge are admin-only because they can cascade across typed records.
 - Every ingest, entity creation/update, task completion, token creation, and MCP tool call writes `audit_events`.
 - Rate limiting and CORS are configured in the API; production deployments should replace default secrets and restrict origins.
 - Database credentials are never exposed to agents or the web client.

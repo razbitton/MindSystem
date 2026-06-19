@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus } from "lucide-react";
-import { apiPost, type AnyRecord } from "../lib/api";
+import { FileText, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -11,6 +12,7 @@ import {
 import { dateValue, projectName, truncate } from "../lib/view-models";
 import { Drawer, EmptyState, PageHeader, Panel } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +46,8 @@ export default function DocumentsView() {
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<DocumentForm>(blankForm());
+  const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load(force = false) {
     const [documentData, projectData] = await Promise.all([
@@ -71,7 +75,24 @@ export default function DocumentsView() {
     await load(true);
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/documents/${deleteTarget.id}`);
+      toast.success(t("documents.deleted"));
+      setDeleteTarget(null);
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
+    <>
     <div className="flex flex-col gap-6">
       <PageHeader
         title={t("documents.title")}
@@ -114,6 +135,17 @@ export default function DocumentsView() {
                   >
                     <FileText className="size-[18px]" />
                   </span>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setDeleteTarget(document)}
+                  >
+                    <Trash2 aria-hidden />
+                    {t("common.delete")}
+                  </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="rounded-full bg-muted px-2 py-0.5">
@@ -222,6 +254,18 @@ export default function DocumentsView() {
         </div>
       </Drawer>
     </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => (!next ? setDeleteTarget(null) : undefined)}
+        title={t("documents.deleteDocument")}
+        description={t("documents.deleteConfirm", { title: deleteTarget?.title ?? "" })}
+        confirmLabel={t("common.delete")}
+        destructive
+        loading={deleting}
+        onConfirm={confirmDelete}
+      />
+    </>
   );
 }
 

@@ -2,11 +2,13 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
-import type { AnyRecord } from "../lib/api";
-import { cachedApiGet, peekCachedQuery } from "../lib/query-cache";
+import { Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { apiDelete, type AnyRecord } from "../lib/api";
+import { cachedApiGet, invalidateWorkspaceQueryCache, peekCachedQuery } from "../lib/query-cache";
 import { dateValue, truncate } from "../lib/view-models";
 import { EmptyState, EntityBadge, PageHeader, StatusBadge } from "../components/page";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +29,8 @@ export default function SearchView() {
   const [mode, setMode] = useState<string>(() => cachedSearch?.retrieval?.mode ?? "");
   const [searched, setSearched] = useState(Boolean(cachedSearch));
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function runSearch(nextFilters = filters, force = false) {
     const cached = peekCachedQuery<{ results: AnyRecord[]; retrieval: AnyRecord }>(
@@ -64,6 +68,23 @@ export default function SearchView() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void runSearch();
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const entityId = deleteTarget.entityId ?? deleteTarget.entity_id ?? deleteTarget.id;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/entities/${entityId}`);
+      toast.success(t("search.deleted"));
+      setDeleteTarget(null);
+      invalidateWorkspaceQueryCache();
+      await runSearch(filters, true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -149,14 +170,37 @@ export default function SearchView() {
               </p>
               <div className="mt-auto flex items-center justify-between gap-2 pt-1">
                 <StatusBadge value={result.status} />
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(dateValue(result, "updatedAt"))}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(dateValue(result, "updatedAt"))}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    title={t("common.delete")}
+                    aria-label={t("common.delete")}
+                    onClick={() => setDeleteTarget(result)}
+                  >
+                    <Trash2 aria-hidden />
+                  </Button>
+                </div>
               </div>
             </article>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => (!next ? setDeleteTarget(null) : undefined)}
+        title={t("search.deleteResult")}
+        description={t("search.deleteConfirm", { title: deleteTarget?.title ?? "" })}
+        confirmLabel={t("common.delete")}
+        destructive
+        loading={deleting}
+        onConfirm={confirmDelete}
+      />
     </>
   );
 }

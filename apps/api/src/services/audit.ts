@@ -1,5 +1,5 @@
 import { auditEvents } from "@personal-context-os/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Actor, AppContext } from "./types.js";
 
 export async function writeAuditEvent(
@@ -35,4 +35,23 @@ export async function listAuditEvents(context: AppContext) {
     .limit(100);
 
   return { events };
+}
+
+export async function deleteAuditEvent(context: AppContext, id: string) {
+  const [event] = await context.db
+    .delete(auditEvents)
+    .where(and(eq(auditEvents.workspaceId, context.workspaceId), eq(auditEvents.id, id)))
+    .returning({ id: auditEvents.id });
+
+  if (!event) throw new Error("Audit event not found");
+  return { ok: true };
+}
+
+export async function clearAuditEvents(context: AppContext) {
+  const result = await context.pool.query(
+    `delete from audit_events
+     where workspace_id = $1`,
+    [context.workspaceId]
+  );
+  return { ok: true, deletedAuditEvents: result.rowCount ?? 0 };
 }

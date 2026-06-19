@@ -1,6 +1,6 @@
 import { agentTokens, auditEvents, agentRuns } from "@personal-context-os/db";
 import type { AgentScope, CreateAgentTokenInput } from "@personal-context-os/shared";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
@@ -68,4 +68,54 @@ export async function listAgentState(context: AppContext) {
   ]);
 
   return { tokens, runs, auditEvents: audits };
+}
+
+export async function revokeAgentToken(context: AppContext, id: string, actor: Actor) {
+  const [token] = await context.db
+    .update(agentTokens)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(agentTokens.workspaceId, context.workspaceId), eq(agentTokens.id, id)))
+    .returning({
+      id: agentTokens.id,
+      name: agentTokens.name,
+      scopes: agentTokens.scopes,
+      createdAt: agentTokens.createdAt,
+      lastUsedAt: agentTokens.lastUsedAt,
+      expiresAt: agentTokens.expiresAt,
+      revokedAt: agentTokens.revokedAt
+    });
+
+  if (!token) throw new Error("Agent token not found");
+  await writeAuditEvent(context, { ...actor, action: "token revoked", metadata: { tokenId: id, name: token.name } });
+  return { token };
+}
+
+export async function deleteAgentToken(context: AppContext, id: string, actor: Actor) {
+  const [token] = await context.db
+    .delete(agentTokens)
+    .where(and(eq(agentTokens.workspaceId, context.workspaceId), eq(agentTokens.id, id)))
+    .returning({ id: agentTokens.id, name: agentTokens.name });
+
+  if (!token) throw new Error("Agent token not found");
+  await writeAuditEvent(context, { ...actor, action: "token deleted", metadata: { tokenId: id, name: token.name } });
+  return { ok: true };
+}
+
+export async function deleteAgentRun(context: AppContext, id: string) {
+  const [run] = await context.db
+    .delete(agentRuns)
+    .where(and(eq(agentRuns.workspaceId, context.workspaceId), eq(agentRuns.id, id)))
+    .returning({ id: agentRuns.id });
+
+  if (!run) throw new Error("Agent run not found");
+  return { ok: true };
+}
+
+export async function clearAgentRuns(context: AppContext) {
+  const result = await context.pool.query(
+    `delete from agent_runs
+     where workspace_id = $1`,
+    [context.workspaceId]
+  );
+  return { ok: true, deletedAgentRuns: result.rowCount ?? 0 };
 }

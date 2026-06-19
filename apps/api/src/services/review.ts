@@ -1,7 +1,7 @@
 import { reviewQueue } from "@personal-context-os/db";
 import { desc, eq, and } from "drizzle-orm";
 import { createTaskSchema, type reviewDecisionSchema } from "@personal-context-os/shared";
-import type { z } from "zod";
+import { z } from "zod";
 import { createNote } from "./notes.js";
 import { createProject } from "./projects.js";
 import { createTask } from "./tasks.js";
@@ -10,11 +10,19 @@ import type { Actor, AppContext } from "./types.js";
 
 type ReviewDecision = z.infer<typeof reviewDecisionSchema>;
 
-export async function listReviewQueue(context: AppContext) {
+const reviewQueueListQuerySchema = z.object({
+  status: z.enum(["pending", "approved", "rejected", "all"]).default("pending")
+});
+
+export async function listReviewQueue(context: AppContext, query: unknown = {}) {
+  const filters = reviewQueueListQuerySchema.parse(query ?? {});
+  const where = [eq(reviewQueue.workspaceId, context.workspaceId)];
+  if (filters.status !== "all") where.push(eq(reviewQueue.status, filters.status));
+
   const items = await context.db
     .select()
     .from(reviewQueue)
-    .where(and(eq(reviewQueue.workspaceId, context.workspaceId), eq(reviewQueue.status, "pending")))
+    .where(and(...where))
     .orderBy(desc(reviewQueue.createdAt))
     .limit(200);
 
@@ -62,6 +70,27 @@ export async function rejectReviewItem(context: AppContext, id: string, actor: A
   if (!updated) throw new Error("Review item not found");
   await writeAuditEvent(context, { ...actor, action: "review reject", rawItemId: updated.rawItemId, metadata: { reviewItemId: id } });
   return { item: updated };
+}
+
+export async function deleteReviewItem(context: AppContext, id: string, actor: Actor) {
+  const [item] = await context.db
+    .delete(reviewQueue)
+    .where(and(eq(reviewQueue.workspaceId, context.workspaceId), eq(reviewQueue.id, id)))
+    .returning({ id: reviewQueue.id, rawItemId: reviewQueue.rawItemId, suggestedAction: reviewQueue.suggestedAction });
+
+  if (!item) throw new Error("Review item not found");
+  await writeAuditEvent(context, { ...actor, action: "review delete", rawItemId: item.rawItemId, metadata: { reviewItemId: id, suggestedAction: item.suggestedAction } });
+  return { ok: true };
+}
+
+export async function clearReviewQueue(context: AppContext, actor: Actor) {
+  const result = await context.pool.query(
+    `delete from review_queue
+     where workspace_id = $1`,
+    [context.workspaceId]
+  );
+  await writeAuditEvent(context, { ...actor, action: "review clear", metadata: { deletedReviewItems: result.rowCount ?? 0 } });
+  return { ok: true, deletedReviewItems: result.rowCount ?? 0 };
 }
 
 function stringOrUndefined(value: unknown) {

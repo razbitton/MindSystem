@@ -53,6 +53,37 @@ function createRuntime(responsePayload: unknown = { ok: true }) {
 }
 
 const routeCases: RouteCase[] = [
+  {
+    name: "list_raw_items",
+    args: { source_type: "manual", limit: 5 },
+    method: "GET",
+    path: "/api/raw-items",
+    query: { source_type: "manual", limit: "5" }
+  },
+  { name: "get_raw_item", args: { id: "raw-id" }, method: "GET", path: "/api/raw-items/raw-id" },
+  {
+    name: "delete_raw_item",
+    args: { id: "raw-id", deleteDerivedEntities: true },
+    method: "POST",
+    path: "/api/raw-items/raw-id/delete",
+    body: { deleteDerivedEntities: true }
+  },
+  {
+    name: "clear_raw_items",
+    args: { deleteDerivedEntities: true },
+    method: "POST",
+    path: "/api/raw-items/clear",
+    body: { deleteDerivedEntities: true }
+  },
+  {
+    name: "list_entities",
+    args: { entity_type: "decision", limit: 10 },
+    method: "GET",
+    path: "/api/entities",
+    query: { entity_type: "decision", limit: "10" }
+  },
+  { name: "get_entity", args: { id: "entity-id" }, method: "GET", path: "/api/entities/entity-id" },
+  { name: "delete_entity", args: { id: "entity-id" }, method: "DELETE", path: "/api/entities/entity-id" },
   { name: "list_projects", args: {}, method: "GET", path: "/api/projects" },
   { name: "create_project", args: { name: "Project" }, method: "POST", path: "/api/projects", body: { name: "Project" } },
   { name: "get_project", args: { id: "project-id" }, method: "GET", path: "/api/projects/project-id" },
@@ -80,11 +111,24 @@ const routeCases: RouteCase[] = [
   { name: "list_documents", args: {}, method: "GET", path: "/api/documents" },
   { name: "attach_document", args: { title: "Doc" }, method: "POST", path: "/api/documents", body: { title: "Doc" } },
   { name: "get_document", args: { id: "document-id" }, method: "GET", path: "/api/documents/document-id" },
+  { name: "update_document", args: { id: "document-id", title: "Doc 2" }, method: "PATCH", path: "/api/documents/document-id", body: { title: "Doc 2" } },
+  { name: "delete_document", args: { id: "document-id" }, method: "DELETE", path: "/api/documents/document-id" },
+  {
+    name: "list_reminders",
+    args: { status: "scheduled", limit: 5 },
+    method: "GET",
+    path: "/api/reminders",
+    query: { status: "scheduled", limit: "5" }
+  },
+  { name: "create_reminder", args: { title: "Reminder" }, method: "POST", path: "/api/reminders", body: { title: "Reminder" } },
+  { name: "get_reminder", args: { id: "reminder-id" }, method: "GET", path: "/api/reminders/reminder-id" },
+  { name: "update_reminder", args: { id: "reminder-id", status: "done" }, method: "PATCH", path: "/api/reminders/reminder-id", body: { status: "done" } },
+  { name: "delete_reminder", args: { id: "reminder-id" }, method: "DELETE", path: "/api/reminders/reminder-id" },
   { name: "get_project_context", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
   { name: "create_context_pack", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
   { name: "get_daily_dashboard", args: {}, method: "GET", path: "/api/dashboard/today" },
   { name: "get_urgent_tasks", args: { limit: 10 }, method: "GET", path: "/api/tasks", query: { priority: "urgent", limit: "10" } },
-  { name: "list_review_queue", args: {}, method: "GET", path: "/api/review-queue" },
+  { name: "list_review_queue", args: { status: "all" }, method: "GET", path: "/api/review-queue", query: { status: "all" } },
   {
     name: "approve_review_item",
     args: { id: "review-id", editedPayload: { title: "Edited" } },
@@ -93,6 +137,8 @@ const routeCases: RouteCase[] = [
     body: { editedPayload: { title: "Edited" } }
   },
   { name: "reject_review_item", args: { id: "review-id" }, method: "POST", path: "/api/review-queue/review-id/reject", body: {} },
+  { name: "delete_review_item", args: { id: "review-id" }, method: "DELETE", path: "/api/review-queue/review-id" },
+  { name: "clear_review_queue", args: {}, method: "POST", path: "/api/review-queue/clear", body: {} },
   { name: "list_agents", args: {}, method: "GET", path: "/api/agents" },
   {
     name: "create_agent_token",
@@ -101,7 +147,35 @@ const routeCases: RouteCase[] = [
     path: "/api/agents/tokens",
     body: { name: "Agent", scopes: ["memory:read"] }
   },
-  { name: "list_audit_events", args: {}, method: "GET", path: "/api/audit-events" }
+  { name: "revoke_agent_token", args: { id: "token-id" }, method: "POST", path: "/api/agents/tokens/token-id/revoke", body: {} },
+  { name: "delete_agent_token", args: { id: "token-id" }, method: "DELETE", path: "/api/agents/tokens/token-id" },
+  { name: "delete_agent_run", args: { id: "run-id" }, method: "DELETE", path: "/api/agents/runs/run-id" },
+  { name: "clear_agent_runs", args: {}, method: "POST", path: "/api/agents/runs/clear", body: {} },
+  { name: "list_audit_events", args: {}, method: "GET", path: "/api/audit-events" },
+  { name: "delete_audit_event", args: { id: "audit-id" }, method: "DELETE", path: "/api/audit-events/audit-id" },
+  { name: "clear_audit_events", args: {}, method: "POST", path: "/api/audit-events/clear", body: {} },
+  { name: "list_retrieval_logs", args: { limit: 5 }, method: "GET", path: "/api/retrieval-logs", query: { limit: "5" } },
+  { name: "delete_retrieval_log", args: { id: "retrieval-id" }, method: "DELETE", path: "/api/retrieval-logs/retrieval-id" },
+  { name: "clear_retrieval_logs", args: {}, method: "POST", path: "/api/retrieval-logs/clear", body: {} },
+  { name: "list_schema_definitions", args: {}, method: "GET", path: "/api/schema-definitions" },
+  { name: "delete_schema_definition", args: { id: "schema-id" }, method: "DELETE", path: "/api/schema-definitions/schema-id" },
+  { name: "clear_schema_definitions", args: {}, method: "POST", path: "/api/schema-definitions/clear", body: {} },
+  { name: "list_project_schema_overrides", args: {}, method: "GET", path: "/api/project-schema-overrides" },
+  {
+    name: "delete_project_schema_override",
+    args: { id: "override-id" },
+    method: "DELETE",
+    path: "/api/project-schema-overrides/override-id"
+  },
+  { name: "clear_project_schema_overrides", args: {}, method: "POST", path: "/api/project-schema-overrides/clear", body: {} },
+  { name: "get_data_inventory", args: {}, method: "GET", path: "/api/admin/data-inventory" },
+  {
+    name: "purge_workspace_data",
+    args: { types: ["raw_items", "entities"] },
+    method: "POST",
+    path: "/api/admin/purge-data",
+    body: { types: ["raw_items", "entities"] }
+  }
 ];
 
 describe("MCP REST execution", () => {
@@ -127,6 +201,10 @@ describe("MCP REST execution", () => {
 });
 
 const resourceCases = [
+  { uri: "raw-items://recent", path: "/api/raw-items", scope: "memory:read" },
+  { uri: "raw-item://raw-id", path: "/api/raw-items/raw-id", scope: "memory:read" },
+  { uri: "entities://all", path: "/api/entities", scope: "memory:read" },
+  { uri: "entity://entity-id", path: "/api/entities/entity-id", scope: "memory:read" },
   { uri: "projects://all", path: "/api/projects", scope: "projects:read" },
   { uri: "project://project-id", path: "/api/projects/project-id", scope: "projects:read" },
   { uri: "tasks://all", path: "/api/tasks", scope: "tasks:read" },
@@ -135,9 +213,15 @@ const resourceCases = [
   { uri: "note://note-id", path: "/api/notes/note-id", scope: "memory:read" },
   { uri: "documents://all", path: "/api/documents", scope: "documents:read" },
   { uri: "document://document-id", path: "/api/documents/document-id", scope: "documents:read" },
+  { uri: "reminders://all", path: "/api/reminders", scope: "memory:read" },
+  { uri: "reminder://reminder-id", path: "/api/reminders/reminder-id", scope: "memory:read" },
   { uri: "review-queue://pending", path: "/api/review-queue", scope: "admin" },
   { uri: "audit-events://recent", path: "/api/audit-events", scope: "admin" },
-  { uri: "agents://state", path: "/api/agents", scope: "admin" }
+  { uri: "retrieval-logs://recent", path: "/api/retrieval-logs", scope: "admin" },
+  { uri: "agents://state", path: "/api/agents", scope: "admin" },
+  { uri: "schema-definitions://all", path: "/api/schema-definitions", scope: "admin" },
+  { uri: "project-schema-overrides://all", path: "/api/project-schema-overrides", scope: "admin" },
+  { uri: "data-inventory://workspace", path: "/api/admin/data-inventory", scope: "admin" }
 ] as const;
 
 describe("MCP resources", () => {

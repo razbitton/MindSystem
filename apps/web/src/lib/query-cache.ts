@@ -18,8 +18,15 @@ const workspaceDataPrefixes = [
   "GET /api/projects",
   "GET /api/tasks",
   "GET /api/documents",
+  "GET /api/reminders",
+  "GET /api/raw-items",
+  "GET /api/entities",
   "GET /api/review-queue",
-  "GET /api/search"
+  "GET /api/search",
+  "GET /api/admin/data-inventory",
+  "GET /api/retrieval-logs",
+  "GET /api/audit-events",
+  "GET /api/agents"
 ];
 
 export function apiQueryKey(path: string, query?: AnyRecord) {

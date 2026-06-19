@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ShieldCheck, X } from "lucide-react";
+import { Check, ShieldCheck, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { apiPost, type AnyRecord } from "../lib/api";
+import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "../i18n";
 
-type Decision = { id: string; action: "approve" | "reject" } | null;
+type Decision = { id: string; action: "approve" | "reject" | "delete" } | null;
 
 export default function ReviewView() {
   const { t, formatDate, translateValue } = useI18n();
@@ -51,8 +51,18 @@ export default function ReviewView() {
     if (!pending) return;
     setBusy(true);
     try {
-      await apiPost(`/api/review-queue/${pending.id}/${pending.action}`, {});
-      toast.success(pending.action === "approve" ? t("review.approved") : t("review.rejected"));
+      if (pending.action === "delete") {
+        await apiDelete(`/api/review-queue/${pending.id}`);
+      } else {
+        await apiPost(`/api/review-queue/${pending.id}/${pending.action}`, {});
+      }
+      toast.success(
+        pending.action === "approve"
+          ? t("review.approved")
+          : pending.action === "delete"
+            ? t("review.deleted")
+            : t("review.rejected")
+      );
       setPending(null);
       invalidateWorkspaceQueryCache();
       await load(true);
@@ -64,6 +74,7 @@ export default function ReviewView() {
   }
 
   const isApprove = pending?.action === "approve";
+  const isDelete = pending?.action === "delete";
 
   return (
     <>
@@ -146,6 +157,15 @@ export default function ReviewView() {
                 >
                   <X aria-hidden /> {t("review.reject")}
                 </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  title={t("common.delete")}
+                  aria-label={t("common.delete")}
+                  onClick={() => setPending({ id: item.id, action: "delete" })}
+                >
+                  <Trash2 aria-hidden />
+                </Button>
               </div>
             </article>
           ))}
@@ -155,9 +175,9 @@ export default function ReviewView() {
       <ConfirmDialog
         open={pending !== null}
         onOpenChange={(next) => (!next ? setPending(null) : undefined)}
-        title={isApprove ? t("review.approveTitle") : t("review.rejectTitle")}
-        description={isApprove ? t("review.approveBody") : t("review.rejectBody")}
-        confirmLabel={isApprove ? t("review.approve") : t("review.reject")}
+        title={isApprove ? t("review.approveTitle") : isDelete ? t("review.deleteTitle") : t("review.rejectTitle")}
+        description={isApprove ? t("review.approveBody") : isDelete ? t("review.deleteBody") : t("review.rejectBody")}
+        confirmLabel={isApprove ? t("review.approve") : isDelete ? t("common.delete") : t("review.reject")}
         destructive={!isApprove}
         loading={busy}
         onConfirm={confirmDecision}

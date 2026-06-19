@@ -4,12 +4,17 @@ import {
   createDocumentSchema,
   createNoteSchema,
   createProjectSchema,
+  createReminderSchema,
   createTaskSchema,
+  deleteRawItemSchema,
   ingestFreeTextSchema,
   loginSchema,
+  patchDocumentSchema,
   patchNoteSchema,
   patchProjectSchema,
+  patchReminderSchema,
   patchTaskSchema,
+  purgeWorkspaceDataSchema,
   reviewDecisionSchema
 } from "./schemas.js";
 
@@ -69,6 +74,34 @@ export function buildOpenApiSpec() {
           ],
           responses: { "200": { description: "Search results" } }
         }
+      },
+      "/raw-items": {
+        get: { summary: "List raw captures", responses: { "200": { description: "Raw captures" } } }
+      },
+      "/raw-items/{id}": {
+        get: { summary: "Get a raw capture", responses: { "200": { description: "Raw capture" } } },
+        delete: { summary: "Delete a raw capture", responses: { "200": { description: "Deleted" } } }
+      },
+      "/raw-items/{id}/delete": {
+        post: {
+          summary: "Delete a raw capture with options",
+          requestBody: { required: false, content: { "application/json": { schema: json(deleteRawItemSchema) } } },
+          responses: { "200": { description: "Deleted" } }
+        }
+      },
+      "/raw-items/clear": {
+        post: {
+          summary: "Delete all raw captures",
+          requestBody: { required: false, content: { "application/json": { schema: json(deleteRawItemSchema) } } },
+          responses: { "200": { description: "Deleted" } }
+        }
+      },
+      "/entities": {
+        get: { summary: "List generic entities", responses: { "200": { description: "Entities" } } }
+      },
+      "/entities/{id}": {
+        get: { summary: "Get a generic entity", responses: { "200": { description: "Entity" } } },
+        delete: { summary: "Delete a generic entity and cascading typed record", responses: { "200": { description: "Deleted" } } }
       },
       "/projects": {
         post: {
@@ -136,7 +169,30 @@ export function buildOpenApiSpec() {
         get: { summary: "List documents", responses: { "200": { description: "Documents" } } }
       },
       "/documents/{id}": {
-        get: { summary: "Get a document", responses: { "200": { description: "Document" } } }
+        get: { summary: "Get a document", responses: { "200": { description: "Document" } } },
+        patch: {
+          summary: "Update document metadata or extracted text",
+          requestBody: { required: true, content: { "application/json": { schema: json(patchDocumentSchema) } } },
+          responses: { "200": { description: "Document" } }
+        },
+        delete: { summary: "Delete a document", responses: { "200": { description: "Deleted" } } }
+      },
+      "/reminders": {
+        post: {
+          summary: "Create a reminder",
+          requestBody: { required: true, content: { "application/json": { schema: json(createReminderSchema) } } },
+          responses: { "200": { description: "Reminder" } }
+        },
+        get: { summary: "List reminders", responses: { "200": { description: "Reminders" } } }
+      },
+      "/reminders/{id}": {
+        get: { summary: "Get a reminder", responses: { "200": { description: "Reminder" } } },
+        patch: {
+          summary: "Update a reminder",
+          requestBody: { required: true, content: { "application/json": { schema: json(patchReminderSchema) } } },
+          responses: { "200": { description: "Reminder" } }
+        },
+        delete: { summary: "Delete a reminder", responses: { "200": { description: "Deleted" } } }
       },
       "/dashboard/today": {
         get: { summary: "Get dashboard data for today", responses: { "200": { description: "Dashboard" } } }
@@ -154,6 +210,12 @@ export function buildOpenApiSpec() {
       "/review-queue/{id}/reject": {
         post: { summary: "Reject a review item", responses: { "200": { description: "Review item" } } }
       },
+      "/review-queue/{id}": {
+        delete: { summary: "Delete a review item", responses: { "200": { description: "Deleted" } } }
+      },
+      "/review-queue/clear": {
+        post: { summary: "Delete all review items", responses: { "200": { description: "Deleted" } } }
+      },
       "/agents": {
         get: { summary: "List agent tokens and recent runs", responses: { "200": { description: "Agents" } } }
       },
@@ -164,8 +226,63 @@ export function buildOpenApiSpec() {
           responses: { "200": { description: "Token. Plaintext is returned once." } }
         }
       },
+      "/agents/tokens/{id}/revoke": {
+        post: { summary: "Revoke an agent token", responses: { "200": { description: "Token" } } }
+      },
+      "/agents/tokens/{id}": {
+        delete: { summary: "Delete an agent token", responses: { "200": { description: "Deleted" } } }
+      },
+      "/agents/runs/{id}": {
+        delete: { summary: "Delete an agent run", responses: { "200": { description: "Deleted" } } }
+      },
+      "/agents/runs/clear": {
+        post: { summary: "Delete all agent runs", responses: { "200": { description: "Deleted" } } }
+      },
       "/audit-events": {
         get: { summary: "List audit events", responses: { "200": { description: "Audit events" } } }
+      },
+      "/audit-events/{id}": {
+        delete: { summary: "Delete an audit event", responses: { "200": { description: "Deleted" } } }
+      },
+      "/audit-events/clear": {
+        post: { summary: "Delete all audit events", responses: { "200": { description: "Deleted" } } }
+      },
+      "/retrieval-logs": {
+        get: { summary: "List retrieval logs", responses: { "200": { description: "Retrieval logs" } } }
+      },
+      "/retrieval-logs/{id}": {
+        delete: { summary: "Delete a retrieval log", responses: { "200": { description: "Deleted" } } }
+      },
+      "/retrieval-logs/clear": {
+        post: { summary: "Delete all retrieval logs", responses: { "200": { description: "Deleted" } } }
+      },
+      "/schema-definitions": {
+        get: { summary: "List schema definitions", responses: { "200": { description: "Schema definitions" } } }
+      },
+      "/schema-definitions/{id}": {
+        delete: { summary: "Delete a schema definition", responses: { "200": { description: "Deleted" } } }
+      },
+      "/schema-definitions/clear": {
+        post: { summary: "Delete all schema definitions", responses: { "200": { description: "Deleted" } } }
+      },
+      "/project-schema-overrides": {
+        get: { summary: "List project schema overrides", responses: { "200": { description: "Project schema overrides" } } }
+      },
+      "/project-schema-overrides/{id}": {
+        delete: { summary: "Delete a project schema override", responses: { "200": { description: "Deleted" } } }
+      },
+      "/project-schema-overrides/clear": {
+        post: { summary: "Delete all project schema overrides", responses: { "200": { description: "Deleted" } } }
+      },
+      "/admin/data-inventory": {
+        get: { summary: "Get workspace data inventory counts", responses: { "200": { description: "Inventory counts" } } }
+      },
+      "/admin/purge-data": {
+        post: {
+          summary: "Bulk-delete selected workspace data categories",
+          requestBody: { required: false, content: { "application/json": { schema: json(purgeWorkspaceDataSchema) } } },
+          responses: { "200": { description: "Deleted counts" } }
+        }
       },
       "/openapi.json": {
         get: { summary: "Get OpenAPI spec", responses: { "200": { description: "OpenAPI" } } }

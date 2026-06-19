@@ -6,6 +6,13 @@ import { getToolDefinition, toolDefinitions } from "./tools.js";
 const expectedScopes: Record<string, AgentScope> = {
   search_memory: "memory:read",
   ingest_free_text: "memory:write",
+  list_raw_items: "memory:read",
+  get_raw_item: "memory:read",
+  delete_raw_item: "memory:write",
+  clear_raw_items: "memory:write",
+  list_entities: "memory:read",
+  get_entity: "memory:read",
+  delete_entity: "admin",
   list_projects: "projects:read",
   create_project: "projects:write",
   get_project: "projects:read",
@@ -27,6 +34,13 @@ const expectedScopes: Record<string, AgentScope> = {
   list_documents: "documents:read",
   attach_document: "documents:write",
   get_document: "documents:read",
+  update_document: "documents:write",
+  delete_document: "documents:write",
+  list_reminders: "memory:read",
+  create_reminder: "memory:write",
+  get_reminder: "memory:read",
+  update_reminder: "memory:write",
+  delete_reminder: "memory:write",
   get_project_context: "projects:read",
   get_daily_dashboard: "memory:read",
   get_urgent_tasks: "tasks:read",
@@ -35,9 +49,28 @@ const expectedScopes: Record<string, AgentScope> = {
   list_review_queue: "admin",
   approve_review_item: "admin",
   reject_review_item: "admin",
+  delete_review_item: "admin",
+  clear_review_queue: "admin",
   list_agents: "admin",
   create_agent_token: "admin",
-  list_audit_events: "admin"
+  revoke_agent_token: "admin",
+  delete_agent_token: "admin",
+  delete_agent_run: "admin",
+  clear_agent_runs: "admin",
+  list_audit_events: "admin",
+  delete_audit_event: "admin",
+  clear_audit_events: "admin",
+  list_retrieval_logs: "admin",
+  delete_retrieval_log: "admin",
+  clear_retrieval_logs: "admin",
+  list_schema_definitions: "admin",
+  delete_schema_definition: "admin",
+  clear_schema_definitions: "admin",
+  list_project_schema_overrides: "admin",
+  delete_project_schema_override: "admin",
+  clear_project_schema_overrides: "admin",
+  get_data_inventory: "admin",
+  purge_workspace_data: "admin"
 };
 
 describe("MCP tool definitions", () => {
@@ -67,6 +100,12 @@ describe("MCP tool definitions", () => {
     expect(getToolDefinition("delete_task")?.requiredScope).toBe("tasks:write");
     expect(getToolDefinition("update_note")?.requiredScope).toBe("memory:write");
     expect(getToolDefinition("delete_note")?.requiredScope).toBe("memory:write");
+    expect(getToolDefinition("delete_raw_item")?.requiredScope).toBe("memory:write");
+    expect(getToolDefinition("delete_entity")?.requiredScope).toBe("admin");
+    expect(getToolDefinition("update_document")?.requiredScope).toBe("documents:write");
+    expect(getToolDefinition("delete_document")?.requiredScope).toBe("documents:write");
+    expect(getToolDefinition("update_reminder")?.requiredScope).toBe("memory:write");
+    expect(getToolDefinition("delete_reminder")?.requiredScope).toBe("memory:write");
   });
 
   it("keeps observability and token administration tools admin-only", () => {
@@ -76,6 +115,9 @@ describe("MCP tool definitions", () => {
     expect(getToolDefinition("list_agents")?.requiredScope).toBe("admin");
     expect(getToolDefinition("create_agent_token")?.requiredScope).toBe("admin");
     expect(getToolDefinition("list_audit_events")?.requiredScope).toBe("admin");
+    expect(getToolDefinition("purge_workspace_data")?.requiredScope).toBe("admin");
+    expect(getToolDefinition("clear_audit_events")?.requiredScope).toBe("admin");
+    expect(getToolDefinition("clear_agent_runs")?.requiredScope).toBe("admin");
   });
 
   it("does not expose a generic arbitrary REST tool", () => {

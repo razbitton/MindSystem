@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Ban, Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { agentScopeValues } from "@personal-context-os/shared";
-import { apiPost, type AnyRecord } from "../lib/api";
+import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateCachedQueries,
@@ -12,12 +12,15 @@ import {
 } from "../lib/query-cache";
 import { EmptyState, PageHeader, Panel, StatusBadge } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "../i18n";
+
+type PendingTokenAction = { kind: "revoke" | "delete"; token: AnyRecord } | null;
 
 export default function AgentsView({ embedded = false }: { embedded?: boolean }) {
   const { t, formatDate, translateValue } = useI18n();
@@ -28,6 +31,8 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
   const [scopes, setScopes] = useState<string[]>(["memory:read", "projects:read", "tasks:read"]);
   const [createdToken, setCreatedToken] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [pendingTokenAction, setPendingTokenAction] = useState<PendingTokenAction>(null);
+  const [busy, setBusy] = useState(false);
 
   async function load(force = false) {
     setData(await cachedApiGet("/api/agents", undefined, { force }));
@@ -54,6 +59,27 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
     setCopied(true);
     toast.success(t("common.copied"));
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function confirmTokenAction() {
+    if (!pendingTokenAction) return;
+    setBusy(true);
+    try {
+      if (pendingTokenAction.kind === "revoke") {
+        await apiPost(`/api/agents/tokens/${pendingTokenAction.token.id}/revoke`, {});
+        toast.success(t("agents.revokedToken"));
+      } else {
+        await apiDelete(`/api/agents/tokens/${pendingTokenAction.token.id}`);
+        toast.success(t("agents.deletedToken"));
+      }
+      setPendingTokenAction(null);
+      invalidateCachedQueries("GET /api/agents");
+      await load(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   const config = useMemo(
@@ -165,6 +191,34 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
                   <span dir="ltr">{row.scopes?.join(", ")}</span> · {formatDate(row.createdAt ?? row.created_at)}
                 </>
               )}
+              action={(row) => {
+                const revoked = Boolean(row.revokedAt ?? row.revoked_at);
+                return (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      title={t("agents.revokeToken")}
+                      aria-label={t("agents.revokeToken")}
+                      disabled={revoked}
+                      onClick={() => setPendingTokenAction({ kind: "revoke", token: row })}
+                    >
+                      <Ban aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      title={t("common.delete")}
+                      aria-label={t("common.delete")}
+                      onClick={() => setPendingTokenAction({ kind: "delete", token: row })}
+                    >
+                      <Trash2 aria-hidden />
+                    </Button>
+                  </div>
+                );
+              }}
             />
           </Panel>
         </div>
@@ -192,6 +246,21 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
           />
         </Panel>
       </div>
+
+      <ConfirmDialog
+        open={pendingTokenAction !== null}
+        onOpenChange={(next) => (!next ? setPendingTokenAction(null) : undefined)}
+        title={pendingTokenAction?.kind === "revoke" ? t("agents.revokeToken") : t("agents.deleteToken")}
+        description={
+          pendingTokenAction?.kind === "revoke"
+            ? t("agents.revokeConfirm", { title: pendingTokenAction.token.name ?? "" })
+            : t("agents.deleteConfirm", { title: pendingTokenAction?.token.name ?? "" })
+        }
+        confirmLabel={pendingTokenAction?.kind === "revoke" ? t("agents.revokeToken") : t("common.delete")}
+        destructive
+        loading={busy}
+        onConfirm={confirmTokenAction}
+      />
     </div>
   );
 }
@@ -199,24 +268,29 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
 function Rows({
   rows,
   title,
-  meta
+  meta,
+  action
 }: {
   rows: AnyRecord[];
   title: (row: AnyRecord) => React.ReactNode;
   meta: (row: AnyRecord) => React.ReactNode;
+  action?: (row: AnyRecord) => React.ReactNode;
 }) {
   const { t } = useI18n();
   if (!rows.length) return <EmptyState>{t("common.nothingRecorded")}</EmptyState>;
   return (
     <ul className="flex flex-col divide-y divide-border">
       {rows.slice(0, 8).map((row) => (
-        <li key={row.id} className="flex flex-col gap-1 py-2.5 first:pt-0 last:pb-0">
-          <p className="text-sm font-medium text-foreground" dir="auto">
-            {title(row)}
-          </p>
-          <div className="text-xs text-muted-foreground" dir="auto">
-            {meta(row)}
+        <li key={row.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-sm font-medium text-foreground" dir="auto">
+              {title(row)}
+            </p>
+            <div className="text-xs text-muted-foreground" dir="auto">
+              {meta(row)}
+            </div>
           </div>
+          {action ? action(row) : null}
         </li>
       ))}
     </ul>
