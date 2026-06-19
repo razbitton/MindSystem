@@ -24,7 +24,6 @@ import {
   EmptyState,
   IconButton,
   PageHeader,
-  Panel,
   PriorityBadge,
   SegmentedControl,
   StatusBadge
@@ -205,8 +204,7 @@ export default function TasksView() {
         }
       />
 
-      <Panel>
-        <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[220px] flex-1">
               <Search
@@ -355,8 +353,7 @@ export default function TasksView() {
               ))}
             </ul>
           )}
-        </div>
-      </Panel>
+      </section>
 
       <Drawer
         open={drawerOpen}

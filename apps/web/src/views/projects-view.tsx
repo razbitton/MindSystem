@@ -10,7 +10,7 @@ import {
   peekCachedQuery
 } from "../lib/query-cache";
 import { dateValue, fromDateTimeInput, matchesQuery, toDateTimeInput, truncate } from "../lib/view-models";
-import { Drawer, EmptyState, IconButton, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
+import { Drawer, EmptyState, IconButton, PageHeader, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -150,8 +150,7 @@ export default function ProjectsView() {
         }
       />
 
-      <Panel>
-        <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-4">
           <div className="relative max-w-md">
             <Search
               className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
@@ -227,8 +226,7 @@ export default function ProjectsView() {
               ))}
             </div>
           )}
-        </div>
-      </Panel>
+      </section>
 
       <Drawer
         open={drawerOpen}
