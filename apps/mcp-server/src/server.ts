@@ -1,15 +1,18 @@
 import { loadEnv } from "@personal-context-os/config";
-import { createDb, ensureDefaultWorkspace, agentRuns, auditEvents, entityEdges } from "@personal-context-os/db";
+import { createDb, ensureDefaultWorkspace, agentRuns, auditEvents } from "@personal-context-os/db";
 import { eq } from "drizzle-orm";
 import Fastify from "fastify";
 import { authenticateAgent, requireToolScope, type AgentIdentity } from "./auth.js";
+import { executeTool, readResource, type McpExecutionRuntime } from "./execution.js";
 import { isAcceptedClientNotification, type JsonRpcEnvelope } from "./protocol.js";
+import { getResourceDefinition, listedResources } from "./resources.js";
 import { getToolDefinition, toolDefinitions } from "./tools.js";
 
 const env = loadEnv();
 const database = createDb(env.DATABASE_URL);
 await ensureDefaultWorkspace(database.db);
 const port = Number(process.env.PORT ?? 4100);
+const runtime: McpExecutionRuntime = { db: database.db, apiBaseUrl: env.API_BASE_URL };
 
 const app = Fastify({ logger: true });
 
@@ -53,14 +56,7 @@ async function handleJsonRpc(method: string, params: Record<string, unknown>, be
 
   if (method === "resources/list") {
     return {
-      resources: [
-        { uri: "dashboard://today", name: "Today's dashboard", mimeType: "application/json" },
-        { uri: "project://{projectId}", name: "Project by id", mimeType: "application/json" },
-        { uri: "task://{taskId}", name: "Task by id", mimeType: "application/json" },
-        { uri: "note://{noteId}", name: "Note by id", mimeType: "application/json" },
-        { uri: "document://{documentId}", name: "Document by id", mimeType: "application/json" },
-        { uri: "context-pack://project/{projectId}", name: "Project context pack", mimeType: "text/markdown" }
-      ]
+      resources: listedResources
     };
   }
 
@@ -87,9 +83,10 @@ async function handleJsonRpc(method: string, params: Record<string, unknown>, be
 
   if (method === "resources/read") {
     const uri = String(params.uri ?? "");
-    const data = await readResource(agent, bearerToken, uri);
+    const resource = getResourceDefinition(uri);
+    const data = await readResource(runtime, agent, bearerToken, uri);
     return {
-      contents: [{ uri, mimeType: uri.startsWith("context-pack://") ? "text/markdown" : "application/json", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
+      contents: [{ uri, mimeType: resource?.mimeType ?? "application/json", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }]
     };
   }
 
@@ -123,7 +120,7 @@ async function callTool(agent: AgentIdentity, bearerToken: string, name: string,
   });
 
   try {
-    const result = await executeTool(agent, bearerToken, name, args);
+    const result = await executeTool(runtime, agent, bearerToken, name, args);
     if (run) {
       await database.db
         .update(agentRuns)
@@ -140,117 +137,6 @@ async function callTool(agent: AgentIdentity, bearerToken: string, name: string,
     }
     throw error;
   }
-}
-
-async function executeTool(agent: AgentIdentity, bearerToken: string, name: string, args: Record<string, unknown>) {
-  if (name === "search_memory") {
-    return apiGet("/api/search", args, bearerToken);
-  }
-  if (name === "ingest_free_text") {
-    return apiPost("/api/ingest/free-text", { sourceType: "codex", ...args }, bearerToken);
-  }
-  if (name === "create_project") {
-    return apiPost("/api/projects", { priority: "medium", ...args }, bearerToken);
-  }
-  if (name === "create_task") {
-    return apiPost("/api/tasks", args, bearerToken);
-  }
-  if (name === "update_task") {
-    const { id, ...body } = args;
-    return apiPatch(`/api/tasks/${String(id)}`, body, bearerToken);
-  }
-  if (name === "complete_task") {
-    return apiPost(`/api/tasks/${String(args.id)}/complete`, {}, bearerToken);
-  }
-  if (name === "get_project_context" || name === "create_context_pack") {
-    return apiGet(`/api/projects/${String(args.projectId)}/context`, {}, bearerToken);
-  }
-  if (name === "get_daily_dashboard") {
-    return apiGet("/api/dashboard/today", {}, bearerToken);
-  }
-  if (name === "get_urgent_tasks") {
-    return apiGet("/api/tasks", { priority: "urgent", limit: args.limit ?? 25 }, bearerToken);
-  }
-  if (name === "attach_document") {
-    return apiPost("/api/documents", args, bearerToken);
-  }
-  if (name === "link_entities") {
-    const [edge] = await database.db
-      .insert(entityEdges)
-      .values({
-        workspaceId: agent.workspaceId,
-        fromEntityId: String(args.fromEntityId),
-        toEntityId: String(args.toEntityId),
-        relationType: String(args.relationType) as "belongs_to",
-        confidenceScore: "1"
-      })
-      .returning();
-    return { edge };
-  }
-  throw new Error(`Unhandled tool: ${name}`);
-}
-
-async function readResource(agent: AgentIdentity, bearerToken: string, uri: string) {
-  if (uri === "dashboard://today") {
-    requireToolScope(agent.scopes, "memory:read");
-    return apiGet("/api/dashboard/today", {}, bearerToken);
-  }
-  if (uri.startsWith("project://")) {
-    requireToolScope(agent.scopes, "projects:read");
-    return apiGet(`/api/projects/${uri.replace("project://", "")}`, {}, bearerToken);
-  }
-  if (uri.startsWith("context-pack://project/")) {
-    requireToolScope(agent.scopes, "projects:read");
-    const data = await apiGet(`/api/projects/${uri.replace("context-pack://project/", "")}/context`, {}, bearerToken);
-    return data.contextPack ?? JSON.stringify(data);
-  }
-  if (uri.startsWith("task://")) {
-    requireToolScope(agent.scopes, "tasks:read");
-    return apiGet(`/api/tasks/${uri.replace("task://", "")}`, {}, bearerToken);
-  }
-  if (uri.startsWith("note://")) {
-    requireToolScope(agent.scopes, "memory:read");
-    return apiGet(`/api/notes/${uri.replace("note://", "")}`, {}, bearerToken);
-  }
-  if (uri.startsWith("document://")) {
-    requireToolScope(agent.scopes, "documents:read");
-    return apiGet(`/api/documents/${uri.replace("document://", "")}`, {}, bearerToken);
-  }
-  throw new Error(`Unsupported resource URI: ${uri}`);
-}
-
-async function apiGet(path: string, query: Record<string, unknown>, bearerToken: string) {
-  const url = new URL(path, env.API_BASE_URL);
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
-  }
-  const response = await fetch(url, { headers: authHeaders(bearerToken) });
-  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
-  return response.json();
-}
-
-async function apiPost(path: string, body: Record<string, unknown>, bearerToken: string) {
-  const response = await fetch(new URL(path, env.API_BASE_URL), {
-    method: "POST",
-    headers: { "content-type": "application/json", ...authHeaders(bearerToken) },
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) throw new Error(`API request failed: ${response.status} ${await response.text()}`);
-  return response.json();
-}
-
-async function apiPatch(path: string, body: Record<string, unknown>, bearerToken: string) {
-  const response = await fetch(new URL(path, env.API_BASE_URL), {
-    method: "PATCH",
-    headers: { "content-type": "application/json", ...authHeaders(bearerToken) },
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) throw new Error(`API request failed: ${response.status} ${await response.text()}`);
-  return response.json();
-}
-
-function authHeaders(bearerToken: string) {
-  return { authorization: `Bearer ${bearerToken}` };
 }
 
 function extractToken(headers: Record<string, string | string[] | undefined>) {

@@ -101,6 +101,8 @@ The plaintext token is returned once.
 
 ## MCP Examples
 
+The MCP server aims for REST parity for scoped agent operations. It exposes explicit tools for project, task, note, document, review queue, audit, and agent-token routes, while browser-session-only auth routes stay REST/browser-only. Destructive tools such as `delete_task`, `delete_project`, and `delete_note` are available, but they are explicit tools and require the matching write scope. Grant agent tokens the least scopes needed for the job.
+
 List tools:
 
 ```bash
@@ -125,6 +127,42 @@ curl -X POST http://localhost:4100/mcp \
   -H "content-type: application/json" \
   -H "authorization: Bearer pcos_your_token" \
   -d '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"context-pack://project/PROJECT_ID"}}'
+```
+
+Update a project:
+
+```bash
+curl -X POST http://localhost:4100/mcp \
+  -H "content-type: application/json" \
+  -H "authorization: Bearer pcos_your_token" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_project","arguments":{"id":"PROJECT_ID","status":"paused","priority":"high"}}}'
+```
+
+Delete a task:
+
+```bash
+curl -X POST http://localhost:4100/mcp \
+  -H "content-type: application/json" \
+  -H "authorization: Bearer pcos_your_token" \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"delete_task","arguments":{"id":"TASK_ID"}}}'
+```
+
+Create a note:
+
+```bash
+curl -X POST http://localhost:4100/mcp \
+  -H "content-type: application/json" \
+  -H "authorization: Bearer pcos_your_token" \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"create_note","arguments":{"title":"Decision","body":"Use scoped MCP tools for agent writes.","projectId":"PROJECT_ID"}}}'
+```
+
+Approve a review item:
+
+```bash
+curl -X POST http://localhost:4100/mcp \
+  -H "content-type: application/json" \
+  -H "authorization: Bearer pcos_your_admin_token" \
+  -d '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"approve_review_item","arguments":{"id":"REVIEW_ITEM_ID"}}}'
 ```
 
 Example Codex/OpenClaw MCP config:
@@ -213,9 +251,9 @@ Pipeline order:
 - For a custom domain or split web/API hosts, set `APP_BASE_URL` and optionally `SESSION_COOKIE_DOMAIN`.
 - Agent access is only through REST or MCP tools.
 - Agent tokens are stored as SHA-256 hashes.
-- MCP write tools require least-privilege scopes such as `memory:write`, `tasks:write`, or `documents:write`.
+- MCP tools mirror concrete REST routes where feasible and require matching scopes such as `memory:read`, `memory:write`, `projects:write`, `tasks:write`, or `documents:write`.
 - `admin` grants all scopes.
-- Destructive MCP actions are intentionally not implemented.
+- Destructive MCP actions are explicit and scoped; there is no generic arbitrary REST-path MCP tool.
 - Every ingest, entity creation/update, task completion, token creation, and MCP tool call writes `audit_events`.
 - Rate limiting and CORS are configured in the API; production deployments should replace default secrets and restrict origins.
 - Database credentials are never exposed to agents or the web client.
