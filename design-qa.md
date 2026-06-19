@@ -4,7 +4,7 @@
 
 **Implementation screenshot paths**
 - `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-card-mobile-3004.png`
-- `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-card-desktop.png`
+- `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-desktop-grid-no-toggle-final.png`
 
 **Viewport**
 - Mobile: 390 x 844, dark theme, Hebrew RTL.
@@ -16,14 +16,16 @@
 **Checks**
 - TypeScript: `pnpm --filter @personal-context-os/web lint` passed.
 - Visual smoke test: Playwright loaded `http://localhost:3004/tasks`, created real API tasks, captured screenshots, and deleted the QA tasks.
-- Automated mobile metrics: cards rendered as `article` elements, card width 366px in a 390px viewport, dense mobile row selector absent.
+- Automated desktop metrics: 4 cards rendered as `article` elements, two 568px card columns in a 1920px viewport, and no list/board view toggle present.
 
 **Patches Made**
 - Replaced the previous dense mobile list and desktop board/table surface with the pasted-code card layout.
-- Added the purple primary action row, segmented list/grid toggle, rounded search/filter surface, collapsible filters, task detail panels, and footer actions.
+- Added the purple primary action row, rounded search/filter surface, collapsible filters, task detail panels, and footer actions.
 - Preserved the real API-backed create, edit, complete, delete, search, and filter behavior.
 - Added Hebrew and English action labels for mark-done/completed states.
 - Fixed RTL search placement so the search icon sits on the right and the filter button on the left.
+- Removed the list/grid view switcher and made the card layout the only task presentation.
+- Expanded desktop layout into a responsive two-column card grid while keeping mobile as one column.
 
 **Findings**
 - No P0/P1/P2 findings remain.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Edit2, Filter, LayoutGrid, List, Plus, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, Edit2, Filter, Plus, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -11,13 +11,10 @@ import {
 import {
   dateValue,
   fromDateTimeInput,
-  loadPreference,
   matchesQuery,
   projectName,
-  savePreference,
   toDateTimeInput,
-  truncate,
-  type TaskViewMode
+  truncate
 } from "../lib/view-models";
 import { Drawer, EmptyState } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -39,8 +36,6 @@ import { toast } from "sonner";
 
 const statuses = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"] as const;
 const priorities = ["low", "medium", "high", "urgent"] as const;
-const preferenceKey = "mindsystem.tasks.cardView";
-const taskViewModes = ["board", "list"] as const;
 const ANY = "__any__";
 const NO_PROJECT = "__none__";
 const defaultTaskFilters = { status: "", project_id: "", priority: "" };
@@ -67,7 +62,6 @@ export default function TasksView() {
   );
   const [filters, setFilters] = useState(defaultTaskFilters);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<TaskViewMode>("list");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [editingTask, setEditingTask] = useState<AnyRecord | null>(null);
@@ -85,14 +79,8 @@ export default function TasksView() {
   }
 
   useEffect(() => {
-    setView(loadPreference(preferenceKey, "list", taskViewModes));
     void load();
   }, []);
-
-  function changeView(nextView: TaskViewMode) {
-    setView(nextView);
-    savePreference(preferenceKey, nextView);
-  }
 
   function openCreate() {
     setEditingTask(null);
@@ -190,28 +178,26 @@ export default function TasksView() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 pb-10">
-      <header className="hidden items-center justify-between gap-3 sm:flex">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-10">
+      <header className="hidden items-center justify-start gap-3 sm:flex">
         <h1 className="text-xl font-bold tracking-tight text-foreground" dir="auto">
           {t("tasks.title")}
         </h1>
       </header>
 
       <section className="flex flex-col gap-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center">
           <Button
             type="button"
             onClick={openCreate}
-            className="h-12 min-w-0 flex-1 rounded-xl bg-indigo-500 text-sm font-semibold text-white shadow-lg shadow-indigo-500/15 hover:bg-indigo-600 active:scale-[0.99]"
+            className="h-12 w-full rounded-xl bg-indigo-500 text-sm font-semibold text-white shadow-lg shadow-indigo-500/15 hover:bg-indigo-600 active:scale-[0.99] sm:mx-auto sm:max-w-3xl"
           >
             <Plus className="size-5" aria-hidden />
             <span className="truncate">{t("tasks.newTask")}</span>
           </Button>
-
-          <ViewToggle value={view} onChange={changeView} label={t("common.view")} />
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs sm:mx-auto sm:w-full sm:max-w-3xl">
           <div className="p-2">
             <div className="relative flex items-center">
               <Search
@@ -316,7 +302,6 @@ export default function TasksView() {
             tasks={filteredTasks}
             projects={projects}
             formatDate={formatDate}
-            view={view}
             onEdit={openEdit}
             onComplete={complete}
             onDelete={requestDelete}
@@ -488,56 +473,10 @@ export default function TasksView() {
   );
 }
 
-function ViewToggle({
-  value,
-  onChange,
-  label
-}: {
-  value: TaskViewMode;
-  onChange: (value: TaskViewMode) => void;
-  label: string;
-}) {
-  const { t } = useI18n();
-
-  return (
-    <div
-      className="flex shrink-0 rounded-xl border border-border bg-card p-1 shadow-xs"
-      role="group"
-      aria-label={label}
-    >
-      <button
-        type="button"
-        onClick={() => onChange("list")}
-        aria-pressed={value === "list"}
-        title={t("common.list")}
-        className={cn(
-          "inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground",
-          value === "list" && "bg-secondary text-secondary-foreground shadow-xs"
-        )}
-      >
-        <List className="size-5" aria-hidden />
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("board")}
-        aria-pressed={value === "board"}
-        title={t("common.board")}
-        className={cn(
-          "inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground",
-          value === "board" && "bg-secondary text-secondary-foreground shadow-xs"
-        )}
-      >
-        <LayoutGrid className="size-5" aria-hidden />
-      </button>
-    </div>
-  );
-}
-
 function TaskCards({
   tasks,
   projects,
   formatDate,
-  view,
   onEdit,
   onComplete,
   onDelete
@@ -545,13 +484,12 @@ function TaskCards({
   tasks: AnyRecord[];
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
-  view: TaskViewMode;
   onEdit: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
   return (
-    <div className={view === "board" ? "grid gap-4 md:grid-cols-2" : "flex flex-col gap-4"}>
+    <div className="grid gap-4 xl:grid-cols-2">
       {tasks.map((task) => (
         <TaskCard
           key={task.id}
