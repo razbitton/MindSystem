@@ -1,34 +1,36 @@
 **Source visual truth path**
-- `C:\Users\hp\AppData\Local\Temp\codex-clipboard-a5e5d7ba-c9b8-4b04-93d2-61689cb2e8b6.png`
-- `C:\Users\hp\.codex\attachments\af6e5354-dad3-4af1-bcb8-a2738f70e8ba\pasted-text.txt`
+- `C:\Users\hp\AppData\Local\Temp\codex-clipboard-5509af91-145c-478e-98be-a1eff02a0937.png`
+- `C:\Users\hp\.codex\attachments\61cff1a4-3b17-4997-af3c-c0ad38752c5f\pasted-text.txt`
 
 **Implementation screenshot paths**
-- `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-card-mobile-3004.png`
-- `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-desktop-grid-no-toggle-final.png`
+- `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-desktop-table-rtl.png`
+- `C:\Users\hp\source\repos\MindSystem\.codex-screenshots\tasks-mobile-cards-preserved.png`
 
 **Viewport**
-- Mobile: 390 x 844, dark theme, Hebrew RTL.
-- Desktop: 1072 x 768, dark theme, Hebrew RTL.
+- Desktop: 1440 x 900, dark theme, Hebrew RTL.
+- Mobile: 360 x 800, dark theme, Hebrew RTL.
 
 **State**
-- Authenticated local dev session with temporary QA tasks. The temporary tasks were deleted after capture.
+- Authenticated local dev session with existing local tasks. No task data was created or deleted during this QA pass.
 
 **Checks**
 - TypeScript: `pnpm --filter @personal-context-os/web lint` passed.
-- Visual smoke test: Playwright loaded `http://localhost:3004/tasks`, created real API tasks, captured screenshots, and deleted the QA tasks.
-- Automated desktop metrics: 4 cards rendered as `article` elements, two 568px card columns in a 1920px viewport, and no list/board view toggle present.
+- Visual smoke test: in-app browser loaded `http://localhost:3004/tasks`, authenticated locally, captured desktop and mobile screenshots, and reset the temporary viewport override.
+- Automated desktop metrics: Hebrew RTL, one visible table, four visible rows including the header, zero visible task-card `article` elements.
+- Automated desktop width metrics after removing the local page max-width: content root 1168px, task table 1128px in a 1440px viewport.
+- Automated mobile metrics: Hebrew RTL, three visible task-card `article` elements, zero visible tables and zero visible rows.
 
 **Patches Made**
-- Replaced the previous dense mobile list and desktop board/table surface with the pasted-code card layout.
-- Added the purple primary action row, rounded search/filter surface, collapsible filters, task detail panels, and footer actions.
-- Preserved the real API-backed create, edit, complete, delete, search, and filter behavior.
-- Added Hebrew and English action labels for mark-done/completed states.
-- Fixed RTL search placement so the search icon sits on the right and the filter button on the left.
-- Removed the list/grid view switcher and made the card layout the only task presentation.
-- Expanded desktop layout into a responsive two-column card grid while keeping mobile as one column.
+- Kept the site shell and other pages untouched.
+- Moved the desktop New Task action, filter button, and search input into the same top row as the Tasks title, matching the reference placement.
+- Kept the New Task action on the same `Button size="sm"` style as the New Project action.
+- Added a desktop-only task table/list surface with columns for actions, status, due date, project, and task details.
+- Preserved the current mobile task-card layout and mobile search/filter controls below the `md` breakpoint.
+- Extracted the filters into a shared `TaskFilterPanel` so desktop and mobile controls use the same state and behavior.
+- Removed the Tasks page-only `max-w-6xl` wrapper so the page uses the same available content width as the other app pages.
 
 **Findings**
 - No P0/P1/P2 findings remain.
-- [P3] The app shell still provides the existing MindSystem mobile topbar; the pasted mock's standalone header was not duplicated inside the page to avoid conflicting navigation chrome.
+- [P3] The app shell still provides the existing MindSystem mobile topbar and bottom/user chrome; those were intentionally not changed because the request was scoped to the Tasks page content.
 
 **final result: passed**

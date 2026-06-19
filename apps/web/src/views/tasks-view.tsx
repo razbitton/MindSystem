@@ -38,7 +38,8 @@ const statuses = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"
 const priorities = ["low", "medium", "high", "urgent"] as const;
 const ANY = "__any__";
 const NO_PROJECT = "__none__";
-const defaultTaskFilters = { status: "", project_id: "", priority: "" };
+type TaskFilters = { status: string; project_id: string; priority: string };
+const defaultTaskFilters: TaskFilters = { status: "", project_id: "", priority: "" };
 
 type TaskForm = {
   title: string;
@@ -53,7 +54,7 @@ type TaskForm = {
 };
 
 export default function TasksView() {
-  const { t, formatDate, translateValue } = useI18n();
+  const { t, formatDate, translateValue, direction } = useI18n();
   const [tasks, setTasks] = useState<AnyRecord[]>(
     () => peekCachedQuery<{ tasks: AnyRecord[] }>("/api/tasks", defaultTaskFilters)?.tasks ?? []
   );
@@ -178,134 +179,141 @@ export default function TasksView() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-10">
-      <header className="hidden items-center justify-start gap-3 sm:flex">
+    <div className="flex min-w-0 max-w-full flex-col gap-6 pb-10">
+      <header className="hidden items-center justify-between gap-6 border-b border-border pb-4 md:flex">
         <h1 className="text-xl font-bold tracking-tight text-foreground" dir="auto">
           {t("tasks.title")}
         </h1>
+
+        <div className="flex min-w-0 items-center gap-3" dir="ltr">
+          <Button dir={direction} size="sm" type="button" onClick={openCreate}>
+            <Plus data-icon="inline-start" />
+            {t("tasks.newTask")}
+          </Button>
+          <Button
+            variant={showFilters ? "secondary" : "ghost"}
+            size="icon-sm"
+            type="button"
+            onClick={() => setShowFilters((current) => !current)}
+            aria-label={t("tasks.filters")}
+            aria-expanded={showFilters}
+            className={cn(
+              "rounded-lg text-muted-foreground hover:text-foreground",
+              showFilters && "text-primary"
+            )}
+          >
+            <Filter className="size-[18px]" aria-hidden />
+          </Button>
+          <div className="relative w-72 min-w-0">
+            <Search
+              className="pointer-events-none absolute start-3 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              dir={direction}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`${t("tasks.searchPlaceholder")}...`}
+              className={cn(
+                "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+                direction === "rtl" ? "text-right" : "text-left"
+              )}
+            />
+          </div>
+        </div>
       </header>
 
       <section className="flex flex-col gap-6">
-        <div className="flex items-center">
-          <Button
-            type="button"
-            onClick={openCreate}
-            className="h-12 w-full rounded-xl bg-indigo-500 text-sm font-semibold text-white shadow-lg shadow-indigo-500/15 hover:bg-indigo-600 active:scale-[0.99] sm:mx-auto sm:max-w-3xl"
-          >
-            <Plus className="size-5" aria-hidden />
-            <span className="truncate">{t("tasks.newTask")}</span>
-          </Button>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs sm:mx-auto sm:w-full sm:max-w-3xl">
-          <div className="p-2">
-            <div className="relative flex items-center">
-              <Search
-                className="pointer-events-none absolute start-3 size-[18px] text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                dir="auto"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={`${t("tasks.searchPlaceholder")}...`}
-                className="h-10 min-w-0 flex-1 border-0 bg-transparent pe-12 ps-10 text-sm shadow-none focus-visible:ring-0"
-              />
-              <Button
-                variant={showFilters ? "secondary" : "ghost"}
-                size="icon-sm"
-                type="button"
-                onClick={() => setShowFilters((current) => !current)}
-                aria-label={t("tasks.filters")}
-                aria-expanded={showFilters}
-                className={cn(
-                  "ms-1 rounded-lg text-muted-foreground hover:text-foreground",
-                  showFilters && "text-primary"
-                )}
-              >
-                <Filter className="size-[18px]" aria-hidden />
+        <div className="flex flex-col gap-3 md:hidden">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex h-[58px] shrink-0 items-center justify-start">
+              <Button size="sm" type="button" onClick={openCreate}>
+                <Plus data-icon="inline-start" />
+                {t("tasks.newTask")}
               </Button>
             </div>
-          </div>
 
-          {showFilters ? (
-            <div className="flex flex-col gap-3 border-t border-border bg-muted/20 p-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Select
-                  value={filters.status || ANY}
-                  onValueChange={(value) => setFilters({ ...filters, status: value === ANY ? "" : value })}
-                >
-                  <SelectTrigger className="w-full min-w-0 rounded-xl bg-background/70">
-                    <SelectValue placeholder={t("tasks.anyStatus")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY}>{t("tasks.anyStatus")}</SelectItem>
-                    {statuses.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {translateValue("status", status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={filters.priority || ANY}
-                  onValueChange={(value) => setFilters({ ...filters, priority: value === ANY ? "" : value })}
-                >
-                  <SelectTrigger className="w-full min-w-0 rounded-xl bg-background/70">
-                    <SelectValue placeholder={t("tasks.anyPriority")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY}>{t("tasks.anyPriority")}</SelectItem>
-                    {priorities.map((priority) => (
-                      <SelectItem key={priority} value={priority}>
-                        {translateValue("priority", priority)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+              <div className="p-2">
+                <div className="relative flex items-center">
+                  <Search
+                    className="pointer-events-none absolute start-3 size-[18px] text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    dir="auto"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={`${t("tasks.searchPlaceholder")}...`}
+                    className="h-10 min-w-0 flex-1 border-0 bg-transparent pe-12 ps-10 text-sm shadow-none focus-visible:ring-0"
+                  />
+                  <Button
+                    variant={showFilters ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    type="button"
+                    onClick={() => setShowFilters((current) => !current)}
+                    aria-label={t("tasks.filters")}
+                    aria-expanded={showFilters}
+                    className={cn(
+                      "ms-1 rounded-lg text-muted-foreground hover:text-foreground",
+                      showFilters && "text-primary"
+                    )}
+                  >
+                    <Filter className="size-[18px]" aria-hidden />
+                  </Button>
+                </div>
               </div>
 
-              <Select
-                value={filters.project_id || ANY}
-                onValueChange={(value) => setFilters({ ...filters, project_id: value === ANY ? "" : value })}
-              >
-                <SelectTrigger className="w-full min-w-0 rounded-xl bg-background/70">
-                  <SelectValue placeholder={t("tasks.anyProject")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>{t("tasks.anyProject")}</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={String(project.id)}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="ghost" size="sm" type="button" onClick={resetFilters} className="rounded-xl">
-                  {t("common.reset")}
-                </Button>
-                <Button variant="outline" size="sm" type="button" onClick={() => load()} className="rounded-xl">
-                  {t("common.apply")}
-                </Button>
-              </div>
+              {showFilters ? (
+                <div className="border-t border-border bg-muted/20 p-4">
+                  <TaskFilterPanel
+                    filters={filters}
+                    projects={projects}
+                    onFiltersChange={setFilters}
+                    onReset={resetFilters}
+                    onApply={() => load()}
+                  />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
+
+        {showFilters ? (
+          <div className="hidden rounded-xl border border-border bg-card p-4 shadow-xs md:block">
+            <TaskFilterPanel
+              filters={filters}
+              projects={projects}
+              onFiltersChange={setFilters}
+              onReset={resetFilters}
+              onApply={() => load()}
+            />
+          </div>
+        ) : null}
 
         {!filteredTasks.length ? (
           <EmptyState title={t("tasks.empty")}>{t("common.emptySearch")}</EmptyState>
         ) : (
-          <TaskCards
-            tasks={filteredTasks}
-            projects={projects}
-            formatDate={formatDate}
-            onEdit={openEdit}
-            onComplete={complete}
-            onDelete={requestDelete}
-          />
+          <>
+            <div className="md:hidden">
+              <TaskCards
+                tasks={filteredTasks}
+                projects={projects}
+                formatDate={formatDate}
+                onEdit={openEdit}
+                onComplete={complete}
+                onDelete={requestDelete}
+              />
+            </div>
+            <TaskDesktopList
+              tasks={filteredTasks}
+              projects={projects}
+              formatDate={formatDate}
+              onEdit={openEdit}
+              onComplete={complete}
+              onDelete={requestDelete}
+            />
+          </>
         )}
       </section>
 
@@ -469,6 +477,231 @@ export default function TasksView() {
           if (!open && !deleting) setDeleteTarget(null);
         }}
       />
+    </div>
+  );
+}
+
+function TaskFilterPanel({
+  filters,
+  projects,
+  onFiltersChange,
+  onReset,
+  onApply
+}: {
+  filters: TaskFilters;
+  projects: AnyRecord[];
+  onFiltersChange: (filters: TaskFilters) => void;
+  onReset: () => void | Promise<void>;
+  onApply: () => void | Promise<void>;
+}) {
+  const { t, translateValue } = useI18n();
+
+  return (
+    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:items-center">
+      <Select
+        value={filters.status || ANY}
+        onValueChange={(value) => onFiltersChange({ ...filters, status: value === ANY ? "" : value })}
+      >
+        <SelectTrigger className="w-full min-w-0 rounded-xl bg-background/70">
+          <SelectValue placeholder={t("tasks.anyStatus")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>{t("tasks.anyStatus")}</SelectItem>
+          {statuses.map((status) => (
+            <SelectItem key={status} value={status}>
+              {translateValue("status", status)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.priority || ANY}
+        onValueChange={(value) => onFiltersChange({ ...filters, priority: value === ANY ? "" : value })}
+      >
+        <SelectTrigger className="w-full min-w-0 rounded-xl bg-background/70">
+          <SelectValue placeholder={t("tasks.anyPriority")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>{t("tasks.anyPriority")}</SelectItem>
+          {priorities.map((priority) => (
+            <SelectItem key={priority} value={priority}>
+              {translateValue("priority", priority)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.project_id || ANY}
+        onValueChange={(value) => onFiltersChange({ ...filters, project_id: value === ANY ? "" : value })}
+      >
+        <SelectTrigger className="w-full min-w-0 rounded-xl bg-background/70">
+          <SelectValue placeholder={t("tasks.anyProject")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>{t("tasks.anyProject")}</SelectItem>
+          {projects.map((project) => (
+            <SelectItem key={project.id} value={String(project.id)}>
+              {project.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <div className="grid grid-cols-2 gap-3 md:flex md:justify-end">
+        <Button variant="ghost" size="sm" type="button" onClick={() => void onReset()} className="rounded-xl">
+          {t("common.reset")}
+        </Button>
+        <Button variant="outline" size="sm" type="button" onClick={() => void onApply()} className="rounded-xl">
+          {t("common.apply")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function TaskDesktopList({
+  tasks,
+  projects,
+  formatDate,
+  onEdit,
+  onComplete,
+  onDelete
+}: {
+  tasks: AnyRecord[];
+  projects: AnyRecord[];
+  formatDate: (value?: string | null) => string;
+  onEdit: (task: AnyRecord) => void;
+  onComplete: (id: string) => void;
+  onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-xs md:block" role="table">
+      <div
+        className="grid grid-cols-[92px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border bg-background/30 px-6 py-3 text-xs font-semibold text-muted-foreground"
+        dir="ltr"
+        role="row"
+      >
+        <div className="text-center" dir="rtl" role="columnheader">
+          {t("command.actions")}
+        </div>
+        <div className="text-center" dir="rtl" role="columnheader">
+          {t("common.status")}
+        </div>
+        <div className="text-center" dir="rtl" role="columnheader">
+          {t("common.due")}
+        </div>
+        <div className="text-center" dir="rtl" role="columnheader">
+          {t("common.project")}
+        </div>
+        <div className="text-right" dir="rtl" role="columnheader">
+          {t("entity.task")}
+        </div>
+      </div>
+
+      {tasks.map((task) => {
+        const isDone = task.status === "done";
+        const description = truncate(task.description, 120);
+        const project = projectName(projects, String(task.projectId ?? task.project_id ?? ""));
+        const displayDate =
+          dateValue(task, "dueAt") ??
+          dateValue(task, "scheduledFor") ??
+          dateValue(task, "completedAt") ??
+          dateValue(task, "updatedAt");
+
+        return (
+          <div
+            key={task.id}
+            className={cn(
+              "grid grid-cols-[92px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20",
+              isDone && "bg-muted/10"
+            )}
+            dir="ltr"
+            role="row"
+          >
+            <div className="flex items-center justify-start gap-2" dir="ltr" role="cell">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={(event) => onDelete(task, event)}
+                title={t("common.delete")}
+                aria-label={t("common.delete")}
+                className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-[18px]" aria-hidden />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={() => onEdit(task)}
+                title={t("common.edit")}
+                aria-label={t("common.edit")}
+                className="rounded-lg text-primary hover:bg-primary/10 hover:text-primary"
+              >
+                <Edit2 className="size-[18px]" aria-hidden />
+              </Button>
+            </div>
+
+            <div className="flex justify-center" dir="rtl" role="cell">
+              <TaskStatusBadge value={task.status} />
+            </div>
+
+            <div className="truncate text-center text-sm text-foreground" dir="ltr" role="cell">
+              {formatDate(displayDate)}
+            </div>
+
+            <div className="flex justify-center" dir="rtl" role="cell">
+              <Badge
+                variant="secondary"
+                className="max-w-full rounded-md bg-secondary/80 px-2 py-1 text-xs font-medium text-secondary-foreground"
+              >
+                <span className="truncate" dir="auto">
+                  {project || t("common.noProject")}
+                </span>
+              </Badge>
+            </div>
+
+            <div className="flex min-w-0 items-start gap-3" dir="rtl" role="cell">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={isDone ? undefined : () => onComplete(task.id)}
+                aria-disabled={isDone}
+                title={isDone ? t("tasks.completed") : t("tasks.markDone")}
+                aria-label={isDone ? t("tasks.completed") : t("tasks.markDone")}
+                className={cn(
+                  "mt-0.5 shrink-0 rounded-full text-muted-foreground hover:bg-success/10 hover:text-success",
+                  isDone && "text-success hover:bg-success/10 hover:text-success"
+                )}
+              >
+                <CheckCircle2 className={cn("size-5", isDone && "fill-success/20")} aria-hidden />
+              </Button>
+              <div className="min-w-0 flex-1 text-right">
+                <h3
+                  className={cn(
+                    "truncate text-sm font-semibold leading-6 text-foreground",
+                    isDone && "text-muted-foreground line-through"
+                  )}
+                  dir="auto"
+                >
+                  {task.title}
+                </h3>
+                {description ? (
+                  <p className="line-clamp-2 text-xs leading-5 text-muted-foreground" dir="auto">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
