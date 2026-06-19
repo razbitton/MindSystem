@@ -279,21 +279,23 @@
 @layer utilities {
   .bounded-surface {
     min-block-size: 0;
-    max-block-size: var(--surface-max-block);
-    overflow: hidden;
+    max-block-size: none !important;
+    overflow: visible;
   }
 
   .bounded-surface-tight {
-    max-block-size: var(--surface-max-block-tight);
+    max-block-size: none !important;
   }
 
   .bounded-surface-tall {
-    max-block-size: var(--surface-max-block-tall);
+    max-block-size: none !important;
   }
 
   .bounded-scroll {
     min-block-size: 0;
-    overflow: auto;
-    overscroll-behavior: contain;
+    max-height: none !important;
+    max-block-size: none !important;
+    overflow: visible;
+    overscroll-behavior: auto;
   }
 }

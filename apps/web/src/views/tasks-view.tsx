@@ -295,7 +295,7 @@ export default function TasksView() {
                 return (
                   <section
                     key={status}
-                    className="flex min-h-60 flex-col gap-2 overflow-hidden rounded-xl bg-muted/40 p-2.5 [max-block-size:min(48rem,calc(100svh_-_10rem))]"
+                    className="flex min-h-60 flex-col gap-2 rounded-xl bg-muted/40 p-2.5"
                   >
                     <div className="flex shrink-0 items-center justify-between gap-2 px-1">
                       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -539,7 +539,7 @@ function TaskCard({
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex min-h-52 shrink-0 flex-col gap-2 overflow-auto overscroll-contain rounded-lg border border-border bg-card p-3 shadow-xs transition-shadow hover:shadow-md [max-block-size:min(18rem,calc(100svh_-_18rem))]">
+    <div className="flex min-h-52 shrink-0 flex-col gap-2 overflow-hidden rounded-lg border border-border bg-card p-3 shadow-xs transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="text-sm font-medium text-foreground" dir="auto">

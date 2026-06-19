@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Home,
   Inbox,
+  Search,
   Settings,
   StickyNote,
   type LucideIcon
@@ -31,7 +32,8 @@ export const navSections: NavSection[] = [
     labelKey: "nav.workspace",
     items: [
       { href: "/dashboard", labelKey: "nav.home", icon: Home },
-      { href: "/inbox", labelKey: "nav.inbox", icon: Inbox }
+      { href: "/inbox", labelKey: "nav.inbox", icon: Inbox },
+      { href: "/search", labelKey: "nav.search", icon: Search }
     ]
   },
   {

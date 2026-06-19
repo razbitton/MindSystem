@@ -9,7 +9,7 @@ import {
   peekCachedQuery
 } from "../lib/query-cache";
 import { dateValue, loadPreference, matchesQuery, projectName, savePreference, type ViewMode } from "../lib/view-models";
-import { Drawer, EmptyState, IconButton, PageHeader, Panel, SegmentedControl } from "../components/page";
+import { Drawer, EmptyState, IconButton, PageHeader, SegmentedControl } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n, type Direction } from "../i18n";
 import { Button } from "@/components/ui/button";
@@ -212,41 +212,41 @@ export default function NotesView() {
         />
       </div>
 
-      <Panel>
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[220px] flex-1">
-              <Search
-                className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                dir="auto"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t("notes.searchPlaceholder")}
-                className="ps-9"
-              />
-            </div>
-            <Select
-              value={projectFilter || ALL_PROJECTS}
-              onValueChange={(value) => setProjectFilter(value === ALL_PROJECTS ? "" : value)}
-            >
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder={t("notes.allProjects")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_PROJECTS}>{t("notes.allProjects")}</SelectItem>
-                {projects.map((project) => {
-                  const projectNameText = String(project.name ?? "");
-                  return (
-                    <SelectItem key={project.id} value={String(project.id)}>
-                      <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+      <section className="flex flex-col gap-4">
+        <div className="grid items-center gap-2 border-b border-border pb-4 md:grid-cols-[minmax(14rem,1fr)_13rem_auto]">
+          <div className="relative min-w-0">
+            <Search
+              className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              dir="auto"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("notes.searchPlaceholder")}
+              className="ps-9"
+            />
+          </div>
+          <Select
+            value={projectFilter || ALL_PROJECTS}
+            onValueChange={(value) => setProjectFilter(value === ALL_PROJECTS ? "" : value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={t("notes.allProjects")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_PROJECTS}>{t("notes.allProjects")}</SelectItem>
+              {projects.map((project) => {
+                const projectNameText = String(project.name ?? "");
+                return (
+                  <SelectItem key={project.id} value={String(project.id)}>
+                    <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <div className="justify-self-start md:justify-self-end">
             <SegmentedControl
               label={t("common.view")}
               value={view}
@@ -257,121 +257,121 @@ export default function NotesView() {
               ]}
             />
           </div>
+        </div>
 
-          {!filteredNotes.length ? (
-            <EmptyState title={t("notes.empty")}>
-              {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
-            </EmptyState>
-          ) : view === "cards" ? (
-            <div className="bounded-scroll columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid [max-block-size:min(62rem,calc(100svh_-_10rem))]">
-              {filteredNotes.map((note) => {
-                const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
-                const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
-                const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
-                const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
-                return (
-                  <div
-                    key={note.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openEdit(note)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openEdit(note);
-                      }
-                    }}
-                    className="bounded-scroll flex cursor-pointer flex-col gap-2 rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [max-block-size:min(40rem,calc(100svh_-_10rem))]"
-                  >
-                    {note.title ? (
-                      <p className="text-start text-sm font-semibold text-foreground" dir={noteDirection}>
-                        {note.title}
-                      </p>
-                    ) : null}
-                    <p className="whitespace-pre-wrap text-start text-sm leading-relaxed text-muted-foreground" dir={noteDirection}>
-                      {note.body}
+        {!filteredNotes.length ? (
+          <EmptyState title={t("notes.empty")}>
+            {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
+          </EmptyState>
+        ) : view === "cards" ? (
+          <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
+            {filteredNotes.map((note) => {
+              const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
+              const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
+              const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
+              const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
+              return (
+                <div
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(note)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEdit(note);
+                    }
+                  }}
+                  className="flex max-h-56 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {note.title ? (
+                    <p className="line-clamp-2 break-words text-start text-sm font-semibold text-foreground" dir={noteDirection}>
+                      {note.title}
                     </p>
-                    <div className="flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
-                        {linkedProject || t("common.noProject")}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span>{formatDate(dateValue(note, "updatedAt"))}</span>
-                        <IconButton
-                          label={t("common.delete")}
-                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onClick={(event) => requestDelete(note, event)}
-                        >
-                          <Trash2 className="size-3.5" aria-hidden />
-                        </IconButton>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <ul className="bounded-scroll flex flex-col divide-y divide-border rounded-xl border border-border [max-block-size:min(56rem,calc(100svh_-_10rem))]">
-              {filteredNotes.map((note) => {
-                const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
-                const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
-                const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
-                const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
-                return (
-                  <li
-                    key={note.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openEdit(note)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openEdit(note);
-                      }
-                    }}
-                    className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <p className="text-start text-sm font-medium text-foreground" dir={noteDirection}>
-                        {note.title || note.body}
-                      </p>
-                      {note.body && note.title ? (
-                        <p className="line-clamp-2 text-start text-sm text-muted-foreground" dir={noteDirection}>
-                          {note.body}
-                        </p>
-                      ) : null}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
-                          {linkedProject || t("common.noProject")}
-                        </span>
-                        <span>{formatDate(dateValue(note, "updatedAt"))}</span>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <IconButton
-                        label={t("common.edit")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          openEdit(note);
-                        }}
-                      >
-                        <Edit3 className="size-4" aria-hidden />
-                      </IconButton>
+                  ) : null}
+                  <p className="line-clamp-6 break-words text-start text-sm leading-relaxed text-muted-foreground" dir={noteDirection}>
+                    {note.body}
+                  </p>
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
+                      <span className="truncate">{linkedProject || t("common.noProject")}</span>
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span>{formatDate(dateValue(note, "updatedAt"))}</span>
                       <IconButton
                         label={t("common.delete")}
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={(event) => requestDelete(note, event)}
                       >
-                        <Trash2 className="size-4" aria-hidden />
+                        <Trash2 className="size-3.5" aria-hidden />
                       </IconButton>
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </Panel>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border border-y border-border">
+            {filteredNotes.map((note) => {
+              const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
+              const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
+              const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
+              const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
+              return (
+                <li
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEdit(note)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openEdit(note);
+                    }
+                  }}
+                  className="flex cursor-pointer items-start justify-between gap-3 overflow-hidden px-1 py-3 transition-colors hover:bg-accent/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-2"
+                >
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <p className="line-clamp-2 break-words text-start text-sm font-medium text-foreground" dir={noteDirection}>
+                      {note.title || note.body}
+                    </p>
+                    {note.body && note.title ? (
+                      <p className="line-clamp-2 break-words text-start text-sm text-muted-foreground" dir={noteDirection}>
+                        {note.body}
+                      </p>
+                    ) : null}
+                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
+                        <span className="truncate">{linkedProject || t("common.noProject")}</span>
+                      </span>
+                      <span className="shrink-0">{formatDate(dateValue(note, "updatedAt"))}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <IconButton
+                      label={t("common.edit")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEdit(note);
+                      }}
+                    >
+                      <Edit3 className="size-4" aria-hidden />
+                    </IconButton>
+                    <IconButton
+                      label={t("common.delete")}
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={(event) => requestDelete(note, event)}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </IconButton>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <Drawer
         open={drawerOpen}
