@@ -184,7 +184,9 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/reminders/:id" && method === "DELETE") return "memory:write";
 
   if (route.startsWith("/api/admin")) return "admin";
-  if (route.startsWith("/api/agents")) return "admin";
+  if (route === "/api/agents/runs/:id" && method === "DELETE") return "admin";
+  if (route === "/api/agents/runs/clear" && method === "POST") return "admin";
+  if (route === "/api/agents" || route.startsWith("/api/agents/tokens")) return null;
   if (route.startsWith("/api/audit-events")) return "admin";
   if (route.startsWith("/api/retrieval-logs")) return "admin";
   if (route.startsWith("/api/schema-definitions")) return "admin";

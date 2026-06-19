@@ -39,8 +39,7 @@ const countKeys = [
   ["reviewQueue", "Review"],
   ["auditEvents", "Audit events"],
   ["agentRuns", "Agent runs"],
-  ["retrievalLogs", "Search logs"],
-  ["agentTokens", "Agent tokens"]
+  ["retrievalLogs", "Search logs"]
 ] as const;
 
 type PendingAction =

@@ -40,7 +40,6 @@ export const resourceDefinitions: ResourceDefinition[] = [
   exactResource("review-queue://pending", "Pending review queue", "admin", "/api/review-queue"),
   exactResource("audit-events://recent", "Recent audit events", "admin", "/api/audit-events"),
   exactResource("retrieval-logs://recent", "Recent retrieval logs", "admin", "/api/retrieval-logs"),
-  exactResource("agents://state", "Agent tokens and activity", "admin", "/api/agents"),
   exactResource("schema-definitions://all", "Schema definitions", "admin", "/api/schema-definitions"),
   exactResource("project-schema-overrides://all", "Project schema overrides", "admin", "/api/project-schema-overrides"),
   exactResource("data-inventory://workspace", "Workspace data inventory", "admin", "/api/admin/data-inventory"),

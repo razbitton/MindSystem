@@ -139,16 +139,6 @@ const routeCases: RouteCase[] = [
   { name: "reject_review_item", args: { id: "review-id" }, method: "POST", path: "/api/review-queue/review-id/reject", body: {} },
   { name: "delete_review_item", args: { id: "review-id" }, method: "DELETE", path: "/api/review-queue/review-id" },
   { name: "clear_review_queue", args: {}, method: "POST", path: "/api/review-queue/clear", body: {} },
-  { name: "list_agents", args: {}, method: "GET", path: "/api/agents" },
-  {
-    name: "create_agent_token",
-    args: { name: "Agent", scopes: ["memory:read"] },
-    method: "POST",
-    path: "/api/agents/tokens",
-    body: { name: "Agent", scopes: ["memory:read"] }
-  },
-  { name: "revoke_agent_token", args: { id: "token-id" }, method: "POST", path: "/api/agents/tokens/token-id/revoke", body: {} },
-  { name: "delete_agent_token", args: { id: "token-id" }, method: "DELETE", path: "/api/agents/tokens/token-id" },
   { name: "delete_agent_run", args: { id: "run-id" }, method: "DELETE", path: "/api/agents/runs/run-id" },
   { name: "clear_agent_runs", args: {}, method: "POST", path: "/api/agents/runs/clear", body: {} },
   { name: "list_audit_events", args: {}, method: "GET", path: "/api/audit-events" },
@@ -218,7 +208,6 @@ const resourceCases = [
   { uri: "review-queue://pending", path: "/api/review-queue", scope: "admin" },
   { uri: "audit-events://recent", path: "/api/audit-events", scope: "admin" },
   { uri: "retrieval-logs://recent", path: "/api/retrieval-logs", scope: "admin" },
-  { uri: "agents://state", path: "/api/agents", scope: "admin" },
   { uri: "schema-definitions://all", path: "/api/schema-definitions", scope: "admin" },
   { uri: "project-schema-overrides://all", path: "/api/project-schema-overrides", scope: "admin" },
   { uri: "data-inventory://workspace", path: "/api/admin/data-inventory", scope: "admin" }

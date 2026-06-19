@@ -1,4 +1,4 @@
-import { agentScopeValues, type AgentScope } from "@personal-context-os/shared";
+import type { AgentScope } from "@personal-context-os/shared";
 
 export type ToolHttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -47,8 +47,7 @@ const purgeDataTypeValues = [
   "agent_runs",
   "retrieval_logs",
   "schema_definitions",
-  "project_schema_overrides",
-  "agent_tokens"
+  "project_schema_overrides"
 ];
 
 const projectProperties = {
@@ -543,43 +542,6 @@ export const mcpRestTools: RestToolDefinition[] = [
     path: "/api/review-queue/clear",
     body: emptyBody,
     inputSchema: objectSchema({})
-  },
-  {
-    name: "list_agents",
-    description: "List agent tokens and recent agent activity.",
-    requiredScope: "admin",
-    method: "GET",
-    path: "/api/agents",
-    inputSchema: objectSchema({})
-  },
-  {
-    name: "create_agent_token",
-    description: "Create a scoped agent token. The plaintext token is returned once.",
-    requiredScope: "admin",
-    method: "POST",
-    path: "/api/agents/tokens",
-    inputSchema: objectSchema({
-      name: { type: "string" },
-      scopes: { type: "array", items: { type: "string", enum: agentScopeValues } },
-      expiresAt: nullableStringSchema("ISO 8601 datetime or null.")
-    }, ["name", "scopes"])
-  },
-  {
-    name: "revoke_agent_token",
-    description: "Revoke an agent token without deleting its record.",
-    requiredScope: "admin",
-    method: "POST",
-    path: (args) => `/api/agents/tokens/${String(args.id)}/revoke`,
-    body: emptyBody,
-    inputSchema: objectSchema({ id: idSchema("Agent token id.") }, ["id"])
-  },
-  {
-    name: "delete_agent_token",
-    description: "Delete an agent token record.",
-    requiredScope: "admin",
-    method: "DELETE",
-    path: (args) => `/api/agents/tokens/${String(args.id)}`,
-    inputSchema: objectSchema({ id: idSchema("Agent token id.") }, ["id"])
   },
   {
     name: "delete_agent_run",

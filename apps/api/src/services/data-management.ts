@@ -14,7 +14,6 @@ const inventoryTables = [
   ["auditEvents", "audit_events"],
   ["agentRuns", "agent_runs"],
   ["retrievalLogs", "retrieval_logs"],
-  ["agentTokens", "agent_tokens"],
   ["schemaDefinitions", "schema_definitions"],
   ["projectSchemaOverrides", "project_schema_overrides"]
 ] as const;
@@ -54,11 +53,6 @@ const purgeStatements: { type: PurgeDataType; resultKey: string; sql: string }[]
     type: "raw_items",
     resultKey: "deletedRawItems",
     sql: "delete from raw_items where workspace_id = $1"
-  },
-  {
-    type: "agent_tokens",
-    resultKey: "deletedAgentTokens",
-    sql: "delete from agent_tokens where workspace_id = $1"
   },
   {
     type: "audit_events",

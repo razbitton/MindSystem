@@ -201,8 +201,7 @@ export const purgeDataTypeSchema = z.enum([
   "agent_runs",
   "retrieval_logs",
   "schema_definitions",
-  "project_schema_overrides",
-  "agent_tokens"
+  "project_schema_overrides"
 ]);
 export type PurgeDataType = z.infer<typeof purgeDataTypeSchema>;
 

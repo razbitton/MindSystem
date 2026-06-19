@@ -89,7 +89,7 @@ Search:
 curl -b cookies.txt "http://localhost:4000/api/search?q=launch&entity_type=task&limit=10"
 ```
 
-Create an agent token:
+Create an agent token with a logged-in browser session cookie. Agent bearer tokens cannot call these token-configuration routes:
 
 ```bash
 curl -b cookies.txt -X POST http://localhost:4000/api/agents/tokens \
@@ -101,9 +101,9 @@ The plaintext token is returned once.
 
 ## MCP Examples
 
-The MCP server aims for REST parity for scoped agent operations. It exposes explicit tools for project, task, note, document, reminder, raw capture, review queue, audit, retrieval-log, schema, and agent-token routes, while browser-session-only auth routes stay REST/browser-only. Destructive tools such as `delete_task`, `delete_project`, `delete_note`, `delete_document`, `delete_reminder`, and `delete_raw_item` are available, but they are explicit tools and require the matching write or admin scope. Grant agent tokens the least scopes needed for the job.
+The MCP server aims for REST parity for scoped agent operations. It exposes explicit tools for project, task, note, document, reminder, raw capture, review queue, audit, retrieval-log, and schema routes, while browser-session-only auth and agent-token routes stay REST/browser-only. Destructive tools such as `delete_task`, `delete_project`, `delete_note`, `delete_document`, `delete_reminder`, and `delete_raw_item` are available, but they are explicit tools and require the matching write or admin scope. Grant agent tokens the least scopes needed for the job.
 
-Admin tokens can also inspect `data-inventory://workspace` and call `purge_workspace_data` to delete selected workspace-owned categories: `raw_items`, `entities`, `review_queue`, `audit_events`, `agent_runs`, `retrieval_logs`, `schema_definitions`, `project_schema_overrides`, and, only when explicitly requested, `agent_tokens`.
+Admin tokens can also inspect `data-inventory://workspace` and call `purge_workspace_data` to delete selected workspace-owned categories: `raw_items`, `entities`, `review_queue`, `audit_events`, `agent_runs`, `retrieval_logs`, `schema_definitions`, and `project_schema_overrides`. Agent-token configuration is deliberately excluded from MCP and agent bearer API access; it is managed only by an authenticated browser user.
 
 List tools:
 
@@ -253,6 +253,7 @@ Pipeline order:
 - For a custom domain or split web/API hosts, set `APP_BASE_URL` and optionally `SESSION_COOKIE_DOMAIN`.
 - Agent access is only through REST or MCP tools.
 - Agent tokens are stored as SHA-256 hashes.
+- Agent-token configuration is browser-session-only. Agents cannot list, create, revoke, delete, or bulk-purge agent tokens through REST bearer auth or MCP.
 - MCP tools mirror concrete REST routes where feasible and require matching scopes such as `memory:read`, `memory:write`, `projects:write`, `tasks:write`, or `documents:write`.
 - `admin` grants all scopes.
 - Destructive MCP actions are explicit and scoped; there is no generic arbitrary REST-path MCP tool. Generic entity deletion and bulk purge are admin-only because they can cascade across typed records.

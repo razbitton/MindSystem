@@ -1,6 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
-  createAgentTokenSchema,
   createDocumentSchema,
   createNoteSchema,
   createProjectSchema,
@@ -215,22 +214,6 @@ export function buildOpenApiSpec() {
       },
       "/review-queue/clear": {
         post: { summary: "Delete all review items", responses: { "200": { description: "Deleted" } } }
-      },
-      "/agents": {
-        get: { summary: "List agent tokens and recent runs", responses: { "200": { description: "Agents" } } }
-      },
-      "/agents/tokens": {
-        post: {
-          summary: "Create a scoped agent token",
-          requestBody: { required: true, content: { "application/json": { schema: json(createAgentTokenSchema) } } },
-          responses: { "200": { description: "Token. Plaintext is returned once." } }
-        }
-      },
-      "/agents/tokens/{id}/revoke": {
-        post: { summary: "Revoke an agent token", responses: { "200": { description: "Token" } } }
-      },
-      "/agents/tokens/{id}": {
-        delete: { summary: "Delete an agent token", responses: { "200": { description: "Deleted" } } }
       },
       "/agents/runs/{id}": {
         delete: { summary: "Delete an agent run", responses: { "200": { description: "Deleted" } } }

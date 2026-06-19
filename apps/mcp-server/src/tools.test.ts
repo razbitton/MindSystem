@@ -51,10 +51,6 @@ const expectedScopes: Record<string, AgentScope> = {
   reject_review_item: "admin",
   delete_review_item: "admin",
   clear_review_queue: "admin",
-  list_agents: "admin",
-  create_agent_token: "admin",
-  revoke_agent_token: "admin",
-  delete_agent_token: "admin",
   delete_agent_run: "admin",
   clear_agent_runs: "admin",
   list_audit_events: "admin",
@@ -112,8 +108,6 @@ describe("MCP tool definitions", () => {
     expect(getToolDefinition("list_review_queue")?.requiredScope).toBe("admin");
     expect(getToolDefinition("approve_review_item")?.requiredScope).toBe("admin");
     expect(getToolDefinition("reject_review_item")?.requiredScope).toBe("admin");
-    expect(getToolDefinition("list_agents")?.requiredScope).toBe("admin");
-    expect(getToolDefinition("create_agent_token")?.requiredScope).toBe("admin");
     expect(getToolDefinition("list_audit_events")?.requiredScope).toBe("admin");
     expect(getToolDefinition("purge_workspace_data")?.requiredScope).toBe("admin");
     expect(getToolDefinition("clear_audit_events")?.requiredScope).toBe("admin");
@@ -122,7 +116,18 @@ describe("MCP tool definitions", () => {
 
   it("does not expose a generic arbitrary REST tool", () => {
     const names = toolDefinitions.map((tool) => tool.name);
-    const forbiddenNames = ["call_rest", "call_rest_path", "rest_request", "api_request", "http_request", "fetch_url"];
+    const forbiddenNames = [
+      "call_rest",
+      "call_rest_path",
+      "rest_request",
+      "api_request",
+      "http_request",
+      "fetch_url",
+      "list_agents",
+      "create_agent_token",
+      "revoke_agent_token",
+      "delete_agent_token"
+    ];
 
     for (const name of forbiddenNames) {
       expect(names).not.toContain(name);
