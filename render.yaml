@@ -45,7 +45,7 @@ services:
           name: mindsystem-redis
           property: port
       - key: APP_BASE_URL
-        value: https://mindsystem-web.onrender.com
+        value: https://razbitton.com
       - key: API_BASE_URL
         value: https://mindsystem-api.onrender.com
       - key: MCP_SERVER_URL
@@ -62,6 +62,9 @@ services:
     name: mindsystem-web
     runtime: docker
     plan: starter
+    domains:
+      - razbitton.com
+    renderSubdomainPolicy: disabled
     dockerfilePath: ./Dockerfile
     dockerCommand: pnpm render:start:web
     healthCheckPath: /login
@@ -95,7 +98,7 @@ services:
           name: mindsystem-redis
           property: port
       - key: APP_BASE_URL
-        value: https://mindsystem-web.onrender.com
+        value: https://razbitton.com
       - key: API_BASE_URL
         value: https://mindsystem-api.onrender.com
       - key: MCP_SERVER_URL
@@ -128,7 +131,7 @@ services:
           name: mindsystem-redis
           property: port
       - key: APP_BASE_URL
-        value: https://mindsystem-web.onrender.com
+        value: https://razbitton.com
       - key: API_BASE_URL
         value: https://mindsystem-api.onrender.com
       - key: MCP_SERVER_URL

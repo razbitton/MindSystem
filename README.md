@@ -206,13 +206,15 @@ To deploy:
    - `S3_ACCESS_KEY`
    - `S3_SECRET_KEY`
 5. Deploy the Blueprint.
-6. Open `https://mindsystem-web.onrender.com/login` and sign in with the bootstrap credentials.
+6. Open `https://razbitton.com/login` and sign in with the bootstrap credentials.
 
 The worker uses Render's `starter` plan because Render does not support the `free` instance type for background workers. The web/API/MCP services and datastores are configured with free plans where Render supports them.
 
-Before adding your final custom domain, update these Render environment variables:
+The production web domain is `https://razbitton.com`. The Blueprint disables the web service's default `onrender.com` subdomain after the custom domain is attached and verified.
 
-- On `mindsystem-api`: set `APP_BASE_URL` to `https://your-domain.com`.
+When using a custom domain, keep these Render environment variables aligned:
+
+- On `mindsystem-api`: set `APP_BASE_URL` to `https://razbitton.com`.
 - On `mindsystem-worker` and `mindsystem-mcp`: set `APP_BASE_URL` to the same value for consistency.
 - On `mindsystem-web`: keep `API_BASE_URL` pointed at `https://mindsystem-api.onrender.com` unless you also add a custom API domain.
 

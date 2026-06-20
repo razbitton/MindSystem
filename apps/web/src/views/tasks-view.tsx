@@ -18,6 +18,7 @@ import {
 } from "../lib/view-models";
 import { Drawer, EmptyState } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
+import { TaskDetailDialog } from "../components/task-detail-dialog";
 import { useI18n } from "../i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,7 @@ export default function TasksView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [editingTask, setEditingTask] = useState<AnyRecord | null>(null);
+  const [viewingTask, setViewingTask] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<TaskForm>(blankForm());
   const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -85,6 +87,7 @@ export default function TasksView() {
 
   function openCreate() {
     setEditingTask(null);
+    setViewingTask(null);
     setForm({
       ...blankForm(),
       projectId: filters.project_id,
@@ -95,6 +98,7 @@ export default function TasksView() {
   }
 
   function openEdit(task: AnyRecord) {
+    setViewingTask(null);
     setEditingTask(task);
     setForm({
       title: String(task.title ?? ""),
@@ -114,6 +118,14 @@ export default function TasksView() {
     setDrawerOpen(false);
     setEditingTask(null);
     setForm(blankForm());
+  }
+
+  function openTaskDetails(task: AnyRecord) {
+    setViewingTask(task);
+  }
+
+  function closeTaskDetails() {
+    setViewingTask(null);
   }
 
   async function save() {
@@ -156,6 +168,7 @@ export default function TasksView() {
     try {
       await apiDelete(`/api/tasks/${deleteTarget.id}`);
       if (editingTask?.id === deleteTarget.id) closeDrawer();
+      if (viewingTask?.id === deleteTarget.id) closeTaskDetails();
       setDeleteTarget(null);
       invalidateWorkspaceQueryCache();
       await load(filters, true);
@@ -304,6 +317,7 @@ export default function TasksView() {
                 projects={projects}
                 formatDate={formatDate}
                 onEdit={openEdit}
+                onOpenDetails={openTaskDetails}
                 onComplete={complete}
                 onDelete={requestDelete}
               />
@@ -313,6 +327,7 @@ export default function TasksView() {
               projects={projects}
               formatDate={formatDate}
               onEdit={openEdit}
+              onOpenDetails={openTaskDetails}
               onComplete={complete}
               onDelete={requestDelete}
             />
@@ -466,6 +481,19 @@ export default function TasksView() {
         </div>
       </Drawer>
 
+      <TaskDetailDialog
+        open={Boolean(viewingTask)}
+        task={viewingTask}
+        projects={projects}
+        onClose={closeTaskDetails}
+        onEdit={openEdit}
+        onComplete={complete}
+        onDelete={(task) => {
+          closeTaskDetails();
+          requestDelete(task);
+        }}
+      />
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title={t("tasks.deleteTask")}
@@ -569,6 +597,7 @@ function TaskDesktopList({
   projects,
   formatDate,
   onEdit,
+  onOpenDetails,
   onComplete,
   onDelete
 }: {
@@ -576,6 +605,7 @@ function TaskDesktopList({
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
   onEdit: (task: AnyRecord) => void;
+  onOpenDetails: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
@@ -618,12 +648,21 @@ function TaskDesktopList({
         return (
           <div
             key={task.id}
+            tabIndex={0}
+            aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
             className={cn(
-              "grid grid-cols-[92px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20",
+              "grid cursor-pointer grid-cols-[92px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isDone && "bg-muted/10"
             )}
             dir="ltr"
             role="row"
+            onClick={() => onOpenDetails(task)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpenDetails(task);
+              }
+            }}
           >
             <div className="flex items-center justify-start gap-2" dir="ltr" role="cell">
               <Button
@@ -641,7 +680,10 @@ function TaskDesktopList({
                 variant="ghost"
                 size="icon-sm"
                 type="button"
-                onClick={() => onEdit(task)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit(task);
+                }}
                 title={t("common.edit")}
                 aria-label={t("common.edit")}
                 className="rounded-lg text-primary hover:bg-primary/10 hover:text-primary"
@@ -674,7 +716,10 @@ function TaskDesktopList({
                 variant="ghost"
                 size="icon-sm"
                 type="button"
-                onClick={isDone ? undefined : () => onComplete(task.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!isDone) void onComplete(task.id);
+                }}
                 aria-disabled={isDone}
                 title={isDone ? t("tasks.completed") : t("tasks.markDone")}
                 aria-label={isDone ? t("tasks.completed") : t("tasks.markDone")}
@@ -714,6 +759,7 @@ function TaskCards({
   projects,
   formatDate,
   onEdit,
+  onOpenDetails,
   onComplete,
   onDelete
 }: {
@@ -721,11 +767,12 @@ function TaskCards({
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
   onEdit: (task: AnyRecord) => void;
+  onOpenDetails: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid min-w-0 max-w-full gap-4 xl:grid-cols-2">
       {tasks.map((task) => (
         <TaskCard
           key={task.id}
@@ -733,6 +780,7 @@ function TaskCards({
           projects={projects}
           formatDate={formatDate}
           onEdit={onEdit}
+          onOpenDetails={onOpenDetails}
           onComplete={onComplete}
           onDelete={onDelete}
         />
@@ -746,6 +794,7 @@ function TaskCard({
   projects,
   formatDate,
   onEdit,
+  onOpenDetails,
   onComplete,
   onDelete
 }: {
@@ -753,6 +802,7 @@ function TaskCard({
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
   onEdit: (task: AnyRecord) => void;
+  onOpenDetails: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
@@ -768,18 +818,30 @@ function TaskCard({
     dateValue(task, "updatedAt");
 
   return (
-    <article className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15">
-      <div className="flex flex-col gap-2">
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
+      onClick={() => onOpenDetails(task)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpenDetails(task);
+        }
+      }}
+      className="flex min-w-0 max-w-full cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere]" dir="auto">
           {task.title}
         </h3>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <TaskStatusBadge value={task.status} />
           <TaskPriorityBadge value={task.priority} />
         </div>
       </div>
 
-      <div className="flex min-h-[5.5rem] flex-col gap-1.5 rounded-xl border border-border bg-background/50 p-3">
+      <div className="flex min-h-[5.5rem] min-w-0 max-w-full flex-col gap-1.5 overflow-hidden rounded-xl border border-border bg-background/50 p-3">
         {assignee ? <TaskMetaRow label={t("tasks.assignee")} value={assignee} /> : null}
         <TaskMetaRow label={t("common.project")} value={project || t("common.noProject")} />
         {description ? <TaskMetaRow label={t("common.description")} value={description} /> : null}
@@ -806,7 +868,10 @@ function TaskCard({
             variant="ghost"
             size="icon-sm"
             type="button"
-            onClick={() => onEdit(task)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(task);
+            }}
             title={t("common.edit")}
             aria-label={t("common.edit")}
             className="rounded-lg text-muted-foreground hover:text-primary"
@@ -819,7 +884,10 @@ function TaskCard({
           variant="ghost"
           size="sm"
           type="button"
-          onClick={isDone ? undefined : () => onComplete(task.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (!isDone) void onComplete(task.id);
+          }}
           aria-disabled={isDone}
           className={cn(
             "rounded-lg px-3 text-sm font-semibold",
@@ -838,9 +906,9 @@ function TaskCard({
 
 function TaskMetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-      <span className="shrink-0 font-medium text-muted-foreground/80">{label}:</span>
-      <span className="min-w-0 truncate" dir="auto">
+    <div className="grid min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2 text-xs text-muted-foreground">
+      <span className="min-w-0 max-w-24 truncate font-medium text-muted-foreground/80">{label}:</span>
+      <span className="min-w-0 truncate text-start" dir="auto">
         {value}
       </span>
     </div>

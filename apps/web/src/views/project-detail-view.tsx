@@ -13,6 +13,7 @@ import {
 import { dateValue, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
+import { TaskDetailDialog } from "../components/task-detail-dialog";
 import { Disclosure, CodeBlock } from "../components/disclosure";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +33,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     () => peekCachedQuery<AnyRecord>(`/api/projects/${projectId}/context`) ?? null
   );
   const [error, setError] = useState<string | null>(null);
+  const [viewingTask, setViewingTask] = useState<AnyRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -52,9 +54,19 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     await apiPost(`/api/tasks/${id}/complete`, {});
     invalidateWorkspaceQueryCache();
     await load(true);
+    setViewingTask((current) => (current?.id === id ? { ...current, status: "done" } : current));
   }
 
-  function requestDelete(type: DeleteTarget["type"], item: AnyRecord) {
+  function openTaskDetails(task: AnyRecord) {
+    setViewingTask(task);
+  }
+
+  function closeTaskDetails() {
+    setViewingTask(null);
+  }
+
+  function requestDelete(type: DeleteTarget["type"], item: AnyRecord, event?: { stopPropagation: () => void }) {
+    event?.stopPropagation();
     setDeleteTarget({
       type,
       id: String(item.id),
@@ -73,6 +85,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             ? `/api/tasks/${deleteTarget.id}`
             : `/api/notes/${deleteTarget.id}`;
       await apiDelete(path);
+      if (deleteTarget.type === "task" && viewingTask?.id === deleteTarget.id) closeTaskDetails();
       setDeleteTarget(null);
       invalidateWorkspaceQueryCache();
       if (path.startsWith("/api/projects/")) {
@@ -161,7 +174,8 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
                 formatDate={formatDate}
                 emptyText={t("projectDetail.noTasks")}
                 completeTask={completeTask}
-                deleteTask={(task) => requestDelete("task", task)}
+                openTask={openTaskDetails}
+                deleteTask={(task, event) => requestDelete("task", task, event)}
               />
             </Panel>
             <Panel title={t("projectDetail.notes")}>
@@ -206,6 +220,18 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
         </div>
       </div>
 
+      <TaskDetailDialog
+        open={Boolean(viewingTask)}
+        task={viewingTask}
+        projects={project ? [project] : []}
+        onClose={closeTaskDetails}
+        onComplete={completeTask}
+        onDelete={(task) => {
+          closeTaskDetails();
+          requestDelete("task", task);
+        }}
+      />
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title={
@@ -239,20 +265,35 @@ function TaskRows({
   formatDate,
   emptyText,
   completeTask,
+  openTask,
   deleteTask
 }: {
   tasks: AnyRecord[];
   formatDate: (value?: string | null) => string;
   emptyText: string;
   completeTask: (id: string) => void;
-  deleteTask: (task: AnyRecord) => void;
+  openTask: (task: AnyRecord) => void;
+  deleteTask: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
   const { t } = useI18n();
   if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex min-w-0 flex-col gap-1">
       {tasks.map((task) => (
-        <li key={task.id} className="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/40">
+        <li
+          key={task.id}
+          role="button"
+          tabIndex={0}
+          aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
+          className="flex min-w-0 cursor-pointer flex-col gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between"
+          onClick={() => openTask(task)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              openTask(task);
+            }
+          }}
+        >
           <div className="flex min-w-0 flex-col gap-0.5">
             <p className="truncate text-sm font-medium text-foreground" dir="auto">
               {task.title}
@@ -261,18 +302,24 @@ function TaskRows({
               {truncate(task.description, 110) || t("common.noDescription")} · {formatDate(dateValue(task, "dueAt"))}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end">
             <PriorityBadge value={task.priority} />
             <StatusBadge value={task.status} />
             {task.status !== "done" ? (
-              <IconButton label={t("common.complete")} onClick={() => completeTask(task.id)}>
+              <IconButton
+                label={t("common.complete")}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  completeTask(task.id);
+                }}
+              >
                 <CheckCircle className="size-4" aria-hidden />
               </IconButton>
             ) : null}
             <IconButton
               label={t("common.delete")}
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => deleteTask(task)}
+              onClick={(event) => deleteTask(task, event)}
             >
               <Trash2 className="size-4" aria-hidden />
             </IconButton>
