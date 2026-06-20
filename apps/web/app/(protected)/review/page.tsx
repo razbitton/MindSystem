@@ -1,4 +1,4 @@
-import ReviewView from "../../src/views/review-view";
+import ReviewView from "@/views/review-view";
 
 export default function ReviewPage() {
   return <ReviewView />;

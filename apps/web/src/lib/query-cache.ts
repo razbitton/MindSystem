@@ -48,6 +48,13 @@ export function peekCachedQuery<T = AnyRecord>(path: string, query?: AnyRecord):
   return cachedQueries.get(apiQueryKey(path, query))?.data as T | undefined;
 }
 
+export function setCachedQuery<T>(path: string, query: AnyRecord | undefined, data: T) {
+  cachedQueries.set(apiQueryKey(path, query), {
+    data,
+    updatedAt: Date.now()
+  });
+}
+
 export async function cachedApiGet<T = AnyRecord>(
   path: string,
   query?: AnyRecord,
@@ -131,4 +138,59 @@ export function warmWorkspaceQueryCache() {
     });
 
   return workspaceWarmPromise;
+}
+
+export function prefetchDataForRoute(href: string) {
+  const route = href.split("?")[0]?.replace(/\/$/, "") || "/dashboard";
+
+  if (route === "/dashboard") {
+    return Promise.all([
+      cachedApiGet("/api/dashboard/today").catch(() => null),
+      cachedApiGet("/api/notes").catch(() => null)
+    ]).then(() => undefined);
+  }
+
+  if (route === "/notes") {
+    return Promise.all([
+      cachedApiGet("/api/notes").catch(() => null),
+      cachedApiGet("/api/projects").catch(() => null)
+    ]).then(() => undefined);
+  }
+
+  if (route === "/tasks") {
+    return Promise.all([
+      cachedApiGet("/api/tasks").catch(() => null),
+      cachedApiGet("/api/projects").catch(() => null)
+    ]).then(() => undefined);
+  }
+
+  if (route === "/projects") {
+    return cachedApiGet("/api/projects")
+      .catch(() => null)
+      .then(() => undefined);
+  }
+
+  if (route.startsWith("/projects/")) {
+    const projectId = route.split("/")[2];
+    return Promise.all([
+      cachedApiGet("/api/projects").catch(() => null),
+      projectId
+        ? cachedApiGet(`/api/projects/${projectId}/context`).catch(() => null)
+        : Promise.resolve(null)
+    ]).then(() => undefined);
+  }
+
+  if (route === "/documents") {
+    return cachedApiGet("/api/documents")
+      .catch(() => null)
+      .then(() => undefined);
+  }
+
+  if (route === "/review") {
+    return cachedApiGet("/api/review-queue")
+      .catch(() => null)
+      .then(() => undefined);
+  }
+
+  return Promise.resolve();
 }

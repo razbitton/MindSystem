@@ -5,14 +5,16 @@ import { CheckCircle2, Clock, Edit2, Filter, Plus, Search, Trash2 } from "lucide
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
-  invalidateWorkspaceQueryCache,
-  peekCachedQuery
+  invalidateCachedQueries,
+  peekCachedQuery,
+  setCachedQuery
 } from "../lib/query-cache";
 import {
   dateValue,
   fromDateTimeInput,
   matchesQuery,
   projectName,
+  sortByPriority,
   toDateTimeInput,
   truncate
 } from "../lib/view-models";
@@ -42,6 +44,11 @@ const NO_PROJECT = "__none__";
 type TaskFilters = { status: string; project_id: string; priority: string };
 const defaultTaskFilters: TaskFilters = { status: "", project_id: "", priority: "" };
 
+type TasksViewProps = {
+  initialTasks?: AnyRecord[];
+  initialProjects?: AnyRecord[];
+};
+
 type TaskForm = {
   title: string;
   description: string;
@@ -54,13 +61,13 @@ type TaskForm = {
   assignee: string;
 };
 
-export default function TasksView() {
+export default function TasksView({ initialTasks, initialProjects }: TasksViewProps = {}) {
   const { t, formatDate, translateValue, direction } = useI18n();
   const [tasks, setTasks] = useState<AnyRecord[]>(
-    () => peekCachedQuery<{ tasks: AnyRecord[] }>("/api/tasks", defaultTaskFilters)?.tasks ?? []
+    () => initialTasks ?? peekCachedQuery<{ tasks: AnyRecord[] }>("/api/tasks", defaultTaskFilters)?.tasks ?? []
   );
   const [projects, setProjects] = useState<AnyRecord[]>(
-    () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
+    () => initialProjects ?? peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
   );
   const [filters, setFilters] = useState(defaultTaskFilters);
   const [query, setQuery] = useState("");
@@ -81,8 +88,29 @@ export default function TasksView() {
     setProjects(projectData.projects);
   }
 
+  function invalidateTaskQueryCache() {
+    invalidateCachedQueries((key) =>
+      key.startsWith("GET /api/tasks") ||
+      key.startsWith("GET /api/dashboard") ||
+      key.startsWith("GET /api/projects/")
+    );
+  }
+
   useEffect(() => {
+    if (initialTasks) {
+      setCachedQuery("/api/tasks", defaultTaskFilters, { tasks: initialTasks });
+      setTasks(initialTasks);
+    }
+    if (initialProjects) {
+      setCachedQuery("/api/projects", undefined, { projects: initialProjects });
+      setProjects(initialProjects);
+    }
+  }, [initialTasks, initialProjects]);
+
+  useEffect(() => {
+    if (initialTasks && initialProjects) return;
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function openCreate() {
@@ -147,13 +175,13 @@ export default function TasksView() {
       await apiPost("/api/tasks", payload);
     }
     closeDrawer();
-    invalidateWorkspaceQueryCache();
+    invalidateTaskQueryCache();
     await load(filters, true);
   }
 
   async function complete(id: string) {
     await apiPost(`/api/tasks/${id}/complete`, {});
-    invalidateWorkspaceQueryCache();
+    invalidateTaskQueryCache();
     await load(filters, true);
   }
 
@@ -170,7 +198,7 @@ export default function TasksView() {
       if (editingTask?.id === deleteTarget.id) closeDrawer();
       if (viewingTask?.id === deleteTarget.id) closeTaskDetails();
       setDeleteTarget(null);
-      invalidateWorkspaceQueryCache();
+      invalidateTaskQueryCache();
       await load(filters, true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
@@ -187,7 +215,7 @@ export default function TasksView() {
   }
 
   const filteredTasks = useMemo(
-    () => tasks.filter((task) => matchesQuery(task, query, ["title", "description", "assignee"])),
+    () => sortByPriority(tasks.filter((task) => matchesQuery(task, query, ["title", "description", "assignee"]))),
     [query, tasks]
   );
 

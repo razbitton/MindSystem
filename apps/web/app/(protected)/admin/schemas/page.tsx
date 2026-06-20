@@ -1,4 +1,4 @@
-import SchemasView from "../../../src/views/schemas-view";
+import SchemasView from "@/views/schemas-view";
 
 export default function SchemasPage() {
   return <SchemasView />;

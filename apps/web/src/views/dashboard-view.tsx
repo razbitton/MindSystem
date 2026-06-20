@@ -14,9 +14,10 @@ import { apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
-  peekCachedQuery
+  peekCachedQuery,
+  setCachedQuery
 } from "../lib/query-cache";
-import { dateValue, truncate } from "../lib/view-models";
+import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import {
   EmptyState,
   EntityBadge,
@@ -30,13 +31,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-export default function DashboardView() {
+type DashboardViewProps = {
+  initialDashboard?: AnyRecord;
+  initialNotes?: AnyRecord[];
+};
+
+export default function DashboardView({
+  initialDashboard,
+  initialNotes
+}: DashboardViewProps = {}) {
   const { t, formatDate, translateValue } = useI18n();
   const [data, setData] = useState<AnyRecord | null>(
-    () => peekCachedQuery<AnyRecord>("/api/dashboard/today") ?? null
+    () => initialDashboard ?? peekCachedQuery<AnyRecord>("/api/dashboard/today") ?? null
   );
   const [notes, setNotes] = useState<AnyRecord[]>(
-    () => peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes.slice(0, 4) ?? []
+    () => initialNotes?.slice(0, 4) ?? peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes.slice(0, 4) ?? []
   );
   const [captureText, setCaptureText] = useState("");
   const [captureResult, setCaptureResult] = useState<AnyRecord | null>(null);
@@ -58,7 +67,20 @@ export default function DashboardView() {
   }
 
   useEffect(() => {
+    if (initialDashboard) {
+      setCachedQuery("/api/dashboard/today", undefined, initialDashboard);
+      setData(initialDashboard);
+    }
+    if (initialNotes) {
+      setCachedQuery("/api/notes", undefined, { notes: initialNotes });
+      setNotes(initialNotes.slice(0, 4));
+    }
+  }, [initialDashboard, initialNotes]);
+
+  useEffect(() => {
+    if (initialDashboard && initialNotes) return;
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function capture() {
@@ -286,7 +308,7 @@ function TaskRows({
   if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
     <ul className="flex min-w-0 flex-col gap-1">
-      {tasks.slice(0, 5).map((task) => (
+      {sortByPriority(tasks).slice(0, 5).map((task) => (
         <li key={task.id}>
           <Link
             href="/tasks"
@@ -323,7 +345,7 @@ function ProjectRows({
   if (!projects.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
     <ul className="flex min-w-0 flex-col gap-1">
-      {projects.slice(0, 6).map((project) => (
+      {sortByPriority(projects).slice(0, 6).map((project) => (
         <li key={project.id}>
           <Link
             href={`/projects/${project.id}`}

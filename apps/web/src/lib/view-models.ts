@@ -50,6 +50,22 @@ export function truncate(value?: string | null, max = 180) {
   return `${text.slice(0, max).trim()}...`;
 }
 
+const priorityRank: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3
+};
+const defaultPriorityRank = 2;
+
+export function sortByPriority<T extends AnyRecord>(records: T[]) {
+  return [...records].sort((a, b) => prioritySortValue(a.priority) - prioritySortValue(b.priority));
+}
+
+function prioritySortValue(value: unknown) {
+  return priorityRank[String(value ?? "medium")] ?? defaultPriorityRank;
+}
+
 export function loadPreference<T extends string>(key: string, fallback: T, allowed: readonly T[]) {
   if (typeof window === "undefined") return fallback;
   const stored = window.localStorage.getItem(key);

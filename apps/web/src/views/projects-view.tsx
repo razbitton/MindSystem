@@ -9,7 +9,7 @@ import {
   invalidateWorkspaceQueryCache,
   peekCachedQuery
 } from "../lib/query-cache";
-import { dateValue, fromDateTimeInput, matchesQuery, toDateTimeInput, truncate } from "../lib/view-models";
+import { dateValue, fromDateTimeInput, matchesQuery, sortByPriority, toDateTimeInput, truncate } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
@@ -134,7 +134,7 @@ export default function ProjectsView() {
   }
 
   const filteredProjects = useMemo(
-    () => projects.filter((project) => matchesQuery(project, query, ["name", "description", "goal", "status", "priority"])),
+    () => sortByPriority(projects.filter((project) => matchesQuery(project, query, ["name", "description", "goal", "status", "priority"]))),
     [projects, query]
   );
 

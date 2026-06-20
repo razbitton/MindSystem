@@ -10,7 +10,7 @@ import {
   invalidateWorkspaceQueryCache,
   peekCachedQuery
 } from "../lib/query-cache";
-import { dateValue, truncate } from "../lib/view-models";
+import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
@@ -106,7 +106,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     .slice(0, 10);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 max-w-full flex-col gap-6 overflow-hidden">
       <PageHeader
         eyebrow={t("projects.title")}
         title={project?.name ?? t("projectDetail.fallbackTitle")}
@@ -138,26 +138,26 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
+      <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 max-w-full flex-col gap-6 lg:col-span-2">
           <Panel title={t("projectDetail.summary")}>
             {project ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 max-w-full flex-col gap-3">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 flex-col gap-1">
-                    <p className="text-sm font-semibold text-foreground" dir="auto">
+                    <p className="break-words text-sm font-semibold text-foreground [overflow-wrap:anywhere]" dir="auto">
                       {project.goal || t("projectDetail.noGoal")}
                     </p>
-                    <p className="text-sm text-muted-foreground" dir="auto">
+                    <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]" dir="auto">
                       {project.description || t("common.noDescription")}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:shrink-0">
                     <PriorityBadge value={project.priority} />
                     <StatusBadge value={project.status} />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-3">
+                <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 border-t border-border pt-3">
                   <MetaItem label={t("common.due")} value={formatDate(dateValue(project, "dueAt"))} />
                   <MetaItem label={t("common.updated")} value={formatDate(dateValue(project, "updatedAt"))} />
                 </div>
@@ -167,7 +167,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             )}
           </Panel>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid min-w-0 max-w-full gap-6 md:grid-cols-2">
             <Panel title={t("projectDetail.tasks")}>
               <TaskRows
                 tasks={data?.tasks ?? []}
@@ -201,7 +201,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           </Panel>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 max-w-full flex-col gap-6">
           <Panel title={t("projectDetail.documents")}>
             <SimpleRows
               rows={data?.documents ?? []}
@@ -278,14 +278,14 @@ function TaskRows({
   const { t } = useI18n();
   if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
-    <ul className="flex min-w-0 flex-col gap-1">
-      {tasks.map((task) => (
+    <ul className="flex min-w-0 max-w-full flex-col gap-1">
+      {sortByPriority(tasks).map((task) => (
         <li
           key={task.id}
           role="button"
           tabIndex={0}
           aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
-          className="flex min-w-0 cursor-pointer flex-col gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between"
+          className="flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between"
           onClick={() => openTask(task)}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -294,7 +294,7 @@ function TaskRows({
             }
           }}
         >
-          <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex min-w-0 max-w-full flex-col gap-0.5">
             <p className="truncate text-sm font-medium text-foreground" dir="auto">
               {task.title}
             </p>
@@ -302,7 +302,7 @@ function TaskRows({
               {truncate(task.description, 110) || t("common.noDescription")} · {formatDate(dateValue(task, "dueAt"))}
             </p>
           </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
             <PriorityBadge value={task.priority} />
             <StatusBadge value={task.status} />
             {task.status !== "done" ? (
@@ -348,14 +348,14 @@ function SimpleRows({
   const { t } = useI18n();
   if (!rows.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex min-w-0 max-w-full flex-col gap-1">
       {rows.map((row) => {
         const bodyValue = bodyKey.toLowerCase().includes("at")
           ? formatDate(dateValue(row, bodyKey))
           : row[bodyKey] ?? row[bodyKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)];
         return (
-          <li key={row.id} className="flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-accent/40">
-            <div className="flex min-w-0 flex-col gap-0.5">
+          <li key={row.id} className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-lg px-3 py-2.5 hover:bg-accent/40">
+            <div className="flex min-w-0 max-w-full flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">
                 {row[titleKey] ?? row.name}
               </p>

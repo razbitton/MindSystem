@@ -5,8 +5,9 @@ import { Check, Folder, PenSquare, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
-  invalidateWorkspaceQueryCache,
-  peekCachedQuery
+  invalidateCachedQueries,
+  peekCachedQuery,
+  setCachedQuery
 } from "../lib/query-cache";
 import { dateValue, matchesQuery, projectName } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader } from "../components/page";
@@ -34,6 +35,11 @@ type NoteForm = {
   projectId: string;
 };
 
+type NotesViewProps = {
+  initialNotes?: AnyRecord[];
+  initialProjects?: AnyRecord[];
+};
+
 const rtlTextPattern = /[\u0590-\u08FF\uFB1D-\uFEFC]/;
 const ltrTextPattern = /[A-Za-z\u00C0-\u024F]/;
 
@@ -45,13 +51,13 @@ function resolveTextDirection(value: string, fallback: Direction): Direction {
   return fallback;
 }
 
-export default function NotesView() {
+export default function NotesView({ initialNotes, initialProjects }: NotesViewProps = {}) {
   const { t, formatDate, direction } = useI18n();
   const [notes, setNotes] = useState<AnyRecord[]>(
-    () => peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes ?? []
+    () => initialNotes ?? peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes ?? []
   );
   const [projects, setProjects] = useState<AnyRecord[]>(
-    () => peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
+    () => initialProjects ?? peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
   );
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
@@ -75,8 +81,29 @@ export default function NotesView() {
     setProjects(projectData.projects);
   }
 
+  function invalidateNoteQueryCache() {
+    invalidateCachedQueries((key) =>
+      key.startsWith("GET /api/notes") ||
+      key.startsWith("GET /api/dashboard") ||
+      key.startsWith("GET /api/projects/")
+    );
+  }
+
   useEffect(() => {
+    if (initialNotes) {
+      setCachedQuery("/api/notes", undefined, { notes: initialNotes });
+      setNotes(initialNotes);
+    }
+    if (initialProjects) {
+      setCachedQuery("/api/projects", undefined, { projects: initialProjects });
+      setProjects(initialProjects);
+    }
+  }, [initialNotes, initialProjects]);
+
+  useEffect(() => {
+    if (initialNotes && initialProjects) return;
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function resetCompose() {
@@ -100,7 +127,7 @@ export default function NotesView() {
       await apiPost("/api/notes", payload);
       setComposeOpen(false);
       resetCompose();
-      invalidateWorkspaceQueryCache();
+      invalidateNoteQueryCache();
       await load(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
@@ -148,7 +175,7 @@ export default function NotesView() {
         projectId: form.projectId || null
       });
       closeDrawer();
-      invalidateWorkspaceQueryCache();
+      invalidateNoteQueryCache();
       await load(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
@@ -167,7 +194,7 @@ export default function NotesView() {
       await apiDelete(`/api/notes/${deleteTarget.id}`);
       if (editingNote?.id === deleteTarget.id) closeDrawer();
       setDeleteTarget(null);
-      invalidateWorkspaceQueryCache();
+      invalidateNoteQueryCache();
       await load(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));

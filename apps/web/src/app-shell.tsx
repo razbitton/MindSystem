@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -12,10 +12,9 @@ import {
   Sparkles
 } from "lucide-react";
 import { LanguageSwitcher, ThemeToggle, useI18n } from "./i18n";
-import { getCurrentSession, logout, type AnyRecord } from "./lib/api";
+import { logout, type AnyRecord } from "./lib/api";
 import { navSections, settingsNav } from "./lib/navigation";
-import { warmWorkspaceQueryCache } from "./lib/query-cache";
-import { sessionAuthenticatedEvent } from "./lib/session-events";
+import { prefetchDataForRoute } from "./lib/query-cache";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -76,10 +75,19 @@ function NavLink({
   tooltipSide: "left" | "right";
   onNavigate?: () => void;
 }) {
+  const router = useRouter();
+
+  function prefetch() {
+    router.prefetch(href);
+    void prefetchDataForRoute(href);
+  }
+
   const link = (
     <Link
       href={href}
       onClick={() => onNavigate?.()}
+      onFocus={prefetch}
+      onMouseEnter={prefetch}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={cn(
@@ -288,16 +296,23 @@ function UserMenu({
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AuthenticatedShell({
+  children,
+  user
+}: {
+  children: React.ReactNode;
+  user: AnyRecord;
+}) {
   const { t, direction } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
-  const isLoginRoute = pathname.startsWith("/login");
-  const [user, setUser] = useState<AnyRecord | null>(null);
-  const [checkingSession, setCheckingSession] = useState(!isLoginRoute);
-  const sessionVerified = useRef(false);
+  const [currentUser, setCurrentUser] = useState(user);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCurrentUser(user);
+  }, [user]);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -307,71 +322,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setSidebarCollapsed(window.localStorage.getItem(sidebarCollapsedStorageKey) === "true");
   }, []);
 
-  useEffect(() => {
-    if (!user || isLoginRoute) return;
-    void warmWorkspaceQueryCache();
-  }, [isLoginRoute, user]);
-
-  useEffect(() => {
-    function handleSessionAuthenticated(event: Event) {
-      const user = (event as CustomEvent<{ user?: AnyRecord }>).detail?.user;
-      if (!user) return;
-
-      sessionVerified.current = true;
-      setUser(user);
-      setCheckingSession(false);
-    }
-
-    window.addEventListener(sessionAuthenticatedEvent, handleSessionAuthenticated);
-    return () => {
-      window.removeEventListener(sessionAuthenticatedEvent, handleSessionAuthenticated);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isLoginRoute) {
-      setCheckingSession(false);
-      return;
-    }
-
-    if (user) {
-      setCheckingSession(false);
-      return;
-    }
-
-    if (sessionVerified.current) {
-      setCheckingSession(false);
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-      return;
-    }
-
-    let active = true;
-    setCheckingSession(true);
-    getCurrentSession()
-      .then((session) => {
-        if (!active) return;
-        sessionVerified.current = true;
-        setUser(session.user);
-        setCheckingSession(false);
-      })
-      .catch(() => {
-        if (!active) return;
-        sessionVerified.current = true;
-        setUser(null);
-        setCheckingSession(false);
-        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [isLoginRoute, pathname, router, user]);
-
   async function handleLogout() {
     await logout().catch(() => null);
-    sessionVerified.current = true;
-    setUser(null);
     router.replace("/login");
+    router.refresh();
   }
 
   function toggleSidebarCollapsed() {
@@ -380,28 +334,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       window.localStorage.setItem(sidebarCollapsedStorageKey, String(next));
       return next;
     });
-  }
-
-  if (isLoginRoute) {
-    return (
-      <main className="relative flex min-h-svh items-center justify-center bg-background px-4 py-10">
-        <div className="absolute end-4 top-4">
-          <LanguageSwitcher />
-        </div>
-        {children}
-        <Toaster />
-      </main>
-    );
-  }
-
-  if (checkingSession || !user) {
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-background px-4">
-        <p className="text-sm text-muted-foreground">
-          {checkingSession ? t("auth.checkingSession") : t("auth.redirectingToLogin")}
-        </p>
-      </main>
-    );
   }
 
   return (
@@ -434,7 +366,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <ThemeToggle />
               </div>
             )}
-            <UserMenu user={user} onLogout={handleLogout} collapsed={sidebarCollapsed} />
+            <UserMenu user={currentUser} onLogout={handleLogout} collapsed={sidebarCollapsed} />
           </div>
         </aside>
 
@@ -454,7 +386,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <LanguageSwitcher />
                   <ThemeToggle />
                 </div>
-                <UserMenu user={user} onLogout={handleLogout} />
+                <UserMenu user={currentUser} onLogout={handleLogout} />
               </div>
             </div>
           </SheetContent>
