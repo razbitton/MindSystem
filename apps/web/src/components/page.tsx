@@ -1,6 +1,7 @@
 "use client";
 
-import { X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -22,27 +23,55 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export function PageHeader({
   eyebrow,
   title,
-  actions
+  actions,
+  backHref,
+  backLabel
 }: {
   eyebrow?: string;
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  backHref?: string;
+  backLabel?: string;
 }) {
+  const router = useRouter();
+  const { direction, t } = useI18n();
+  const BackIcon = direction === "rtl" ? ArrowRight : ArrowLeft;
+
+  function goBack() {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    if (backHref) router.push(backHref);
+  }
+
   return (
     <header className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        {eyebrow ? (
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {eyebrow}
-          </p>
+      <div className="flex min-w-0 items-start gap-3">
+        {backHref ? (
+          <IconButton
+            label={backLabel ?? t("common.back")}
+            className="mt-0.5 shrink-0"
+            onClick={goBack}
+          >
+            <BackIcon className="size-4" aria-hidden />
+          </IconButton>
         ) : null}
-        <h1
-          className="min-w-0 text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
-          dir="auto"
-        >
-          {title}
-        </h1>
+        <div className="flex min-w-0 flex-col gap-1">
+          {eyebrow ? (
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h1
+            className="min-w-0 text-pretty text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+            dir="auto"
+          >
+            {title}
+          </h1>
+        </div>
       </div>
       {actions ? <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </header>

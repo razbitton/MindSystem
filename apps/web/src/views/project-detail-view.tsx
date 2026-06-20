@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Trash2 } from "lucide-react";
 import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
@@ -108,28 +107,11 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-6 overflow-hidden">
       <PageHeader
+        backHref="/projects"
+        backLabel={t("common.back")}
         eyebrow={t("projects.title")}
         title={project?.name ?? t("projectDetail.fallbackTitle")}
         subtitle={project?.description ?? t("projectDetail.fallbackSubtitle")}
-        actions={
-          <>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/projects">{t("projects.title")}</Link>
-            </Button>
-            {project ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => requestDelete("project", project)}
-              >
-                <Trash2 data-icon="inline-start" />
-                {t("common.delete")}
-              </Button>
-            ) : null}
-          </>
-        }
       />
 
       {error ? (
@@ -219,6 +201,27 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           </Panel>
         </div>
       </div>
+
+      {project ? (
+        <section className="flex min-w-0 max-w-full flex-col gap-3 border-t border-border pt-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="text-sm font-medium text-foreground">{t("projects.deleteProject")}</h2>
+            <p className="text-sm text-muted-foreground" dir="auto">
+              {t("projects.deleteProjectHelp")}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            className="w-full justify-center text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-fit"
+            onClick={() => requestDelete("project", project)}
+          >
+            <Trash2 data-icon="inline-start" />
+            {t("common.delete")}
+          </Button>
+        </section>
+      ) : null}
 
       <TaskDetailDialog
         open={Boolean(viewingTask)}

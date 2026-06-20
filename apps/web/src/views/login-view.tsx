@@ -7,6 +7,7 @@ import { LockKeyhole, LogIn, Mail } from "lucide-react";
 import { login } from "../lib/api";
 import { emitSessionAuthenticated } from "../lib/session-events";
 import { useI18n } from "../i18n";
+import { BrandLogo } from "../components/brand-logo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,12 +49,7 @@ export default function LoginView() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="items-center text-center">
-        <div
-          className="mb-1 flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-          aria-hidden
-        >
-          <span className="text-lg font-semibold">M</span>
-        </div>
+        <BrandLogo className="mb-1 size-16 rounded-2xl" />
         <CardTitle className="text-xl">{t("auth.title")}</CardTitle>
         <CardDescription>{t("auth.subtitle")}</CardDescription>
       </CardHeader>

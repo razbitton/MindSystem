@@ -15,6 +15,7 @@ import { LanguageSwitcher, ThemeToggle, useI18n } from "./i18n";
 import { logout, type AnyRecord } from "./lib/api";
 import { navSections, settingsNav } from "./lib/navigation";
 import { prefetchDataForRoute } from "./lib/query-cache";
+import { BrandLogo } from "./components/brand-logo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -145,12 +146,7 @@ function SidebarContent({
       )}
     >
       <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-2.5 px-2")}>
-        <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"
-          aria-hidden
-        >
-          <Sparkles className="size-5" />
-        </span>
+        <BrandLogo className="size-9 rounded-lg" />
         {collapsed ? null : (
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate text-sm font-semibold text-sidebar-foreground">
@@ -404,9 +400,7 @@ export function AuthenticatedShell({
               <Menu aria-hidden />
             </Button>
             <Link href="/dashboard" className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground" aria-hidden>
-                <Sparkles className="size-4" />
-              </span>
+              <BrandLogo className="size-7 rounded-md" />
               <span className="text-sm font-semibold">{t("app.name")}</span>
             </Link>
             <div className="ms-auto flex items-center gap-1">

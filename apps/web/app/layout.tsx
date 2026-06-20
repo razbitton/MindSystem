@@ -18,7 +18,22 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "MindSystem",
   description:
-    "Capture-first personal knowledge workspace with notes, tasks, projects, documents, agents, and English/Hebrew support."
+    "Capture-first personal knowledge workspace with notes, tasks, projects, documents, agents, and English/Hebrew support.",
+  icons: {
+    icon: [
+      {
+        url: "/brand/mindsystem-logo-dark.png",
+        media: "(prefers-color-scheme: light)",
+        type: "image/png"
+      },
+      {
+        url: "/brand/mindsystem-logo-light.png",
+        media: "(prefers-color-scheme: dark)",
+        type: "image/png"
+      }
+    ],
+    apple: [{ url: "/brand/mindsystem-logo-dark.png", type: "image/png" }]
+  }
 };
 
 export const viewport: Viewport = {

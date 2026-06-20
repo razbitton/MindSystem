@@ -253,6 +253,23 @@
     select {
       font-size: 16px;
     }
+
+    :where(button, [data-slot="button"], [role="button"]):where(:not(:disabled, [aria-disabled="true"])) {
+      -webkit-tap-highlight-color: color-mix(in oklch, var(--ring) 28%, transparent);
+      touch-action: manipulation;
+    }
+
+    :where(button:not([data-slot="button"]), [role="button"]:not([data-slot="button"])):where(:not(:disabled, [aria-disabled="true"])):active {
+      transform: translateY(1px) scale(0.98);
+      filter: brightness(0.96);
+      transition-duration: 75ms;
+    }
+  }
+
+  @media (pointer: coarse) and (prefers-reduced-motion: reduce) {
+    :where(button:not([data-slot="button"]), [role="button"]:not([data-slot="button"])):where(:not(:disabled, [aria-disabled="true"])):active {
+      transform: none;
+    }
   }
 
   ::selection {
