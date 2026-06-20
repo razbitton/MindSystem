@@ -203,13 +203,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
       </div>
 
       {project ? (
-        <section className="flex min-w-0 max-w-full flex-col gap-3 border-t border-border pt-4">
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="text-sm font-medium text-foreground">{t("projects.deleteProject")}</h2>
-            <p className="text-sm text-muted-foreground" dir="auto">
-              {t("projects.deleteProjectHelp")}
-            </p>
-          </div>
+        <section className="flex min-w-0 max-w-full justify-center border-t border-border pt-4 sm:justify-start">
           <Button
             variant="ghost"
             size="sm"
