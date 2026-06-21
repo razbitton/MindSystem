@@ -176,6 +176,24 @@ export function buildOpenApiSpec() {
         },
         delete: { summary: "Delete a document", responses: { "200": { description: "Deleted" } } }
       },
+      "/documents/{id}/download": {
+        get: {
+          summary: "Download or open a document file",
+          parameters: [
+            {
+              name: "disposition",
+              in: "query",
+              schema: { type: "string", enum: ["attachment", "inline"], default: "attachment" }
+            }
+          ],
+          responses: {
+            "200": {
+              description: "Document file stream",
+              content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } }
+            }
+          }
+        }
+      },
       "/reminders": {
         post: {
           summary: "Create a reminder",

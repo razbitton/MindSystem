@@ -44,7 +44,7 @@ import {
 } from "./services/auth.js";
 import { getDashboard } from "./services/dashboard.js";
 import { ingestFreeText } from "./services/ingest.js";
-import { createDocument, deleteDocument, getDocument, listDocuments, patchDocument } from "./services/documents.js";
+import { createDocument, deleteDocument, getDocument, getDocumentFile, listDocuments, patchDocument } from "./services/documents.js";
 import { deleteEntity, getEntity, listEntities } from "./services/entities.js";
 import {
   createNote,
@@ -91,6 +91,7 @@ import {
 import type { Actor, AppContext } from "./services/types.js";
 
 const idParam = z.object({ id: z.string().uuid() });
+const documentDownloadQuery = z.object({ disposition: z.enum(["inline", "attachment"]).default("attachment") });
 type AuthenticatedRequest = FastifyRequest & { identity: RequestIdentity };
 
 const publicPaths = new Set([
@@ -174,6 +175,7 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/documents" && method === "GET") return "documents:read";
   if (route === "/api/documents" && method === "POST") return "documents:write";
   if (route === "/api/documents/:id" && method === "GET") return "documents:read";
+  if (route === "/api/documents/:id/download" && method === "GET") return "documents:read";
   if (route === "/api/documents/:id" && method === "PATCH") return "documents:write";
   if (route === "/api/documents/:id" && method === "DELETE") return "documents:write";
 
@@ -379,6 +381,16 @@ export async function registerRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/documents", async (request) => listDocuments(requestContext(app, request)));
+
+  app.get("/api/documents/:id/download", async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    const { disposition } = documentDownloadQuery.parse(request.query);
+    const file = await getDocumentFile(requestContext(app, request), id, disposition);
+    for (const [name, value] of Object.entries(file.headers)) {
+      reply.header(name, value);
+    }
+    return reply.send(file.body);
+  });
 
   app.get("/api/documents/:id", async (request) => {
     const { id } = idParam.parse(request.params);

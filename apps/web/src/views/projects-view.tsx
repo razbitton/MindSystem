@@ -185,8 +185,8 @@ export default function ProjectsView() {
         />
       </div>
 
-      <section className="flex flex-col gap-4">
-          <div className="relative max-w-md md:hidden">
+      <section className="flex min-w-0 max-w-full flex-col gap-4 overflow-hidden">
+          <div className="relative w-full max-w-md md:hidden">
             <Search
               className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
               aria-hidden
@@ -209,19 +209,19 @@ export default function ProjectsView() {
           {!filteredProjects.length && !error ? (
             <EmptyState title={t("projects.empty")}>{t("common.emptySearch")}</EmptyState>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid min-w-0 max-w-full gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md [max-block-size:min(36rem,calc(100svh_-_10rem))]"
+                  className="flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md"
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
                     <Link
                       href={`/projects/${project.id}`}
-                      className="min-w-0 hover:underline"
+                      className="min-w-0 flex-1 overflow-hidden hover:underline"
                       aria-label={`${t("projects.openProject")}: ${project.name}`}
                     >
-                      <p className="truncate text-sm font-semibold text-foreground" dir="auto">
+                      <p className="truncate text-sm font-semibold text-foreground [overflow-wrap:anywhere]" dir="auto">
                         {project.name}
                       </p>
                     </Link>
@@ -238,22 +238,22 @@ export default function ProjectsView() {
                       </IconButton>
                     </div>
                   </div>
-                  <p className="line-clamp-3 text-sm text-muted-foreground" dir="auto">
+                  <p className="line-clamp-3 max-w-full break-words text-start text-sm text-muted-foreground [overflow-wrap:anywhere]" dir="auto">
                     {truncate(project.description || project.goal, 180) || t("common.noDescription")}
                   </p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <PriorityBadge value={project.priority} />
                     <StatusBadge value={project.status} />
                     <span>{formatDate(dateValue(project, "updatedAt"))}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-                    <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border pt-3">
+                    <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-xs text-muted-foreground">
                       <FolderKanban className="size-[15px] shrink-0" aria-hidden />
-                      <strong className="truncate font-medium text-foreground" dir="auto">
+                      <strong className="min-w-0 truncate font-medium text-foreground [overflow-wrap:anywhere]" dir="auto">
                         {project.goal || t("projects.noGoal")}
                       </strong>
                     </span>
-                    <Button asChild variant="ghost" size="sm">
+                    <Button asChild variant="ghost" size="sm" className="shrink-0">
                       <Link href={`/projects/${project.id}`}>{t("common.open")}</Link>
                     </Button>
                   </div>

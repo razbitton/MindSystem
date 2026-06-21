@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { Download, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
@@ -110,66 +110,87 @@ export default function DocumentsView() {
           <EmptyState title={t("documents.empty")}>{t("documents.subtitle")}</EmptyState>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {documents.map((document) => (
-              <article
-                key={document.id}
-                className="bounded-scroll flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs [max-block-size:min(38rem,calc(100svh_-_10rem))]"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="truncate text-sm font-semibold text-foreground" dir="auto">
-                      {document.title}
-                    </p>
-                    <p className="line-clamp-3 text-sm text-muted-foreground" dir="auto">
-                      {truncate(
-                        document.extractedText ||
-                          document.extracted_text ||
-                          t("common.metadataOnly"),
-                        160
-                      )}
-                    </p>
+            {documents.map((document) => {
+              const hasFile = Boolean(String(document.objectKey ?? document.object_key ?? "").trim());
+              return (
+                <article
+                  key={document.id}
+                  className="flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs"
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <p className="truncate text-sm font-semibold text-foreground" dir="auto">
+                        {document.title}
+                      </p>
+                      <p className="line-clamp-3 break-words text-sm text-muted-foreground [overflow-wrap:anywhere]" dir="auto">
+                        {truncate(
+                          document.extractedText ||
+                            document.extracted_text ||
+                            t("common.metadataOnly"),
+                          160
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+                      aria-hidden
+                    >
+                      <FileText className="size-[18px]" />
+                    </span>
                   </div>
-                  <span
-                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-                    aria-hidden
-                  >
-                    <FileText className="size-[18px]" />
-                  </span>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="delete"
-                    onClick={() => setDeleteTarget(document)}
-                  >
-                    <Trash2 aria-hidden />
-                    {t("common.delete")}
-                  </Button>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-full bg-muted px-2 py-0.5">
-                    {projectName(projects, String(document.projectId ?? document.project_id ?? "")) ||
-                      t("common.noProject")}
-                  </span>
-                  <span>{formatDate(dateValue(document, "updatedAt"))}</span>
-                </div>
-                <div className="border-t border-border pt-3">
-                  <Disclosure label={t("documents.storageDetails")}>
-                    <CodeBlock>
-                      {JSON.stringify(
-                        {
-                          objectKey: document.objectKey ?? document.object_key,
-                          mimeType: document.mimeType ?? document.mime_type
-                        },
-                        null,
-                        2
-                      )}
-                    </CodeBlock>
-                  </Disclosure>
-                </div>
-              </article>
-            ))}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {hasFile ? (
+                      <>
+                        <Button asChild size="sm" variant="outline">
+                          <a href={documentFileUrl(document, "inline")} target="_blank" rel="noreferrer">
+                            <ExternalLink aria-hidden />
+                            {t("documents.openFile")}
+                          </a>
+                        </Button>
+                        <Button asChild size="sm" variant="secondary">
+                          <a href={documentFileUrl(document, "attachment")}>
+                            <Download aria-hidden />
+                            {t("documents.downloadFile")}
+                          </a>
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{t("documents.fileUnavailable")}</span>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="delete"
+                      onClick={() => setDeleteTarget(document)}
+                    >
+                      <Trash2 aria-hidden />
+                      {t("common.delete")}
+                    </Button>
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="max-w-full truncate rounded-full bg-muted px-2 py-0.5">
+                      {projectName(projects, String(document.projectId ?? document.project_id ?? "")) ||
+                        t("common.noProject")}
+                    </span>
+                    <span>{formatDate(dateValue(document, "updatedAt"))}</span>
+                  </div>
+                  <div className="border-t border-border pt-3">
+                    <Disclosure label={t("documents.storageDetails")}>
+                      <CodeBlock>
+                        {JSON.stringify(
+                          {
+                            objectKey: document.objectKey ?? document.object_key,
+                            mimeType: document.mimeType ?? document.mime_type
+                          },
+                          null,
+                          2
+                        )}
+                      </CodeBlock>
+                    </Disclosure>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </Panel>
@@ -277,4 +298,8 @@ function blankForm(): DocumentForm {
     mimeType: "",
     extractedText: ""
   };
+}
+
+function documentFileUrl(document: AnyRecord, disposition: "inline" | "attachment") {
+  return `/api/documents/${encodeURIComponent(String(document.id))}/download?disposition=${disposition}`;
 }
