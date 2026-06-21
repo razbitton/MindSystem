@@ -144,15 +144,20 @@ export function EmptyState({
 export function IconButton({
   label,
   children,
+  action,
   className = "",
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; children: React.ReactNode }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  children: React.ReactNode;
+  action?: "edit" | "delete";
+}) {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant={action ?? "ghost"}
       size="icon"
-      className={cn("text-muted-foreground hover:text-foreground", className)}
+      className={cn(!action && "text-muted-foreground hover:text-foreground", className)}
       title={label}
       aria-label={label}
       {...props}

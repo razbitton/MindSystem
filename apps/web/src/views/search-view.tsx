@@ -177,7 +177,7 @@ export default function SearchView() {
                   <Button
                     type="button"
                     size="icon"
-                    variant="ghost"
+                    variant="delete"
                     title={t("common.delete")}
                     aria-label={t("common.delete")}
                     onClick={() => setDeleteTarget(result)}

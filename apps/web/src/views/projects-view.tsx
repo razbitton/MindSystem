@@ -226,12 +226,12 @@ export default function ProjectsView() {
                       </p>
                     </Link>
                     <div className="flex shrink-0 items-center gap-1">
-                      <IconButton label={t("common.edit")} onClick={() => openEdit(project)}>
+                      <IconButton label={t("common.edit")} action="edit" onClick={() => openEdit(project)}>
                         <Edit3 className="size-4" aria-hidden />
                       </IconButton>
                       <IconButton
                         label={t("common.delete")}
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        action="delete"
                         onClick={(event) => requestDelete(project, event)}
                       >
                         <Trash2 className="size-4" aria-hidden />
@@ -274,8 +274,7 @@ export default function ProjectsView() {
               {editingProject ? (
                 <Button
                   type="button"
-                  variant="ghost"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  variant="delete"
                   onClick={() => requestDelete(editingProject)}
                 >
                   <Trash2 data-icon="inline-start" />

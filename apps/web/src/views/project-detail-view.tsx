@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Trash2 } from "lucide-react";
-import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
+import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -13,6 +13,7 @@ import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
+import { TaskEditorDrawer, type TaskEditorPayload } from "../components/task-editor-drawer";
 import { Disclosure, CodeBlock } from "../components/disclosure";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,6 +34,8 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
   );
   const [error, setError] = useState<string | null>(null);
   const [viewingTask, setViewingTask] = useState<AnyRecord | null>(null);
+  const [editingTask, setEditingTask] = useState<AnyRecord | null>(null);
+  const [taskEditorOpen, setTaskEditorOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -64,6 +67,26 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     setViewingTask(null);
   }
 
+  function openTaskEdit(task: AnyRecord) {
+    setViewingTask(null);
+    setEditingTask(task);
+    setTaskEditorOpen(true);
+  }
+
+  function closeTaskEditor() {
+    setTaskEditorOpen(false);
+    setEditingTask(null);
+  }
+
+  async function saveTask(payload: TaskEditorPayload, task: AnyRecord | null) {
+    const targetTask = task ?? editingTask;
+    if (!targetTask) return;
+    await apiPatch(`/api/tasks/${targetTask.id}`, payload);
+    closeTaskEditor();
+    invalidateWorkspaceQueryCache();
+    await load(true);
+  }
+
   function requestDelete(type: DeleteTarget["type"], item: AnyRecord, event?: { stopPropagation: () => void }) {
     event?.stopPropagation();
     setDeleteTarget({
@@ -85,6 +108,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             : `/api/notes/${deleteTarget.id}`;
       await apiDelete(path);
       if (deleteTarget.type === "task" && viewingTask?.id === deleteTarget.id) closeTaskDetails();
+      if (deleteTarget.type === "task" && editingTask?.id === deleteTarget.id) closeTaskEditor();
       setDeleteTarget(null);
       invalidateWorkspaceQueryCache();
       if (path.startsWith("/api/projects/")) {
@@ -205,10 +229,10 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
       {project ? (
         <section className="flex min-w-0 max-w-full justify-center border-t border-border pt-4 sm:justify-start">
           <Button
-            variant="ghost"
+            variant="delete"
             size="sm"
             type="button"
-            className="w-full justify-center text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-fit"
+            className="w-full justify-center sm:w-fit"
             onClick={() => requestDelete("project", project)}
           >
             <Trash2 data-icon="inline-start" />
@@ -222,11 +246,22 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
         task={viewingTask}
         projects={project ? [project] : []}
         onClose={closeTaskDetails}
+        onEdit={openTaskEdit}
         onComplete={completeTask}
         onDelete={(task) => {
           closeTaskDetails();
           requestDelete("task", task);
         }}
+      />
+
+      <TaskEditorDrawer
+        open={taskEditorOpen}
+        task={editingTask}
+        projects={project ? [project] : []}
+        defaultProjectId={String(project?.id ?? "")}
+        onClose={closeTaskEditor}
+        onSave={saveTask}
+        onDelete={(task) => requestDelete("task", task)}
       />
 
       <ConfirmDialog
@@ -315,7 +350,7 @@ function TaskRows({
             ) : null}
             <IconButton
               label={t("common.delete")}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              action="delete"
               onClick={(event) => deleteTask(task, event)}
             >
               <Trash2 className="size-4" aria-hidden />
@@ -363,7 +398,8 @@ function SimpleRows({
             {deleteRow ? (
               <IconButton
                 label={t("common.delete")}
-                className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                action="delete"
+                className="shrink-0"
                 onClick={() => deleteRow(row)}
               >
                 <Trash2 className="size-4" aria-hidden />

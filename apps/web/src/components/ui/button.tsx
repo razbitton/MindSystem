@@ -18,6 +18,10 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70",
         ghost:
           "hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground dark:hover:bg-accent/50 dark:active:bg-accent/60",
+        edit:
+          "text-primary hover:bg-primary/10 hover:text-primary active:bg-primary/15 active:text-primary focus-visible:ring-primary/25",
+        delete:
+          "text-destructive hover:bg-destructive/10 hover:text-destructive active:bg-destructive/15 active:text-destructive focus-visible:ring-destructive/25",
         link: "text-primary underline-offset-4 hover:underline active:text-primary/80",
       },
       size: {

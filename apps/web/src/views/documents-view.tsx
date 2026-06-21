@@ -140,7 +140,7 @@ export default function DocumentsView() {
                   <Button
                     type="button"
                     size="sm"
-                    variant="ghost"
+                    variant="delete"
                     onClick={() => setDeleteTarget(document)}
                   >
                     <Trash2 aria-hidden />

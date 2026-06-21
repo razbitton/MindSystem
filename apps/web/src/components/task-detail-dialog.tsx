@@ -104,9 +104,8 @@ export function TaskDetailDialog({
               {onDelete ? (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="delete"
                   size="sm"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => onDelete(task)}
                 >
                   <Trash2 data-icon="inline-start" />
@@ -116,7 +115,7 @@ export function TaskDetailDialog({
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               {onEdit ? (
-                <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(task)}>
+                <Button type="button" variant="edit" size="sm" onClick={() => onEdit(task)}>
                   <Edit2 data-icon="inline-start" />
                   {t("common.edit")}
                 </Button>

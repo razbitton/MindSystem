@@ -301,7 +301,8 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
                       <span>{formatDate(dateValue(note, "updatedAt"))}</span>
                       <IconButton
                         label={t("common.delete")}
-                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        action="delete"
+                        className="size-7"
                         onClick={(event) => requestDelete(note, event)}
                       >
                         <Trash2 className="size-3.5" aria-hidden />
@@ -540,9 +541,8 @@ function NoteEditorPanel({
           {mode === "edit" && onDelete ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="delete"
               size="sm"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={onDelete}
             >
               <Trash2 data-icon="inline-start" />

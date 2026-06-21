@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Edit2, Filter, Plus, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, Filter, Plus, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -11,23 +11,20 @@ import {
 } from "../lib/query-cache";
 import {
   dateValue,
-  fromDateTimeInput,
   matchesQuery,
   projectName,
   sortByPriority,
-  toDateTimeInput,
   truncate
 } from "../lib/view-models";
-import { Drawer, EmptyState } from "../components/page";
+import { EmptyState } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
+import { TaskEditorDrawer, type TaskEditorPayload } from "../components/task-editor-drawer";
 import { useI18n } from "../i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -40,25 +37,12 @@ import { toast } from "sonner";
 const statuses = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"] as const;
 const priorities = ["low", "medium", "high", "urgent"] as const;
 const ANY = "__any__";
-const NO_PROJECT = "__none__";
 type TaskFilters = { status: string; project_id: string; priority: string };
 const defaultTaskFilters: TaskFilters = { status: "", project_id: "", priority: "" };
 
 type TasksViewProps = {
   initialTasks?: AnyRecord[];
   initialProjects?: AnyRecord[];
-};
-
-type TaskForm = {
-  title: string;
-  description: string;
-  projectId: string;
-  status: string;
-  priority: string;
-  dueAt: string;
-  scheduledFor: string;
-  estimateMinutes: string;
-  assignee: string;
 };
 
 export default function TasksView({ initialTasks, initialProjects }: TasksViewProps = {}) {
@@ -75,7 +59,6 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
   const [showFilters, setShowFilters] = useState(false);
   const [editingTask, setEditingTask] = useState<AnyRecord | null>(null);
   const [viewingTask, setViewingTask] = useState<AnyRecord | null>(null);
-  const [form, setForm] = useState<TaskForm>(blankForm());
   const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -116,36 +99,18 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
   function openCreate() {
     setEditingTask(null);
     setViewingTask(null);
-    setForm({
-      ...blankForm(),
-      projectId: filters.project_id,
-      priority: filters.priority || "medium",
-      status: filters.status || "todo"
-    });
     setDrawerOpen(true);
   }
 
   function openEdit(task: AnyRecord) {
     setViewingTask(null);
     setEditingTask(task);
-    setForm({
-      title: String(task.title ?? ""),
-      description: String(task.description ?? ""),
-      projectId: String(task.projectId ?? task.project_id ?? ""),
-      status: String(task.status ?? "todo"),
-      priority: String(task.priority ?? "medium"),
-      dueAt: toDateTimeInput(dateValue(task, "dueAt")),
-      scheduledFor: toDateTimeInput(dateValue(task, "scheduledFor")),
-      estimateMinutes: task.estimateMinutes ?? task.estimate_minutes ? String(task.estimateMinutes ?? task.estimate_minutes) : "",
-      assignee: String(task.assignee ?? "")
-    });
     setDrawerOpen(true);
   }
 
   function closeDrawer() {
     setDrawerOpen(false);
     setEditingTask(null);
-    setForm(blankForm());
   }
 
   function openTaskDetails(task: AnyRecord) {
@@ -156,21 +121,10 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
     setViewingTask(null);
   }
 
-  async function save() {
-    if (!form.title.trim()) return;
-    const payload = {
-      title: form.title,
-      description: form.description || undefined,
-      projectId: form.projectId || null,
-      status: form.status,
-      priority: form.priority,
-      dueAt: fromDateTimeInput(form.dueAt),
-      scheduledFor: fromDateTimeInput(form.scheduledFor),
-      estimateMinutes: form.estimateMinutes.trim() ? Number(form.estimateMinutes) : null,
-      assignee: form.assignee.trim() || null
-    };
-    if (editingTask) {
-      await apiPatch(`/api/tasks/${editingTask.id}`, payload);
+  async function save(payload: TaskEditorPayload, task: AnyRecord | null) {
+    const targetTask = task ?? editingTask;
+    if (targetTask) {
+      await apiPatch(`/api/tasks/${targetTask.id}`, payload);
     } else {
       await apiPost("/api/tasks", payload);
     }
@@ -344,7 +298,6 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
                 tasks={filteredTasks}
                 projects={projects}
                 formatDate={formatDate}
-                onEdit={openEdit}
                 onOpenDetails={openTaskDetails}
                 onComplete={complete}
                 onDelete={requestDelete}
@@ -354,7 +307,6 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
               tasks={filteredTasks}
               projects={projects}
               formatDate={formatDate}
-              onEdit={openEdit}
               onOpenDetails={openTaskDetails}
               onComplete={complete}
               onDelete={requestDelete}
@@ -363,151 +315,17 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
         )}
       </section>
 
-      <Drawer
+      <TaskEditorDrawer
         open={drawerOpen}
-        title={editingTask ? t("tasks.editTask") : t("tasks.newTask")}
-        subtitle={editingTask ? formatDate(dateValue(editingTask, "updatedAt")) : t("tasks.subtitle")}
+        task={editingTask}
+        projects={projects}
+        defaultProjectId={filters.project_id}
+        defaultPriority={filters.priority || "medium"}
+        defaultStatus={filters.status || "todo"}
         onClose={closeDrawer}
-        footer={
-          <div className="flex w-full items-center justify-between gap-2">
-            <div>
-              {editingTask ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => requestDelete(editingTask)}
-                >
-                  <Trash2 data-icon="inline-start" />
-                  {t("common.delete")}
-                </Button>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" type="button" onClick={closeDrawer}>
-                {t("common.cancel")}
-              </Button>
-              <Button type="button" onClick={save} disabled={!form.title.trim()}>
-                {t("common.save")}
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="task-title">{t("common.title")}</Label>
-            <Input
-              id="task-title"
-              dir="auto"
-              value={form.title}
-              onChange={(event) => setForm({ ...form, title: event.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="task-description">{t("common.description")}</Label>
-            <Textarea
-              id="task-description"
-              dir="auto"
-              rows={4}
-              value={form.description}
-              onChange={(event) => setForm({ ...form, description: event.target.value })}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="task-project">{t("common.project")}</Label>
-              <Select
-                value={form.projectId || NO_PROJECT}
-                onValueChange={(value) => setForm({ ...form, projectId: value === NO_PROJECT ? "" : value })}
-              >
-                <SelectTrigger id="task-project" className="w-full">
-                  <SelectValue placeholder={t("common.noProject")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_PROJECT}>{t("common.noProject")}</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={String(project.id)}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="task-status">{t("common.status")}</Label>
-              <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
-                <SelectTrigger id="task-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {translateValue("status", status)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="task-priority">{t("common.priority")}</Label>
-              <Select value={form.priority} onValueChange={(value) => setForm({ ...form, priority: value })}>
-                <SelectTrigger id="task-priority" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorities.map((priority) => (
-                    <SelectItem key={priority} value={priority}>
-                      {translateValue("priority", priority)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="task-assignee">{t("tasks.assignee")}</Label>
-              <Input
-                id="task-assignee"
-                dir="auto"
-                value={form.assignee}
-                onChange={(event) => setForm({ ...form, assignee: event.target.value })}
-              />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="task-due">{t("tasks.dueAt")}</Label>
-              <Input
-                id="task-due"
-                type="datetime-local"
-                value={form.dueAt}
-                onChange={(event) => setForm({ ...form, dueAt: event.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="task-scheduled">{t("tasks.scheduledFor")}</Label>
-              <Input
-                id="task-scheduled"
-                type="datetime-local"
-                value={form.scheduledFor}
-                onChange={(event) => setForm({ ...form, scheduledFor: event.target.value })}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="task-estimate">{t("tasks.estimateMinutes")}</Label>
-            <Input
-              id="task-estimate"
-              type="number"
-              min="1"
-              value={form.estimateMinutes}
-              onChange={(event) => setForm({ ...form, estimateMinutes: event.target.value })}
-            />
-          </div>
-        </div>
-      </Drawer>
+        onSave={save}
+        onDelete={requestDelete}
+      />
 
       <TaskDetailDialog
         open={Boolean(viewingTask)}
@@ -624,7 +442,6 @@ function TaskDesktopList({
   tasks,
   projects,
   formatDate,
-  onEdit,
   onOpenDetails,
   onComplete,
   onDelete
@@ -632,7 +449,6 @@ function TaskDesktopList({
   tasks: AnyRecord[];
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
-  onEdit: (task: AnyRecord) => void;
   onOpenDetails: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
@@ -642,7 +458,7 @@ function TaskDesktopList({
   return (
     <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-xs md:block" role="table">
       <div
-        className="grid grid-cols-[92px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border bg-background/30 px-6 py-3 text-xs font-semibold text-muted-foreground"
+        className="grid grid-cols-[64px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border bg-background/30 px-6 py-3 text-xs font-semibold text-muted-foreground"
         dir="ltr"
         role="row"
       >
@@ -679,7 +495,7 @@ function TaskDesktopList({
             tabIndex={0}
             aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
             className={cn(
-              "grid cursor-pointer grid-cols-[92px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "grid cursor-pointer grid-cols-[64px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isDone && "bg-muted/10"
             )}
             dir="ltr"
@@ -692,31 +508,16 @@ function TaskDesktopList({
               }
             }}
           >
-            <div className="flex items-center justify-start gap-2" dir="ltr" role="cell">
+            <div className="flex items-center justify-center" dir="ltr" role="cell">
               <Button
-                variant="ghost"
+                variant="delete"
                 size="icon-sm"
                 type="button"
                 onClick={(event) => onDelete(task, event)}
                 title={t("common.delete")}
                 aria-label={t("common.delete")}
-                className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 className="size-[18px]" aria-hidden />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onEdit(task);
-                }}
-                title={t("common.edit")}
-                aria-label={t("common.edit")}
-                className="rounded-lg text-primary hover:bg-primary/10 hover:text-primary"
-              >
-                <Edit2 className="size-[18px]" aria-hidden />
               </Button>
             </div>
 
@@ -786,7 +587,6 @@ function TaskCards({
   tasks,
   projects,
   formatDate,
-  onEdit,
   onOpenDetails,
   onComplete,
   onDelete
@@ -794,7 +594,6 @@ function TaskCards({
   tasks: AnyRecord[];
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
-  onEdit: (task: AnyRecord) => void;
   onOpenDetails: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
@@ -807,7 +606,6 @@ function TaskCards({
           task={task}
           projects={projects}
           formatDate={formatDate}
-          onEdit={onEdit}
           onOpenDetails={onOpenDetails}
           onComplete={onComplete}
           onDelete={onDelete}
@@ -821,7 +619,6 @@ function TaskCard({
   task,
   projects,
   formatDate,
-  onEdit,
   onOpenDetails,
   onComplete,
   onDelete
@@ -829,7 +626,6 @@ function TaskCard({
   task: AnyRecord;
   projects: AnyRecord[];
   formatDate: (value?: string | null) => string;
-  onEdit: (task: AnyRecord) => void;
   onOpenDetails: (task: AnyRecord) => void;
   onComplete: (id: string) => void;
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
@@ -882,29 +678,14 @@ function TaskCard({
       <div className="mt-1 flex items-center justify-between border-t border-border pt-2">
         <div className="flex items-center gap-1">
           <Button
-            variant="ghost"
+            variant="delete"
             size="icon-sm"
             type="button"
             onClick={(event) => onDelete(task, event)}
             title={t("common.delete")}
             aria-label={t("common.delete")}
-            className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-[18px]" aria-hidden />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(task);
-            }}
-            title={t("common.edit")}
-            aria-label={t("common.edit")}
-            className="rounded-lg text-muted-foreground hover:text-primary"
-          >
-            <Edit2 className="size-[18px]" aria-hidden />
           </Button>
         </div>
 
@@ -981,18 +762,4 @@ function TaskStatusBadge({ value }: { value?: string | null }) {
       {translateValue("status", status)}
     </Badge>
   );
-}
-
-function blankForm(): TaskForm {
-  return {
-    title: "",
-    description: "",
-    projectId: "",
-    status: "todo",
-    priority: "medium",
-    dueAt: "",
-    scheduledFor: "",
-    estimateMinutes: "",
-    assignee: ""
-  };
 }

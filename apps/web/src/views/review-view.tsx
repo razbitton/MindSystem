@@ -159,7 +159,7 @@ export default function ReviewView() {
                 </Button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="delete"
                   title={t("common.delete")}
                   aria-label={t("common.delete")}
                   onClick={() => setPending({ id: item.id, action: "delete" })}
