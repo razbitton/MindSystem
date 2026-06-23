@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { Edit3, FolderKanban, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Edit3, FolderKanban, Plus, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -12,8 +12,6 @@ import {
 import { dateValue, fromDateTimeInput, matchesQuery, sortByPriority, toDateTimeInput, truncate } from "../lib/view-models";
 import {
   projectColorClass,
-  projectColorPalette,
-  projectColorPickerValue,
   projectColorStyle,
   projectColorValue
 } from "../lib/project-colors";
@@ -37,6 +35,19 @@ import { toast } from "sonner";
 
 const priorities = ["low", "medium", "high", "urgent"] as const;
 const statuses = ["active", "paused", "completed", "archived"] as const;
+const solidProjectColors = [
+  "#EF4444",
+  "#F97316",
+  "#F59E0B",
+  "#10B981",
+  "#3B82F6",
+  "#6366F1",
+  "#8B5CF6",
+  "#EC4899",
+  "#111827",
+  "#9CA3AF"
+] as const;
+const normalizedSolidProjectColors = new Set(solidProjectColors.map((color) => color.toLowerCase()));
 
 type ProjectForm = {
   name: string;
@@ -439,13 +450,82 @@ function ProjectColorPicker({
   onChange: (color: string) => void;
 }) {
   const { t } = useI18n();
+  const customColorInputId = useId();
   const selectedColor = projectColorValue(value);
-  const pickerValue = projectColorPickerValue(value);
+  const customColorValue = selectedColor ?? "#3b82f6";
+  const customColorSelected = Boolean(selectedColor && !normalizedSolidProjectColors.has(selectedColor));
 
   return (
     <div className="flex flex-col gap-2">
       <Label>{t("projects.color")}</Label>
-      <div className="flex min-w-0 items-center gap-2">
+      <div
+        className="flex min-w-0 flex-wrap items-center gap-2"
+        role="radiogroup"
+        aria-label={t("projects.color")}
+      >
+        {solidProjectColors.map((color) => {
+          const normalizedColor = color.toLowerCase();
+          const isSelected = selectedColor === normalizedColor;
+
+          return (
+            <button
+              key={color}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              onClick={() => onChange(color)}
+              title={color}
+              className={cn(
+                "flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-background shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+              )}
+              style={{ backgroundColor: color }}
+            >
+              {isSelected ? (
+                <Check
+                  className={cn("size-5", isLightProjectColor(normalizedColor) ? "text-slate-950" : "text-white")}
+                  strokeWidth={3}
+                  aria-hidden
+                />
+              ) : null}
+              <span className="sr-only">{color}</span>
+            </button>
+          );
+        })}
+        <label
+          htmlFor={customColorInputId}
+          title={customColorValue.toUpperCase()}
+          className={cn(
+            "relative flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-background shadow-sm transition-transform hover:scale-105",
+            customColorSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+          )}
+          style={{
+            background: "conic-gradient(from 0deg, #ef4444, #f59e0b, #84cc16, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444)"
+          }}
+        >
+          <input
+            id={customColorInputId}
+            type="color"
+            value={customColorValue}
+            onChange={(event) => onChange(event.target.value)}
+            className="peer sr-only"
+            aria-label={t("projects.color")}
+          />
+          <span
+            className="flex size-6 items-center justify-center rounded-full border border-white/70 bg-background text-foreground shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background"
+            style={customColorSelected ? { backgroundColor: customColorValue } : undefined}
+            aria-hidden
+          >
+            {customColorSelected ? (
+              <Check
+                className={cn("size-4", isLightProjectColor(customColorValue) ? "text-slate-950" : "text-white")}
+                strokeWidth={3}
+              />
+            ) : (
+              <Plus className="size-4" strokeWidth={2.5} />
+            )}
+          </span>
+        </label>
         <button
           type="button"
           aria-pressed={!selectedColor}
@@ -458,39 +538,17 @@ function ProjectColorPicker({
           <span className="size-4 rounded-full border border-border bg-background" aria-hidden />
           <span className="truncate">{t("projectColor.none")}</span>
         </button>
-        <label className="flex h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-          <span className="truncate">{pickerValue.toUpperCase()}</span>
-          <input
-            type="color"
-            value={pickerValue}
-            onChange={(event) => onChange(event.target.value)}
-            className="ms-auto size-6 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-            aria-label={t("projects.color")}
-          />
-        </label>
-      </div>
-      <div
-        className="grid max-h-40 grid-cols-8 gap-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-2 sm:grid-cols-12"
-        role="radiogroup"
-        aria-label={t("projects.color")}
-      >
-        {projectColorPalette.map((color) => (
-          <button
-            key={color}
-            type="button"
-            aria-pressed={selectedColor === color}
-            onClick={() => onChange(color)}
-            title={color.toUpperCase()}
-            className={cn(
-              "size-7 rounded-md border border-border shadow-xs transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              selectedColor === color && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-            )}
-            style={projectColorStyle(color)}
-          >
-            <span className={cn("block size-full rounded-[inherit]", projectColorClass(color, "swatch"))} style={projectColorStyle(color)} aria-hidden />
-          </button>
-        ))}
       </div>
     </div>
   );
+}
+
+function isLightProjectColor(color: string) {
+  const normalizedColor = projectColorValue(color);
+  if (!normalizedColor) return false;
+
+  const red = parseInt(normalizedColor.slice(1, 3), 16);
+  const green = parseInt(normalizedColor.slice(3, 5), 16);
+  const blue = parseInt(normalizedColor.slice(5, 7), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 > 155;
 }
