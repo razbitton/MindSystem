@@ -61,7 +61,7 @@ export function TaskDetailDialog({
         )}
         style={projectColorStyle(linkedProject?.color)}
       >
-        <div className="flex max-h-[min(42rem,calc(100svh_-_2rem))] flex-col sm:max-h-[min(58rem,calc(100svh_-_2rem))]">
+        <div className="flex max-h-[min(42rem,calc(100svh_-_2rem))] flex-col md:max-h-[min(72rem,calc(100svh_-_1rem))]">
           <div className="flex-1 overflow-y-auto p-4 sm:p-5">
             <div className="flex min-w-0 flex-col gap-4">
               <div className="flex min-w-0 flex-col gap-3 pe-10">

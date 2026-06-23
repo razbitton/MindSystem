@@ -484,7 +484,8 @@ function NoteEditorPanel({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const maxHeight = mode === "edit" ? 420 : 260;
+    const desktopEditor = mode === "edit" && window.matchMedia("(min-width: 768px)").matches;
+    const maxHeight = mode === "edit" ? (desktopEditor ? 640 : 420) : 260;
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
@@ -500,14 +501,14 @@ function NoteEditorPanel({
         "relative w-full overflow-visible rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-all duration-200",
         expanded ? "shadow-lg shadow-black/10" : "hover:border-primary/40 hover:shadow-md",
         projectColorClass(selectedProject?.color, "card"),
-        mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))] sm:max-h-[min(58rem,calc(100svh_-_2rem))]"
+        mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))] md:max-h-[min(72rem,calc(100svh_-_1rem))]"
       )}
       style={projectColorStyle(selectedProject?.color)}
     >
       <div
         className={cn(
           "flex flex-col p-3 sm:p-4",
-          mode === "edit" && "max-h-[min(34rem,calc(100svh_-_8rem))] overflow-y-auto sm:max-h-[min(50rem,calc(100svh_-_8rem))]"
+          mode === "edit" && "max-h-[min(34rem,calc(100svh_-_8rem))] overflow-y-auto md:max-h-[min(64rem,calc(100svh_-_7rem))]"
         )}
       >
         {expanded ? (
