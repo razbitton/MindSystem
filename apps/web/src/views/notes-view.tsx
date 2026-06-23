@@ -334,6 +334,7 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
         title={t("notes.editNote")}
         onClose={closeDrawer}
         hideHeader
+        preventOpenAutoFocus
         contentClassName="border-0 bg-transparent p-0 shadow-none sm:max-w-xl"
         bodyClassName="overflow-visible p-0 sm:p-0"
       >
@@ -498,7 +499,7 @@ function NoteEditorPanel({
   return (
     <div
       className={cn(
-        "relative w-full overflow-visible rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-all duration-200",
+        "relative w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-all duration-200",
         expanded ? "shadow-lg shadow-black/10" : "hover:border-primary/40 hover:shadow-md",
         projectColorClass(selectedProject?.color, "card"),
         mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))] md:max-h-[min(72rem,calc(100svh_-_1rem))]"
@@ -514,7 +515,6 @@ function NoteEditorPanel({
         {expanded ? (
           <Input
             aria-label={t("common.title")}
-            autoFocus={mode === "edit"}
             dir={titleDirection}
             placeholder={t("notes.titlePlaceholder")}
             value={form.title}
@@ -554,16 +554,17 @@ function NoteEditorPanel({
 
       <div
         className={cn(
-          "flex items-center justify-between gap-2 px-3 pb-3 transition-all duration-200 sm:px-4",
-          expanded ? "max-h-20 opacity-100" : "pointer-events-none max-h-0 overflow-hidden pb-0 opacity-0"
+          "flex min-w-0 flex-wrap items-center justify-between gap-2 px-3 pb-3 transition-all duration-200 sm:flex-nowrap sm:px-4",
+          expanded ? "max-h-32 opacity-100" : "pointer-events-none max-h-0 overflow-hidden pb-0 opacity-0"
         )}
       >
         <ProjectPillSelect
           value={form.projectId}
           projects={projects}
           onChange={(projectId) => onChange({ ...form, projectId })}
+          className="w-full min-w-0 flex-1 basis-40 sm:w-fit sm:flex-none"
         />
-        <div className="flex items-center gap-2">
+        <div className="ms-auto flex shrink-0 items-center gap-2">
           {mode === "edit" && onDelete ? (
             <Button
               type="button"
@@ -599,11 +600,13 @@ function NoteEditorPanel({
 function ProjectPillSelect({
   value,
   projects,
-  onChange
+  onChange,
+  className
 }: {
   value: string;
   projects: AnyRecord[];
   onChange: (projectId: string) => void;
+  className?: string;
 }) {
   const { t, direction } = useI18n();
   const selectedProject = projects.find((project) => String(project.id) === value);
@@ -613,7 +616,8 @@ function ProjectPillSelect({
       <SelectTrigger
         size="sm"
         className={cn(
-          "max-w-[14rem] rounded-full border-border bg-transparent px-3 text-xs shadow-none transition-colors hover:bg-accent/50 dark:bg-transparent dark:hover:bg-accent/50",
+          "max-w-[14rem] min-w-0 rounded-full border-border bg-transparent px-3 text-xs shadow-none transition-colors hover:bg-accent/50 dark:bg-transparent dark:hover:bg-accent/50",
+          className,
           projectColorClass(selectedProject?.color, "badge")
         )}
         style={projectColorStyle(selectedProject?.color)}

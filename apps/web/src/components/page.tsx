@@ -203,6 +203,7 @@ export function Drawer({
   children,
   footer,
   hideHeader = false,
+  preventOpenAutoFocus = false,
   contentClassName,
   bodyClassName,
   footerClassName
@@ -214,6 +215,7 @@ export function Drawer({
   children: React.ReactNode;
   footer?: React.ReactNode;
   hideHeader?: boolean;
+  preventOpenAutoFocus?: boolean;
   contentClassName?: string;
   bodyClassName?: string;
   footerClassName?: string;
@@ -225,6 +227,7 @@ export function Drawer({
           "flex max-h-[min(46rem,calc(100svh_-_2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl md:max-h-[min(72rem,calc(100svh_-_1rem))]",
           contentClassName
         )}
+        onOpenAutoFocus={preventOpenAutoFocus ? (event) => event.preventDefault() : undefined}
       >
         {hideHeader ? (
           <DialogTitle className="sr-only" dir="auto">{title}</DialogTitle>
