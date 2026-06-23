@@ -9,7 +9,7 @@ import {
   invalidateWorkspaceQueryCache,
   peekCachedQuery
 } from "../lib/query-cache";
-import { projectColorClass } from "../lib/project-colors";
+import { projectColorClass, projectColorStyle } from "../lib/project-colors";
 import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -148,7 +148,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
 
       <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 max-w-full flex-col gap-6 lg:col-span-2">
-          <Panel title={t("projectDetail.summary")} className={projectColorClass(project?.color, "card")}>
+          <Panel title={t("projectDetail.summary")} className={projectColorClass(project?.color, "card")} style={projectColorStyle(project?.color)}>
             {project ? (
               <div className="flex min-w-0 max-w-full flex-col gap-3">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -176,7 +176,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           </Panel>
 
           <div className="grid min-w-0 max-w-full gap-6 md:grid-cols-2">
-            <Panel title={t("projectDetail.tasks")} className={projectColorClass(project?.color, "card")}>
+            <Panel title={t("projectDetail.tasks")} className={projectColorClass(project?.color, "card")} style={projectColorStyle(project?.color)}>
               <TaskRows
                 tasks={data?.tasks ?? []}
                 projectColor={project?.color}
@@ -187,7 +187,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
                 deleteTask={(task, event) => requestDelete("task", task, event)}
               />
             </Panel>
-            <Panel title={t("projectDetail.notes")} className={projectColorClass(project?.color, "card")}>
+            <Panel title={t("projectDetail.notes")} className={projectColorClass(project?.color, "card")} style={projectColorStyle(project?.color)}>
               <SimpleRows
                 rows={data?.notes ?? []}
                 projectColor={project?.color}
@@ -200,7 +200,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             </Panel>
           </div>
 
-          <Panel title={t("projectDetail.activity")} className={projectColorClass(project?.color, "card")}>
+          <Panel title={t("projectDetail.activity")} className={projectColorClass(project?.color, "card")} style={projectColorStyle(project?.color)}>
             <SimpleRows
               rows={activity}
               projectColor={project?.color}
@@ -213,7 +213,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
         </div>
 
         <div className="flex min-w-0 max-w-full flex-col gap-6">
-          <Panel title={t("projectDetail.documents")} className={projectColorClass(project?.color, "card")}>
+          <Panel title={t("projectDetail.documents")} className={projectColorClass(project?.color, "card")} style={projectColorStyle(project?.color)}>
             <SimpleRows
               rows={data?.documents ?? []}
               projectColor={project?.color}
@@ -329,6 +329,7 @@ function TaskRows({
             "flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between",
             projectColorClass(projectColor, "row")
           )}
+          style={projectColorStyle(projectColor)}
           onClick={() => openTask(task)}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -405,6 +406,7 @@ function SimpleRows({
               "flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-lg px-3 py-2.5 hover:bg-accent/40",
               projectColorClass(projectColor, "row")
             )}
+            style={projectColorStyle(projectColor)}
           >
             <div className="flex min-w-0 max-w-full flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">

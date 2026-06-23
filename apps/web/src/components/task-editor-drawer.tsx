@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
-import { projectColorClass, projectColorValue } from "../lib/project-colors";
+import { projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
 import { dateValue, fromDateTimeInput, toDateTimeInput } from "../lib/view-models";
 import { useI18n } from "../i18n";
 import { Drawer } from "./page";
@@ -163,7 +163,11 @@ export function TaskEditorDrawer({
                   <SelectItem key={project.id} value={String(project.id)}>
                     <span className="inline-flex min-w-0 items-center gap-2">
                       {projectColorValue(project.color) ? (
-                        <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                        <span
+                          className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))}
+                          style={projectColorStyle(project.color)}
+                          aria-hidden
+                        />
                       ) : null}
                       <span className="truncate" dir="auto">
                         {project.name}

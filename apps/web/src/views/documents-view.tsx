@@ -9,7 +9,7 @@ import {
   invalidateWorkspaceQueryCache,
   peekCachedQuery
 } from "../lib/query-cache";
-import { findProjectForRecord, projectColorClass, projectColorValue } from "../lib/project-colors";
+import { findProjectForRecord, projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
 import { dateValue, matchesQuery, projectName, truncate } from "../lib/view-models";
 import { Drawer, EmptyState } from "../components/page";
 import { Disclosure, CodeBlock } from "../components/disclosure";
@@ -351,7 +351,11 @@ export default function DocumentsView() {
                     <SelectItem key={project.id} value={String(project.id)}>
                       <span className="inline-flex min-w-0 items-center gap-2">
                         {projectColorValue(project.color) ? (
-                          <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                          <span
+                            className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))}
+                            style={projectColorStyle(project.color)}
+                            aria-hidden
+                          />
                         ) : null}
                         <span className="truncate" dir="auto">
                           {project.name}
@@ -442,7 +446,11 @@ function DocumentFilterPanel({
             <SelectItem key={project.id} value={String(project.id)}>
               <span className="inline-flex min-w-0 items-center gap-2">
                 {projectColorValue(project.color) ? (
-                  <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                  <span
+                    className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))}
+                    style={projectColorStyle(project.color)}
+                    aria-hidden
+                  />
                 ) : null}
                 <span className="truncate" dir="auto">
                   {project.name}
@@ -510,6 +518,7 @@ function DocumentCard({
         "group flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15",
         projectColorClass(linkedProjectRecord?.color, "card")
       )}
+      style={projectColorStyle(linkedProjectRecord?.color)}
     >
       <div className="mb-3 flex min-w-0 items-start gap-4">
         <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden>
@@ -574,35 +583,40 @@ function DocumentCard({
         </div>
 
         <div className="border-t border-border pt-4">
-          <div className="mb-3 flex min-w-0 items-center justify-between gap-3 text-sm">
+          <div className="flex min-w-0 items-start justify-between gap-3 text-sm">
             <Badge
               variant="secondary"
               className={cn(
                 "min-w-0 max-w-[70%] rounded-md bg-secondary/80 px-2.5 py-1 text-xs",
                 projectColorClass(linkedProjectRecord?.color, "badge")
               )}
+              style={projectColorStyle(linkedProjectRecord?.color)}
             >
               {projectColorValue(linkedProjectRecord?.color) ? (
-                <span className={cn("size-2 shrink-0 rounded-full", projectColorClass(linkedProjectRecord?.color, "swatch"))} aria-hidden />
+                <span
+                  className={cn("size-2 shrink-0 rounded-full", projectColorClass(linkedProjectRecord?.color, "swatch"))}
+                  style={projectColorStyle(linkedProjectRecord?.color)}
+                  aria-hidden
+                />
               ) : null}
               <span className="truncate" dir="auto">
                 {linkedProject || t("common.noProject")}
               </span>
             </Badge>
-          </div>
 
-          <Disclosure label={t("documents.storageDetails")}>
-            <CodeBlock>
-              {JSON.stringify(
-                {
-                  objectKey: objectKey || null,
-                  mimeType: mimeType || null
-                },
-                null,
-                2
-              )}
-            </CodeBlock>
-          </Disclosure>
+            <Disclosure label={t("documents.storageDetails")} className="w-auto shrink-0 text-end">
+              <CodeBlock>
+                {JSON.stringify(
+                  {
+                    objectKey: objectKey || null,
+                    mimeType: mimeType || null
+                  },
+                  null,
+                  2
+                )}
+              </CodeBlock>
+            </Disclosure>
+          </div>
         </div>
       </div>
     </article>

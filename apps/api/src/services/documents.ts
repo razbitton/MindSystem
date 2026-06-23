@@ -1,7 +1,8 @@
 import { documents, entities } from "@personal-context-os/db";
 import { patchDocumentSchema, type CreateDocumentInput } from "@personal-context-os/shared";
+import { GetObjectCommand, S3Client, S3ServiceException } from "@aws-sdk/client-s3";
 import { and, desc, eq } from "drizzle-orm";
-import { createHash, createHmac } from "node:crypto";
+import { Readable } from "node:stream";
 import { createGenericEntity } from "./entities.js";
 import { writeAuditEvent } from "./audit.js";
 import type { z } from "zod";
@@ -10,10 +11,14 @@ import type { AppContext } from "./types.js";
 
 type DocumentFileDisposition = "inline" | "attachment";
 
-class DocumentFileError extends Error {
+export class DocumentFileError extends Error {
   constructor(message: string, public readonly statusCode: number) {
     super(message);
   }
+}
+
+export function isDocumentFileError(error: unknown): error is DocumentFileError {
+  return error instanceof DocumentFileError;
 }
 
 export async function createDocument(context: AppContext, input: CreateDocumentInput, actor: Actor) {
@@ -70,25 +75,16 @@ export async function getDocumentFile(context: AppContext, id: string, dispositi
   const objectKey = String(document.objectKey ?? "").trim();
   if (!objectKey) throw new DocumentFileError("Document file is not available", 404);
 
-  const response = await fetchDocumentObject(context, objectKey).catch((error: unknown) => {
-    if (error instanceof DocumentFileError) throw error;
-    throw new DocumentFileError("Could not retrieve document file", 502);
-  });
-  if (!response.ok) {
-    const statusCode = response.status === 404 ? 404 : 502;
-    throw new DocumentFileError(response.status === 404 ? "Document file not found" : "Could not retrieve document file", statusCode);
-  }
-
-  const body = Buffer.from(await response.arrayBuffer());
-  const contentType = document.mimeType || response.headers.get("content-type") || "application/octet-stream";
+  const object = await fetchDocumentObject(context, objectKey);
+  const body = object.body;
+  const contentType = document.mimeType || object.contentType || "application/octet-stream";
   const filename = documentFilename(document.title, objectKey, contentType);
   const headers: Record<string, string> = {
     "content-type": contentType,
     "content-disposition": contentDisposition(disposition, filename),
     "cache-control": "private, max-age=60"
   };
-  const contentLength = response.headers.get("content-length");
-  headers["content-length"] = contentLength ?? String(body.byteLength);
+  headers["content-length"] = object.contentLength !== undefined ? String(object.contentLength) : String(body.byteLength);
 
   return {
     body,
@@ -144,9 +140,47 @@ export async function deleteDocument(context: AppContext, id: string, actor: Act
 }
 
 async function fetchDocumentObject(context: AppContext, objectKey: string) {
-  const objectUrl = objectStorageUrl(context, normalizeObjectKey(context, objectKey));
-  const headers = signedS3Headers(context, objectUrl, "GET");
-  return fetch(objectUrl, { headers });
+  const key = normalizeObjectKey(context, objectKey);
+  const client = createS3Client(context);
+
+  try {
+    const object = await client.send(
+      new GetObjectCommand({
+        Bucket: context.env.S3_BUCKET,
+        Key: key
+      })
+    );
+
+    return {
+      body: await streamToBuffer(object.Body),
+      contentLength: object.ContentLength,
+      contentType: object.ContentType
+    };
+  } catch (error) {
+    if (error instanceof S3ServiceException) {
+      const code = error.name || "S3Error";
+      const statusCode = error.$metadata.httpStatusCode;
+      if (statusCode === 404 || code === "NoSuchKey" || code === "NotFound") {
+        throw new DocumentFileError("Document file not found", 404);
+      }
+      throw new DocumentFileError(`Could not retrieve document file from storage (${code})`, 502);
+    }
+    throw new DocumentFileError("Could not retrieve document file from storage", 502);
+  } finally {
+    client.destroy();
+  }
+}
+
+function createS3Client(context: AppContext) {
+  return new S3Client({
+    region: s3SigningRegion(context.env.S3_ENDPOINT, context.env.S3_REGION),
+    endpoint: context.env.S3_ENDPOINT,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: context.env.S3_ACCESS_KEY,
+      secretAccessKey: context.env.S3_SECRET_KEY
+    }
+  });
 }
 
 function normalizeObjectKey(context: AppContext, objectKey: string) {
@@ -173,48 +207,6 @@ function trimBucketPrefix(context: AppContext, objectKey: string) {
   return objectKey.startsWith(bucketPrefix) ? objectKey.slice(bucketPrefix.length) : objectKey;
 }
 
-function objectStorageUrl(context: AppContext, objectKey: string) {
-  const endpoint = new URL(context.env.S3_ENDPOINT);
-  const bucket = encodeURIComponent(context.env.S3_BUCKET);
-  const encodedKey = objectKey.split("/").map(encodeURIComponent).join("/");
-  return new URL(`${trimTrailingSlash(endpoint.pathname)}/${bucket}/${encodedKey}`, endpoint.origin);
-}
-
-function signedS3Headers(context: AppContext, url: URL, method: "GET") {
-  const now = new Date();
-  const amzDate = toAmzDate(now);
-  const dateStamp = amzDate.slice(0, 8);
-  const service = "s3";
-  const region = s3SigningRegion(context.env.S3_ENDPOINT, context.env.S3_REGION);
-  const host = url.host;
-  const canonicalHeaders = `host:${host}\nx-amz-content-sha256:UNSIGNED-PAYLOAD\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
-  const canonicalRequest = [
-    method,
-    url.pathname,
-    url.searchParams.toString(),
-    canonicalHeaders,
-    signedHeaders,
-    "UNSIGNED-PAYLOAD"
-  ].join("\n");
-  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-  const stringToSign = [
-    "AWS4-HMAC-SHA256",
-    amzDate,
-    credentialScope,
-    sha256Hex(canonicalRequest)
-  ].join("\n");
-  const signingKey = s3SigningKey(context.env.S3_SECRET_KEY, dateStamp, region, service);
-  const signature = hmacHex(signingKey, stringToSign);
-
-  return {
-    host,
-    "x-amz-date": amzDate,
-    "x-amz-content-sha256": "UNSIGNED-PAYLOAD",
-    authorization: `AWS4-HMAC-SHA256 Credential=${context.env.S3_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`
-  };
-}
-
 export function s3SigningRegion(endpoint: string, configuredRegion: string) {
   const region = configuredRegion.trim() || "us-east-1";
   try {
@@ -229,29 +221,6 @@ export function s3SigningRegion(endpoint: string, configuredRegion: string) {
   return region;
 }
 
-function s3SigningKey(secretKey: string, dateStamp: string, region: string, service: string) {
-  const dateKey = hmacBuffer(`AWS4${secretKey}`, dateStamp);
-  const dateRegionKey = hmacBuffer(dateKey, region);
-  const dateRegionServiceKey = hmacBuffer(dateRegionKey, service);
-  return hmacBuffer(dateRegionServiceKey, "aws4_request");
-}
-
-function hmacBuffer(key: string | Buffer, value: string) {
-  return createHmac("sha256", key).update(value).digest();
-}
-
-function hmacHex(key: Buffer, value: string) {
-  return createHmac("sha256", key).update(value).digest("hex");
-}
-
-function sha256Hex(value: string) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function toAmzDate(date: Date) {
-  return date.toISOString().replace(/[:-]|\.\d{3}/g, "");
-}
-
 function trimTrailingSlash(value: string) {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
@@ -263,6 +232,27 @@ function tryParseHttpUrl(value: string) {
   } catch {
     return null;
   }
+}
+
+async function streamToBuffer(body: unknown) {
+  if (!body) return Buffer.alloc(0);
+
+  const transformable = body as { transformToByteArray?: () => Promise<Uint8Array> };
+  if (typeof transformable.transformToByteArray === "function") {
+    return Buffer.from(await transformable.transformToByteArray());
+  }
+
+  if (body instanceof Uint8Array) return Buffer.from(body);
+
+  if (body instanceof Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  throw new DocumentFileError("Could not read document file stream", 502);
 }
 
 function documentFilename(title: string, objectKey: string, contentType: string) {

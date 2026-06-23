@@ -9,7 +9,7 @@ import {
   peekCachedQuery,
   setCachedQuery
 } from "../lib/query-cache";
-import { findProjectForRecord, projectColorClass, projectColorValue } from "../lib/project-colors";
+import { findProjectForRecord, projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
 import { dateValue, matchesQuery, projectName } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -289,6 +289,7 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
                     "flex max-h-56 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     projectColorClass(linkedProjectRecord?.color, "card")
                   )}
+                  style={projectColorStyle(linkedProjectRecord?.color)}
                 >
                   {note.title ? (
                     <p className="line-clamp-2 break-words text-start text-sm font-semibold text-foreground" dir={noteDirection}>
@@ -301,7 +302,11 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
                   <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
                     <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
                       {projectColorValue(linkedProjectRecord?.color) ? (
-                        <span className={cn("size-2 shrink-0 rounded-full", projectColorClass(linkedProjectRecord?.color, "swatch"))} aria-hidden />
+                        <span
+                          className={cn("size-2 shrink-0 rounded-full", projectColorClass(linkedProjectRecord?.color, "swatch"))}
+                          style={projectColorStyle(linkedProjectRecord?.color)}
+                          aria-hidden
+                        />
                       ) : null}
                       <span className="truncate">{linkedProject || t("common.noProject")}</span>
                     </span>
@@ -412,7 +417,11 @@ function NotesSearchProjectFilter({
               <SelectItem key={project.id} value={String(project.id)}>
                 <span className="inline-flex min-w-0 items-center gap-2">
                   {projectColorValue(project.color) ? (
-                    <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                    <span
+                      className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))}
+                      style={projectColorStyle(project.color)}
+                      aria-hidden
+                    />
                   ) : null}
                   <span className="truncate" dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
                 </span>
@@ -493,6 +502,7 @@ function NoteEditorPanel({
         projectColorClass(selectedProject?.color, "card"),
         mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))] sm:max-h-[min(58rem,calc(100svh_-_2rem))]"
       )}
+      style={projectColorStyle(selectedProject?.color)}
     >
       <div
         className={cn(
@@ -605,6 +615,7 @@ function ProjectPillSelect({
           "max-w-[14rem] rounded-full border-border bg-transparent px-3 text-xs shadow-none transition-colors hover:bg-accent/50 dark:bg-transparent dark:hover:bg-accent/50",
           projectColorClass(selectedProject?.color, "badge")
         )}
+        style={projectColorStyle(selectedProject?.color)}
       >
         <Folder className="size-3.5" aria-hidden />
         <SelectValue placeholder={t("common.noProject")} />
@@ -620,7 +631,11 @@ function ProjectPillSelect({
             <SelectItem key={projectId} value={projectId}>
               <span className="inline-flex min-w-0 items-center gap-2">
                 {projectColorValue(project.color) ? (
-                  <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                  <span
+                    className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))}
+                    style={projectColorStyle(project.color)}
+                    aria-hidden
+                  />
                 ) : null}
                 <span className="truncate" dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
               </span>

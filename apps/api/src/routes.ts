@@ -44,7 +44,7 @@ import {
 } from "./services/auth.js";
 import { getDashboard } from "./services/dashboard.js";
 import { ingestFreeText } from "./services/ingest.js";
-import { createDocument, deleteDocument, getDocument, getDocumentFile, listDocuments, patchDocument } from "./services/documents.js";
+import { createDocument, deleteDocument, getDocument, getDocumentFile, isDocumentFileError, listDocuments, patchDocument } from "./services/documents.js";
 import { deleteEntity, getEntity, listEntities } from "./services/entities.js";
 import {
   createNote,
@@ -385,7 +385,16 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/api/documents/:id/download", async (request, reply) => {
     const { id } = idParam.parse(request.params);
     const { disposition } = documentDownloadQuery.parse(request.query);
-    const file = await getDocumentFile(requestContext(app, request), id, disposition);
+    const file = await getDocumentFile(requestContext(app, request), id, disposition).catch((error: unknown) => {
+      if (!isDocumentFileError(error)) throw error;
+      reply.code(error.statusCode).send({
+        statusCode: error.statusCode,
+        error: error.statusCode === 404 ? "Not Found" : error.statusCode === 400 ? "Bad Request" : "Bad Gateway",
+        message: error.message
+      });
+      return null;
+    });
+    if (!file) return reply;
     for (const [name, value] of Object.entries(file.headers)) {
       reply.header(name, value);
     }

@@ -17,7 +17,7 @@ import {
   peekCachedQuery,
   setCachedQuery
 } from "../lib/query-cache";
-import { findProjectForRecord, projectColorClass } from "../lib/project-colors";
+import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
 import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import {
   EmptyState,
@@ -207,11 +207,12 @@ export default function DashboardView({
                     <li key={note.id}>
                       <Link
                         href="/notes"
-                        className={cn(
-                          "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
-                          projectColorClass(linkedProject?.color, "row")
-                        )}
-                      >
+                          className={cn(
+                            "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
+                            projectColorClass(linkedProject?.color, "row")
+                          )}
+                          style={projectColorStyle(linkedProject?.color)}
+                        >
                         <div className="flex min-w-0 flex-col gap-0.5">
                           <p className="truncate text-sm font-medium text-foreground" dir="auto">
                             {note.title}
@@ -335,6 +336,7 @@ function TaskRows({
               "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
               projectColorClass(task.projectColor ?? task.project_color, "row")
             )}
+            style={projectColorStyle(task.projectColor ?? task.project_color)}
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">
@@ -375,6 +377,7 @@ function ProjectRows({
               "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
               projectColorClass(project.color, "row")
             )}
+            style={projectColorStyle(project.color)}
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">

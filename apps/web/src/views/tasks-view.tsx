@@ -16,7 +16,7 @@ import {
   sortByPriority,
   truncate
 } from "../lib/view-models";
-import { findProjectForRecord, projectColorClass, projectColorValue } from "../lib/project-colors";
+import { findProjectForRecord, projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
 import { EmptyState } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
@@ -423,7 +423,11 @@ function TaskFilterPanel({
             <SelectItem key={project.id} value={String(project.id)}>
               <span className="inline-flex min-w-0 items-center gap-2">
                 {projectColorValue(project.color) ? (
-                  <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                  <span
+                    className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))}
+                    style={projectColorStyle(project.color)}
+                    aria-hidden
+                  />
                 ) : null}
                 <span className="truncate">{project.name}</span>
               </span>
@@ -506,6 +510,7 @@ function TaskDesktopList({
               projectColorClass(linkedProject?.color, "row"),
               isDone && "opacity-75"
             )}
+            style={projectColorStyle(linkedProject?.color)}
             dir="ltr"
             role="row"
             onClick={() => onOpenDetails(task)}
@@ -544,6 +549,7 @@ function TaskDesktopList({
                   "max-w-full rounded-md bg-secondary/80 px-2 py-1 text-xs font-medium text-secondary-foreground",
                   projectColorClass(linkedProject?.color, "badge")
                 )}
+                style={projectColorStyle(linkedProject?.color)}
               >
                 <span className="truncate" dir="auto">
                   {project || t("common.noProject")}
@@ -669,6 +675,7 @@ function TaskCard({
         "flex min-w-0 max-w-full cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         projectColorClass(linkedProject?.color, "card")
       )}
+      style={projectColorStyle(linkedProject?.color)}
     >
       <div className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere]" dir="auto">

@@ -294,6 +294,38 @@
 }
 
 @layer utilities {
+  .project-color-card {
+    border-color: color-mix(in srgb, var(--project-color) 34%, var(--border));
+    background-color: color-mix(in srgb, var(--project-color) 9%, var(--card));
+  }
+
+  .project-color-card:hover {
+    border-color: color-mix(in srgb, var(--project-color) 48%, var(--border));
+  }
+
+  .project-color-row {
+    border-color: color-mix(in srgb, var(--project-color) 28%, transparent);
+    background-color: color-mix(in srgb, var(--project-color) 8%, transparent);
+  }
+
+  .project-color-row:hover {
+    background-color: color-mix(in srgb, var(--project-color) 13%, transparent);
+  }
+
+  .project-color-badge {
+    border-color: color-mix(in srgb, var(--project-color) 34%, var(--border));
+    background-color: color-mix(in srgb, var(--project-color) 15%, var(--secondary));
+  }
+
+  .project-color-swatch {
+    background-color: var(--project-color);
+  }
+
+  .project-color-text,
+  .project-color-accent {
+    color: color-mix(in srgb, var(--project-color) 82%, var(--foreground));
+  }
+
   .bounded-surface {
     min-block-size: 0;
     max-block-size: none !important;

@@ -18,7 +18,7 @@ export type EntityType = z.infer<typeof entityTypeSchema>;
 export const projectStatusSchema = z.enum(["active", "paused", "completed", "archived"]);
 export const taskStatusSchema = z.enum(["inbox", "todo", "in_progress", "waiting", "done", "cancelled"]);
 export const prioritySchema = z.enum(["low", "medium", "high", "urgent"]);
-export const projectColorSchema = z.enum(["slate", "blue", "cyan", "teal", "emerald", "lime", "amber", "orange", "rose", "pink", "violet", "purple"]);
+export const projectColorSchema = z.string().trim().regex(/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/).nullable().optional();
 export const relationTypeSchema = z.enum([
   "belongs_to",
   "depends_on",

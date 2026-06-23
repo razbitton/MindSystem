@@ -10,7 +10,13 @@ import {
   peekCachedQuery
 } from "../lib/query-cache";
 import { dateValue, fromDateTimeInput, matchesQuery, sortByPriority, toDateTimeInput, truncate } from "../lib/view-models";
-import { projectColorClass, projectColorOptions, projectColorValue } from "../lib/project-colors";
+import {
+  projectColorClass,
+  projectColorPalette,
+  projectColorPickerValue,
+  projectColorStyle,
+  projectColorValue
+} from "../lib/project-colors";
 import { Drawer, EmptyState, IconButton, PageHeader, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
@@ -229,6 +235,7 @@ export default function ProjectsView() {
                     "flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md",
                     projectColorClass(project.color, "card")
                   )}
+                  style={projectColorStyle(project.color)}
                 >
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <Link
@@ -240,6 +247,7 @@ export default function ProjectsView() {
                         {projectColorValue(project.color) ? (
                           <span
                             className={cn("me-2 inline-block size-2.5 rounded-full align-middle", projectColorClass(project.color, "swatch"))}
+                            style={projectColorStyle(project.color)}
                             aria-hidden
                           />
                         ) : null}
@@ -269,7 +277,11 @@ export default function ProjectsView() {
                   </div>
                   <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border pt-3">
                     <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-xs text-muted-foreground">
-                      <FolderKanban className={cn("size-[15px] shrink-0", projectColorClass(project.color, "text"))} aria-hidden />
+                      <FolderKanban
+                        className={cn("size-[15px] shrink-0", projectColorClass(project.color, "text"))}
+                        style={projectColorStyle(project.color)}
+                        aria-hidden
+                      />
                       <strong className="min-w-0 truncate font-medium text-foreground [overflow-wrap:anywhere]" dir="auto">
                         {project.goal || t("projects.noGoal")}
                       </strong>
@@ -427,36 +439,55 @@ function ProjectColorPicker({
   onChange: (color: string) => void;
 }) {
   const { t } = useI18n();
+  const selectedColor = projectColorValue(value);
+  const pickerValue = projectColorPickerValue(value);
 
   return (
     <div className="flex flex-col gap-2">
       <Label>{t("projects.color")}</Label>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t("projects.color")}>
+      <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
-          aria-pressed={!value}
+          aria-pressed={!selectedColor}
           onClick={() => onChange("")}
           className={cn(
-            "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2 text-start text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            !value && "border-primary text-primary"
+            "flex h-9 min-w-0 items-center gap-2 rounded-lg border border-border bg-background/70 px-3 text-start text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !selectedColor && "border-primary text-primary"
           )}
         >
           <span className="size-4 rounded-full border border-border bg-background" aria-hidden />
           <span className="truncate">{t("projectColor.none")}</span>
         </button>
-        {projectColorOptions.map((color) => (
+        <label className="flex h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background/70 px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <span className="truncate">{pickerValue.toUpperCase()}</span>
+          <input
+            type="color"
+            value={pickerValue}
+            onChange={(event) => onChange(event.target.value)}
+            className="ms-auto size-6 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+            aria-label={t("projects.color")}
+          />
+        </label>
+      </div>
+      <div
+        className="grid max-h-40 grid-cols-8 gap-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-2 sm:grid-cols-12"
+        role="radiogroup"
+        aria-label={t("projects.color")}
+      >
+        {projectColorPalette.map((color) => (
           <button
             key={color}
             type="button"
-            aria-pressed={value === color}
+            aria-pressed={selectedColor === color}
             onClick={() => onChange(color)}
+            title={color.toUpperCase()}
             className={cn(
-              "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2 text-start text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              value === color && "border-primary text-primary"
+              "size-7 rounded-md border border-border shadow-xs transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              selectedColor === color && "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
+            style={projectColorStyle(color)}
           >
-            <span className={cn("size-4 rounded-full", projectColorClass(color, "swatch"))} aria-hidden />
-            <span className="truncate">{t(`projectColor.${color}` as Parameters<typeof t>[0])}</span>
+            <span className={cn("block size-full rounded-[inherit]", projectColorClass(color, "swatch"))} style={projectColorStyle(color)} aria-hidden />
           </button>
         ))}
       </div>

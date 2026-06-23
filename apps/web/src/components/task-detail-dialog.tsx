@@ -2,7 +2,7 @@
 
 import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
-import { findProjectForRecord, projectColorClass } from "../lib/project-colors";
+import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
 import { dateValue, projectName } from "../lib/view-models";
 import { useI18n } from "../i18n";
 import { Drawer, PriorityBadge, StatusBadge } from "./page";
@@ -59,6 +59,7 @@ export function TaskDetailDialog({
           "relative w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg shadow-black/10",
           projectColorClass(linkedProject?.color, "card")
         )}
+        style={projectColorStyle(linkedProject?.color)}
       >
         <div className="flex max-h-[min(42rem,calc(100svh_-_2rem))] flex-col sm:max-h-[min(58rem,calc(100svh_-_2rem))]">
           <div className="flex-1 overflow-y-auto p-4 sm:p-5">

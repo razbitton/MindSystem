@@ -86,12 +86,14 @@ export function Panel({
   title,
   children,
   action,
-  className = ""
+  className = "",
+  style
 }: {
   title?: string;
   children: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties | undefined;
 }) {
   return (
     <section
@@ -99,6 +101,7 @@ export function Panel({
         "bounded-surface flex min-w-0 max-w-full flex-col rounded-xl border border-border bg-card text-card-foreground shadow-xs",
         className
       )}
+      style={style}
     >
       {title || action ? (
         <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 px-4 pt-4 sm:px-5">
