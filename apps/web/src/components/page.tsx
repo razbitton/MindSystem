@@ -219,7 +219,7 @@ export function Drawer({
     <Dialog open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
       <DialogContent
         className={cn(
-          "flex max-h-[min(46rem,calc(100svh_-_2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl",
+          "flex max-h-[min(46rem,calc(100svh_-_2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-h-[min(58rem,calc(100svh_-_2rem))] sm:max-w-2xl",
           contentClassName
         )}
       >

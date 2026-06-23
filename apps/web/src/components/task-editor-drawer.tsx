@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
+import { projectColorClass, projectColorValue } from "../lib/project-colors";
 import { dateValue, fromDateTimeInput, toDateTimeInput } from "../lib/view-models";
 import { useI18n } from "../i18n";
 import { Drawer } from "./page";
@@ -17,6 +18,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 const statuses = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"] as const;
 const priorities = ["low", "medium", "high", "urgent"] as const;
@@ -159,7 +161,14 @@ export function TaskEditorDrawer({
                 <SelectItem value={NO_PROJECT}>{t("common.noProject")}</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={String(project.id)}>
-                    {project.name}
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      {projectColorValue(project.color) ? (
+                        <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                      ) : null}
+                      <span className="truncate" dir="auto">
+                        {project.name}
+                      </span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

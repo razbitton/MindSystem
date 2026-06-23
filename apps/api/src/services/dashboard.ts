@@ -9,24 +9,27 @@ export async function getDashboard(context: AppContext) {
 
   const [todayTasks, overdueTasks, urgentTasks, activeProjects, recentItems, reviewCount] = await Promise.all([
     context.pool.query(
-      `select * from tasks
-       where workspace_id = $1 and status not in ('done', 'cancelled')
-       and (due_at between $2 and $3 or scheduled_for between $2 and $3)
-       order by coalesce(due_at, scheduled_for), priority desc
+      `select tasks.*, projects.color as project_color from tasks
+       left join projects on projects.id = tasks.project_id and projects.workspace_id = tasks.workspace_id
+       where tasks.workspace_id = $1 and tasks.status not in ('done', 'cancelled')
+       and (tasks.due_at between $2 and $3 or tasks.scheduled_for between $2 and $3)
+       order by coalesce(tasks.due_at, tasks.scheduled_for), tasks.priority desc
        limit 25`,
       [context.workspaceId, startOfDay, endOfDay]
     ),
     context.pool.query(
-      `select * from tasks
-       where workspace_id = $1 and status not in ('done', 'cancelled') and due_at < $2
-       order by due_at asc
+      `select tasks.*, projects.color as project_color from tasks
+       left join projects on projects.id = tasks.project_id and projects.workspace_id = tasks.workspace_id
+       where tasks.workspace_id = $1 and tasks.status not in ('done', 'cancelled') and tasks.due_at < $2
+       order by tasks.due_at asc
        limit 25`,
       [context.workspaceId, now]
     ),
     context.pool.query(
-      `select * from tasks
-       where workspace_id = $1 and status not in ('done', 'cancelled') and priority = 'urgent'
-       order by due_at nulls last, updated_at desc
+      `select tasks.*, projects.color as project_color from tasks
+       left join projects on projects.id = tasks.project_id and projects.workspace_id = tasks.workspace_id
+       where tasks.workspace_id = $1 and tasks.status not in ('done', 'cancelled') and tasks.priority = 'urgent'
+       order by tasks.due_at nulls last, tasks.updated_at desc
        limit 25`,
       [context.workspaceId]
     ),

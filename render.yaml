@@ -11,6 +11,8 @@ envVarGroups:
         sync: false
       - key: S3_BUCKET
         value: personal-context-os
+      - key: S3_REGION
+        sync: false
 
 services:
   - type: keyvalue

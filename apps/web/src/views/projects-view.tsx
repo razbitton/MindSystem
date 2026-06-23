@@ -10,6 +10,7 @@ import {
   peekCachedQuery
 } from "../lib/query-cache";
 import { dateValue, fromDateTimeInput, matchesQuery, sortByPriority, toDateTimeInput, truncate } from "../lib/view-models";
+import { projectColorClass, projectColorOptions, projectColorValue } from "../lib/project-colors";
 import { Drawer, EmptyState, IconButton, PageHeader, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
@@ -35,6 +36,7 @@ type ProjectForm = {
   name: string;
   description: string;
   goal: string;
+  color: string;
   status: string;
   priority: string;
   dueAt: string;
@@ -50,6 +52,7 @@ export default function ProjectsView() {
   const [editingProject, setEditingProject] = useState<AnyRecord | null>(null);
   const [form, setForm] = useState<ProjectForm>(blankForm());
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -79,6 +82,7 @@ export default function ProjectsView() {
       name: String(project.name ?? ""),
       description: String(project.description ?? ""),
       goal: String(project.goal ?? ""),
+      color: String(project.color ?? ""),
       status: String(project.status ?? "active"),
       priority: String(project.priority ?? "medium"),
       dueAt: toDateTimeInput(dateValue(project, "dueAt"))
@@ -93,23 +97,31 @@ export default function ProjectsView() {
   }
 
   async function save() {
-    if (!form.name.trim()) return;
-    const payload = {
-      name: form.name,
-      description: form.description || undefined,
-      goal: form.goal || undefined,
-      status: form.status,
-      priority: form.priority,
-      dueAt: fromDateTimeInput(form.dueAt)
-    };
-    if (editingProject) {
-      await apiPatch(`/api/projects/${editingProject.id}`, payload);
-    } else {
-      await apiPost("/api/projects", payload);
+    if (!form.name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name,
+        description: form.description || undefined,
+        goal: form.goal || undefined,
+        color: form.color || null,
+        status: form.status,
+        priority: form.priority,
+        dueAt: fromDateTimeInput(form.dueAt)
+      };
+      if (editingProject) {
+        await apiPatch(`/api/projects/${editingProject.id}`, payload);
+      } else {
+        await apiPost("/api/projects", payload);
+      }
+      closeDrawer();
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("common.failed"));
+    } finally {
+      setSaving(false);
     }
-    closeDrawer();
-    invalidateWorkspaceQueryCache();
-    await load(true);
   }
 
   function requestDelete(project: AnyRecord, event?: { stopPropagation: () => void }) {
@@ -134,7 +146,7 @@ export default function ProjectsView() {
   }
 
   const filteredProjects = useMemo(
-    () => sortByPriority(projects.filter((project) => matchesQuery(project, query, ["name", "description", "goal", "status", "priority"]))),
+    () => sortByPriority(projects.filter((project) => matchesQuery(project, query, ["name", "description", "goal", "status", "priority", "color"]))),
     [projects, query]
   );
 
@@ -213,7 +225,10 @@ export default function ProjectsView() {
               {filteredProjects.map((project) => (
                 <article
                   key={project.id}
-                  className="flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md"
+                  className={cn(
+                    "flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md",
+                    projectColorClass(project.color, "card")
+                  )}
                 >
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <Link
@@ -222,6 +237,12 @@ export default function ProjectsView() {
                       aria-label={`${t("projects.openProject")}: ${project.name}`}
                     >
                       <p className="truncate text-sm font-semibold text-foreground [overflow-wrap:anywhere]" dir="auto">
+                        {projectColorValue(project.color) ? (
+                          <span
+                            className={cn("me-2 inline-block size-2.5 rounded-full align-middle", projectColorClass(project.color, "swatch"))}
+                            aria-hidden
+                          />
+                        ) : null}
                         {project.name}
                       </p>
                     </Link>
@@ -248,7 +269,7 @@ export default function ProjectsView() {
                   </div>
                   <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border pt-3">
                     <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-xs text-muted-foreground">
-                      <FolderKanban className="size-[15px] shrink-0" aria-hidden />
+                      <FolderKanban className={cn("size-[15px] shrink-0", projectColorClass(project.color, "text"))} aria-hidden />
                       <strong className="min-w-0 truncate font-medium text-foreground [overflow-wrap:anywhere]" dir="auto">
                         {project.goal || t("projects.noGoal")}
                       </strong>
@@ -286,7 +307,7 @@ export default function ProjectsView() {
               <Button variant="outline" type="button" onClick={closeDrawer}>
                 {t("common.cancel")}
               </Button>
-              <Button type="button" onClick={save} disabled={!form.name.trim()}>
+              <Button type="button" onClick={() => void save()} disabled={!form.name.trim() || saving}>
                 {t("common.save")}
               </Button>
             </div>
@@ -323,6 +344,7 @@ export default function ProjectsView() {
               onChange={(event) => setForm({ ...form, goal: event.target.value })}
             />
           </div>
+          <ProjectColorPicker value={form.color} onChange={(color) => setForm({ ...form, color })} />
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="project-status">{t("common.status")}</Label>
@@ -390,8 +412,54 @@ function blankForm(): ProjectForm {
     name: "",
     description: "",
     goal: "",
+    color: "",
     status: "active",
     priority: "medium",
     dueAt: ""
   };
+}
+
+function ProjectColorPicker({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (color: string) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>{t("projects.color")}</Label>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t("projects.color")}>
+        <button
+          type="button"
+          aria-pressed={!value}
+          onClick={() => onChange("")}
+          className={cn(
+            "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2 text-start text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            !value && "border-primary text-primary"
+          )}
+        >
+          <span className="size-4 rounded-full border border-border bg-background" aria-hidden />
+          <span className="truncate">{t("projectColor.none")}</span>
+        </button>
+        {projectColorOptions.map((color) => (
+          <button
+            key={color}
+            type="button"
+            aria-pressed={value === color}
+            onClick={() => onChange(color)}
+            className={cn(
+              "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background/70 px-3 py-2 text-start text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              value === color && "border-primary text-primary"
+            )}
+          >
+            <span className={cn("size-4 rounded-full", projectColorClass(color, "swatch"))} aria-hidden />
+            <span className="truncate">{t(`projectColor.${color}` as Parameters<typeof t>[0])}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

@@ -12,6 +12,7 @@ const rawEnvSchema = z.object({
   S3_ACCESS_KEY: z.string().default("minio"),
   S3_SECRET_KEY: z.string().default("minio123"),
   S3_BUCKET: z.string().default("personal-context-os"),
+  S3_REGION: z.string().default("us-east-1"),
   JWT_SECRET: z.string().min(16).default("change-me-in-production"),
   APP_BASE_URL: z.string().url().default("http://localhost:3000"),
   API_BASE_URL: z.string().url().default("http://localhost:4000"),

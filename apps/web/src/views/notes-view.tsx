@@ -9,6 +9,7 @@ import {
   peekCachedQuery,
   setCachedQuery
 } from "../lib/query-cache";
+import { findProjectForRecord, projectColorClass, projectColorValue } from "../lib/project-colors";
 import { dateValue, matchesQuery, projectName } from "../lib/view-models";
 import { Drawer, EmptyState, IconButton, PageHeader } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -268,7 +269,8 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
           <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
             {filteredNotes.map((note) => {
               const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
-              const linkedProject = linkedProjectId ? projectName(projects, linkedProjectId) : "";
+              const linkedProjectRecord = findProjectForRecord(projects, note);
+              const linkedProject = linkedProjectRecord?.name ?? (linkedProjectId ? projectName(projects, linkedProjectId) : "");
               const noteDirection = resolveTextDirection(`${String(note.title ?? "")}\n${String(note.body ?? "")}`, direction);
               const projectDirection = resolveTextDirection(linkedProject || t("common.noProject"), direction);
               return (
@@ -283,7 +285,10 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
                       openEdit(note);
                     }
                   }}
-                  className="flex max-h-56 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={cn(
+                    "flex max-h-56 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    projectColorClass(linkedProjectRecord?.color, "card")
+                  )}
                 >
                   {note.title ? (
                     <p className="line-clamp-2 break-words text-start text-sm font-semibold text-foreground" dir={noteDirection}>
@@ -295,6 +300,9 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
                   </p>
                   <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
                     <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-0 py-0.5 text-muted-foreground" dir={projectDirection}>
+                      {projectColorValue(linkedProjectRecord?.color) ? (
+                        <span className={cn("size-2 shrink-0 rounded-full", projectColorClass(linkedProjectRecord?.color, "swatch"))} aria-hidden />
+                      ) : null}
                       <span className="truncate">{linkedProject || t("common.noProject")}</span>
                     </span>
                     <div className="flex shrink-0 items-center gap-1.5">
@@ -402,7 +410,12 @@ function NotesSearchProjectFilter({
             const projectNameText = String(project.name ?? "");
             return (
               <SelectItem key={project.id} value={String(project.id)}>
-                <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  {projectColorValue(project.color) ? (
+                    <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                  ) : null}
+                  <span className="truncate" dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+                </span>
               </SelectItem>
             );
           })}
@@ -456,6 +469,7 @@ function NoteEditorPanel({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const titleDirection = resolveTextDirection(form.title || form.body, direction);
   const bodyDirection = resolveTextDirection(form.body || form.title, direction);
+  const selectedProject = projects.find((project) => String(project.id) === form.projectId);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -476,13 +490,14 @@ function NoteEditorPanel({
       className={cn(
         "relative w-full overflow-visible rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-all duration-200",
         expanded ? "shadow-lg shadow-black/10" : "hover:border-primary/40 hover:shadow-md",
-        mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))]"
+        projectColorClass(selectedProject?.color, "card"),
+        mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))] sm:max-h-[min(58rem,calc(100svh_-_2rem))]"
       )}
     >
       <div
         className={cn(
           "flex flex-col p-3 sm:p-4",
-          mode === "edit" && "max-h-[min(34rem,calc(100svh_-_8rem))] overflow-y-auto"
+          mode === "edit" && "max-h-[min(34rem,calc(100svh_-_8rem))] overflow-y-auto sm:max-h-[min(50rem,calc(100svh_-_8rem))]"
         )}
       >
         {expanded ? (
@@ -580,12 +595,16 @@ function ProjectPillSelect({
   onChange: (projectId: string) => void;
 }) {
   const { t, direction } = useI18n();
+  const selectedProject = projects.find((project) => String(project.id) === value);
 
   return (
     <Select value={value || NO_PROJECT} onValueChange={(next) => onChange(next === NO_PROJECT ? "" : next)}>
       <SelectTrigger
         size="sm"
-        className="max-w-[14rem] rounded-full border-border bg-transparent px-3 text-xs shadow-none transition-colors hover:bg-accent/50 dark:bg-transparent dark:hover:bg-accent/50"
+        className={cn(
+          "max-w-[14rem] rounded-full border-border bg-transparent px-3 text-xs shadow-none transition-colors hover:bg-accent/50 dark:bg-transparent dark:hover:bg-accent/50",
+          projectColorClass(selectedProject?.color, "badge")
+        )}
       >
         <Folder className="size-3.5" aria-hidden />
         <SelectValue placeholder={t("common.noProject")} />
@@ -599,7 +618,12 @@ function ProjectPillSelect({
           const projectNameText = String(project.name ?? "");
           return (
             <SelectItem key={projectId} value={projectId}>
-              <span dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+              <span className="inline-flex min-w-0 items-center gap-2">
+                {projectColorValue(project.color) ? (
+                  <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                ) : null}
+                <span className="truncate" dir={resolveTextDirection(projectNameText, direction)}>{projectNameText}</span>
+              </span>
             </SelectItem>
           );
         })}

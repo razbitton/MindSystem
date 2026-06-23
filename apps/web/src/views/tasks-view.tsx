@@ -16,6 +16,7 @@ import {
   sortByPriority,
   truncate
 } from "../lib/view-models";
+import { findProjectForRecord, projectColorClass, projectColorValue } from "../lib/project-colors";
 import { EmptyState } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
@@ -420,7 +421,12 @@ function TaskFilterPanel({
           <SelectItem value={ANY}>{t("tasks.anyProject")}</SelectItem>
           {projects.map((project) => (
             <SelectItem key={project.id} value={String(project.id)}>
-              {project.name}
+              <span className="inline-flex min-w-0 items-center gap-2">
+                {projectColorValue(project.color) ? (
+                  <span className={cn("size-2.5 shrink-0 rounded-full", projectColorClass(project.color, "swatch"))} aria-hidden />
+                ) : null}
+                <span className="truncate">{project.name}</span>
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
@@ -482,7 +488,8 @@ function TaskDesktopList({
       {tasks.map((task) => {
         const isDone = task.status === "done";
         const description = truncate(task.description, 120);
-        const project = projectName(projects, String(task.projectId ?? task.project_id ?? ""));
+        const linkedProject = findProjectForRecord(projects, task);
+        const project = linkedProject?.name ?? projectName(projects, String(task.projectId ?? task.project_id ?? ""));
         const displayDate =
           dateValue(task, "dueAt") ??
           dateValue(task, "scheduledFor") ??
@@ -496,7 +503,8 @@ function TaskDesktopList({
             aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
             className={cn(
               "grid cursor-pointer grid-cols-[64px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              isDone && "bg-muted/10"
+              projectColorClass(linkedProject?.color, "row"),
+              isDone && "opacity-75"
             )}
             dir="ltr"
             role="row"
@@ -532,7 +540,10 @@ function TaskDesktopList({
             <div className="flex justify-center" dir="rtl" role="cell">
               <Badge
                 variant="secondary"
-                className="max-w-full rounded-md bg-secondary/80 px-2 py-1 text-xs font-medium text-secondary-foreground"
+                className={cn(
+                  "max-w-full rounded-md bg-secondary/80 px-2 py-1 text-xs font-medium text-secondary-foreground",
+                  projectColorClass(linkedProject?.color, "badge")
+                )}
               >
                 <span className="truncate" dir="auto">
                   {project || t("common.noProject")}
@@ -634,7 +645,8 @@ function TaskCard({
   const isDone = task.status === "done";
   const description = truncate(task.description, 140);
   const assignee = String(task.assignee ?? "").trim();
-  const project = projectName(projects, String(task.projectId ?? task.project_id ?? ""));
+  const linkedProject = findProjectForRecord(projects, task);
+  const project = linkedProject?.name ?? projectName(projects, String(task.projectId ?? task.project_id ?? ""));
   const displayDate =
     dateValue(task, "dueAt") ??
     dateValue(task, "scheduledFor") ??
@@ -653,7 +665,10 @@ function TaskCard({
           onOpenDetails(task);
         }
       }}
-      className="flex min-w-0 max-w-full cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        "flex min-w-0 max-w-full cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        projectColorClass(linkedProject?.color, "card")
+      )}
     >
       <div className="flex min-w-0 flex-col gap-2">
         <h3 className="text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere]" dir="auto">

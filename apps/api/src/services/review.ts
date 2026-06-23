@@ -1,6 +1,6 @@
 import { reviewQueue } from "@personal-context-os/db";
 import { desc, eq, and } from "drizzle-orm";
-import { createTaskSchema, type reviewDecisionSchema } from "@personal-context-os/shared";
+import { createTaskSchema, projectColorSchema, type reviewDecisionSchema } from "@personal-context-os/shared";
 import { z } from "zod";
 import { createNote } from "./notes.js";
 import { createProject } from "./projects.js";
@@ -47,7 +47,12 @@ export async function approveReviewItem(context: AppContext, id: string, input: 
     applied = await createNote(context, { title: payload.title, body: stringOrUndefined(payload.body) ?? payload.title }, actor);
   }
   if (item.suggestedAction === "create_project" && typeof payload.title === "string") {
-    applied = await createProject(context, { name: payload.title, description: stringOrUndefined(payload.description) }, actor);
+    const parsedColor = projectColorSchema.safeParse(payload.color);
+    applied = await createProject(context, {
+      name: payload.title,
+      description: stringOrUndefined(payload.description),
+      color: parsedColor.success ? parsedColor.data : null
+    }, actor);
   }
 
   const [updated] = await context.db

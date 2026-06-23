@@ -2,6 +2,7 @@
 
 import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
+import { findProjectForRecord, projectColorClass } from "../lib/project-colors";
 import { dateValue, projectName } from "../lib/view-models";
 import { useI18n } from "../i18n";
 import { Drawer, PriorityBadge, StatusBadge } from "./page";
@@ -35,7 +36,8 @@ export function TaskDetailDialog({
   const description = String(task.description ?? "").trim();
   const assignee = String(task.assignee ?? "").trim();
   const estimateMinutes = task.estimateMinutes ?? task.estimate_minutes;
-  const project = projectName(projects, String(task.projectId ?? task.project_id ?? ""));
+  const linkedProject = findProjectForRecord(projects, task);
+  const project = linkedProject?.name ?? projectName(projects, String(task.projectId ?? task.project_id ?? ""));
   const dueAt = dateValue(task, "dueAt");
   const scheduledFor = dateValue(task, "scheduledFor");
   const createdAt = dateValue(task, "createdAt");
@@ -52,8 +54,13 @@ export function TaskDetailDialog({
       contentClassName="border-0 bg-transparent p-0 shadow-none sm:max-w-xl"
       bodyClassName="overflow-visible p-0 sm:p-0"
     >
-      <article className="relative w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg shadow-black/10">
-        <div className="flex max-h-[min(42rem,calc(100svh_-_2rem))] flex-col">
+      <article
+        className={cn(
+          "relative w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-lg shadow-black/10",
+          projectColorClass(linkedProject?.color, "card")
+        )}
+      >
+        <div className="flex max-h-[min(42rem,calc(100svh_-_2rem))] flex-col sm:max-h-[min(58rem,calc(100svh_-_2rem))]">
           <div className="flex-1 overflow-y-auto p-4 sm:p-5">
             <div className="flex min-w-0 flex-col gap-4">
               <div className="flex min-w-0 flex-col gap-3 pe-10">

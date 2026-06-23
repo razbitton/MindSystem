@@ -126,6 +126,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   description: text("description"),
   goal: text("goal"),
+  color: text("color"),
   status: projectStatus("status").notNull().default("active"),
   priority: priority("priority").notNull().default("medium"),
   dueAt: timestamp("due_at", { withTimezone: true }),

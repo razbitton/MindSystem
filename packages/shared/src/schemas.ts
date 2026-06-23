@@ -18,6 +18,7 @@ export type EntityType = z.infer<typeof entityTypeSchema>;
 export const projectStatusSchema = z.enum(["active", "paused", "completed", "archived"]);
 export const taskStatusSchema = z.enum(["inbox", "todo", "in_progress", "waiting", "done", "cancelled"]);
 export const prioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+export const projectColorSchema = z.enum(["slate", "blue", "cyan", "teal", "emerald", "lime", "amber", "orange", "rose", "pink", "violet", "purple"]);
 export const relationTypeSchema = z.enum([
   "belongs_to",
   "depends_on",
@@ -49,6 +50,7 @@ export const normalizedProjectSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   goal: z.string().optional(),
+  color: projectColorSchema.nullable().optional(),
   status: projectStatusSchema.default("active"),
   priority: prioritySchema.default("medium"),
   dueAt: z.string().datetime().optional(),
@@ -130,9 +132,10 @@ export const createProjectSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   goal: z.string().optional(),
+  color: projectColorSchema.nullable().optional(),
   status: projectStatusSchema.default("active"),
   priority: prioritySchema.default("medium"),
-  dueAt: z.string().datetime().optional()
+  dueAt: z.string().datetime().nullable().optional()
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 

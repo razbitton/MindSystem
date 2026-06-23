@@ -84,6 +84,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
         name: project.title,
         description: project.description ?? null,
         goal: project.goal ?? null,
+        color: project.color ?? null,
         status: project.status,
         priority: project.priority,
         dueAt: project.dueAt ? new Date(project.dueAt) : null,

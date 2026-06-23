@@ -9,6 +9,7 @@ import {
   invalidateWorkspaceQueryCache,
   peekCachedQuery
 } from "../lib/query-cache";
+import { projectColorClass } from "../lib/project-colors";
 import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
@@ -18,6 +19,7 @@ import { Disclosure, CodeBlock } from "../components/disclosure";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type DeleteTarget = {
@@ -146,7 +148,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
 
       <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 max-w-full flex-col gap-6 lg:col-span-2">
-          <Panel title={t("projectDetail.summary")}>
+          <Panel title={t("projectDetail.summary")} className={projectColorClass(project?.color, "card")}>
             {project ? (
               <div className="flex min-w-0 max-w-full flex-col gap-3">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -174,9 +176,10 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           </Panel>
 
           <div className="grid min-w-0 max-w-full gap-6 md:grid-cols-2">
-            <Panel title={t("projectDetail.tasks")}>
+            <Panel title={t("projectDetail.tasks")} className={projectColorClass(project?.color, "card")}>
               <TaskRows
                 tasks={data?.tasks ?? []}
+                projectColor={project?.color}
                 formatDate={formatDate}
                 emptyText={t("projectDetail.noTasks")}
                 completeTask={completeTask}
@@ -184,9 +187,10 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
                 deleteTask={(task, event) => requestDelete("task", task, event)}
               />
             </Panel>
-            <Panel title={t("projectDetail.notes")}>
+            <Panel title={t("projectDetail.notes")} className={projectColorClass(project?.color, "card")}>
               <SimpleRows
                 rows={data?.notes ?? []}
+                projectColor={project?.color}
                 titleKey="title"
                 bodyKey="body"
                 emptyText={t("projectDetail.nothingLinked")}
@@ -196,9 +200,10 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             </Panel>
           </div>
 
-          <Panel title={t("projectDetail.activity")}>
+          <Panel title={t("projectDetail.activity")} className={projectColorClass(project?.color, "card")}>
             <SimpleRows
               rows={activity}
+              projectColor={project?.color}
               titleKey="title"
               bodyKey="updatedAt"
               emptyText={t("projectDetail.nothingLinked")}
@@ -208,9 +213,10 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
         </div>
 
         <div className="flex min-w-0 max-w-full flex-col gap-6">
-          <Panel title={t("projectDetail.documents")}>
+          <Panel title={t("projectDetail.documents")} className={projectColorClass(project?.color, "card")}>
             <SimpleRows
               rows={data?.documents ?? []}
+              projectColor={project?.color}
               titleKey="title"
               bodyKey="objectKey"
               emptyText={t("projectDetail.nothingLinked")}
@@ -294,6 +300,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
 
 function TaskRows({
   tasks,
+  projectColor,
   formatDate,
   emptyText,
   completeTask,
@@ -301,6 +308,7 @@ function TaskRows({
   deleteTask
 }: {
   tasks: AnyRecord[];
+  projectColor?: unknown;
   formatDate: (value?: string | null) => string;
   emptyText: string;
   completeTask: (id: string) => void;
@@ -317,7 +325,10 @@ function TaskRows({
           role="button"
           tabIndex={0}
           aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
-          className="flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between"
+          className={cn(
+            "flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between",
+            projectColorClass(projectColor, "row")
+          )}
           onClick={() => openTask(task)}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -364,6 +375,7 @@ function TaskRows({
 
 function SimpleRows({
   rows,
+  projectColor,
   titleKey,
   bodyKey,
   emptyText,
@@ -371,6 +383,7 @@ function SimpleRows({
   deleteRow
 }: {
   rows: AnyRecord[];
+  projectColor?: unknown;
   titleKey: string;
   bodyKey: string;
   emptyText: string;
@@ -386,7 +399,13 @@ function SimpleRows({
           ? formatDate(dateValue(row, bodyKey))
           : row[bodyKey] ?? row[bodyKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)];
         return (
-          <li key={row.id} className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-lg px-3 py-2.5 hover:bg-accent/40">
+          <li
+            key={row.id}
+            className={cn(
+              "flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-lg px-3 py-2.5 hover:bg-accent/40",
+              projectColorClass(projectColor, "row")
+            )}
+          >
             <div className="flex min-w-0 max-w-full flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">
                 {row[titleKey] ?? row.name}

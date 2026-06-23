@@ -17,6 +17,7 @@ import {
   peekCachedQuery,
   setCachedQuery
 } from "../lib/query-cache";
+import { findProjectForRecord, projectColorClass } from "../lib/project-colors";
 import { dateValue, sortByPriority, truncate } from "../lib/view-models";
 import {
   EmptyState,
@@ -30,15 +31,18 @@ import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type DashboardViewProps = {
   initialDashboard?: AnyRecord;
   initialNotes?: AnyRecord[];
+  initialProjects?: AnyRecord[];
 };
 
 export default function DashboardView({
   initialDashboard,
-  initialNotes
+  initialNotes,
+  initialProjects
 }: DashboardViewProps = {}) {
   const { t, formatDate, translateValue } = useI18n();
   const [data, setData] = useState<AnyRecord | null>(
@@ -46,6 +50,9 @@ export default function DashboardView({
   );
   const [notes, setNotes] = useState<AnyRecord[]>(
     () => initialNotes?.slice(0, 4) ?? peekCachedQuery<{ notes: AnyRecord[] }>("/api/notes")?.notes.slice(0, 4) ?? []
+  );
+  const [projects, setProjects] = useState<AnyRecord[]>(
+    () => initialProjects ?? peekCachedQuery<{ projects: AnyRecord[] }>("/api/projects")?.projects ?? []
   );
   const [captureText, setCaptureText] = useState("");
   const [captureResult, setCaptureResult] = useState<AnyRecord | null>(null);
@@ -55,12 +62,14 @@ export default function DashboardView({
   async function load(force = false) {
     setError(null);
     try {
-      const [dashboardData, noteData] = await Promise.all([
+      const [dashboardData, noteData, projectData] = await Promise.all([
         cachedApiGet<AnyRecord>("/api/dashboard/today", undefined, { force }),
-        cachedApiGet<{ notes: AnyRecord[] }>("/api/notes", undefined, { force })
+        cachedApiGet<{ notes: AnyRecord[] }>("/api/notes", undefined, { force }),
+        cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force })
       ]);
       setData(dashboardData);
       setNotes(noteData.notes.slice(0, 4));
+      setProjects(projectData.projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("dashboard.loadError"));
     }
@@ -75,10 +84,14 @@ export default function DashboardView({
       setCachedQuery("/api/notes", undefined, { notes: initialNotes });
       setNotes(initialNotes.slice(0, 4));
     }
-  }, [initialDashboard, initialNotes]);
+    if (initialProjects) {
+      setCachedQuery("/api/projects", undefined, { projects: initialProjects });
+      setProjects(initialProjects);
+    }
+  }, [initialDashboard, initialNotes, initialProjects]);
 
   useEffect(() => {
-    if (initialDashboard && initialNotes) return;
+    if (initialDashboard && initialNotes && initialProjects) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -188,11 +201,16 @@ export default function DashboardView({
                 <EmptyState>{t("home.noRecentNotes")}</EmptyState>
               ) : (
                 <ul className="flex min-w-0 flex-col gap-1">
-                  {notes.map((note) => (
+                  {notes.map((note) => {
+                    const linkedProject = findProjectForRecord(projects, note);
+                    return (
                     <li key={note.id}>
                       <Link
                         href="/notes"
-                        className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
+                        className={cn(
+                          "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
+                          projectColorClass(linkedProject?.color, "row")
+                        )}
                       >
                         <div className="flex min-w-0 flex-col gap-0.5">
                           <p className="truncate text-sm font-medium text-foreground" dir="auto">
@@ -207,7 +225,8 @@ export default function DashboardView({
                         </div>
                       </Link>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </Panel>
@@ -312,7 +331,10 @@ function TaskRows({
         <li key={task.id}>
           <Link
             href="/tasks"
-            className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
+            className={cn(
+              "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
+              projectColorClass(task.projectColor ?? task.project_color, "row")
+            )}
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">
@@ -349,7 +371,10 @@ function ProjectRows({
         <li key={project.id}>
           <Link
             href={`/projects/${project.id}`}
-            className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60"
+            className={cn(
+              "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
+              projectColorClass(project.color, "row")
+            )}
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <p className="truncate text-sm font-medium text-foreground" dir="auto">

@@ -26,6 +26,7 @@ export async function createProject(context: AppContext, input: z.input<typeof c
       name: parsed.name,
       description: parsed.description ?? null,
       goal: parsed.goal ?? null,
+      color: parsed.color ?? null,
       status: parsed.status,
       priority: parsed.priority,
       dueAt: parsed.dueAt ? new Date(parsed.dueAt) : null,
@@ -105,6 +106,7 @@ export async function patchProject(context: AppContext, id: string, input: z.inf
   if (input.name !== undefined) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
   if (input.goal !== undefined) updates.goal = input.goal;
+  if (input.color !== undefined) updates.color = input.color;
   if (input.status !== undefined) updates.status = input.status;
   if (input.priority !== undefined) updates.priority = input.priority;
   if (input.dueAt !== undefined) updates.dueAt = input.dueAt ? new Date(input.dueAt) : null;

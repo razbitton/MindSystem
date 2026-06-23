@@ -10,6 +10,12 @@ import type { AppContext } from "./types.js";
 
 type DocumentFileDisposition = "inline" | "attachment";
 
+class DocumentFileError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+  }
+}
+
 export async function createDocument(context: AppContext, input: CreateDocumentInput, actor: Actor) {
   const entity = await createGenericEntity(context, {
     entityType: "document",
@@ -62,11 +68,15 @@ export async function getDocument(context: AppContext, id: string) {
 export async function getDocumentFile(context: AppContext, id: string, disposition: DocumentFileDisposition = "attachment") {
   const { document } = await getDocument(context, id);
   const objectKey = String(document.objectKey ?? "").trim();
-  if (!objectKey) throw new Error("Document file is not available");
+  if (!objectKey) throw new DocumentFileError("Document file is not available", 404);
 
-  const response = await fetchDocumentObject(context, objectKey);
+  const response = await fetchDocumentObject(context, objectKey).catch((error: unknown) => {
+    if (error instanceof DocumentFileError) throw error;
+    throw new DocumentFileError("Could not retrieve document file", 502);
+  });
   if (!response.ok) {
-    throw new Error(response.status === 404 ? "Document file not found" : "Could not retrieve document file");
+    const statusCode = response.status === 404 ? 404 : 502;
+    throw new DocumentFileError(response.status === 404 ? "Document file not found" : "Could not retrieve document file", statusCode);
   }
 
   const body = Buffer.from(await response.arrayBuffer());
@@ -140,21 +150,27 @@ async function fetchDocumentObject(context: AppContext, objectKey: string) {
 }
 
 function normalizeObjectKey(context: AppContext, objectKey: string) {
-  const directUrl = tryParseHttpUrl(objectKey);
-  if (!directUrl) return objectKey;
+  const trimmedObjectKey = objectKey.trim().replace(/^\/+/, "");
+  const directUrl = tryParseHttpUrl(trimmedObjectKey);
+  if (!directUrl) return trimBucketPrefix(context, trimmedObjectKey);
 
   const endpoint = new URL(context.env.S3_ENDPOINT);
   if (directUrl.origin !== endpoint.origin) {
-    throw new Error("Document file location is not allowed");
+    throw new DocumentFileError("Document file location is not allowed", 400);
   }
 
   const endpointPath = trimTrailingSlash(endpoint.pathname);
   const bucketPrefix = `${endpointPath}/${encodeURIComponent(context.env.S3_BUCKET)}/`;
   if (!directUrl.pathname.startsWith(bucketPrefix)) {
-    throw new Error("Document file location is not allowed");
+    throw new DocumentFileError("Document file location is not allowed", 400);
   }
 
   return directUrl.pathname.slice(bucketPrefix.length).split("/").map(decodeURIComponent).join("/");
+}
+
+function trimBucketPrefix(context: AppContext, objectKey: string) {
+  const bucketPrefix = `${context.env.S3_BUCKET}/`;
+  return objectKey.startsWith(bucketPrefix) ? objectKey.slice(bucketPrefix.length) : objectKey;
 }
 
 function objectStorageUrl(context: AppContext, objectKey: string) {
@@ -169,7 +185,7 @@ function signedS3Headers(context: AppContext, url: URL, method: "GET") {
   const amzDate = toAmzDate(now);
   const dateStamp = amzDate.slice(0, 8);
   const service = "s3";
-  const region = "us-east-1";
+  const region = s3SigningRegion(context.env.S3_ENDPOINT, context.env.S3_REGION);
   const host = url.host;
   const canonicalHeaders = `host:${host}\nx-amz-content-sha256:UNSIGNED-PAYLOAD\nx-amz-date:${amzDate}\n`;
   const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
@@ -197,6 +213,20 @@ function signedS3Headers(context: AppContext, url: URL, method: "GET") {
     "x-amz-content-sha256": "UNSIGNED-PAYLOAD",
     authorization: `AWS4-HMAC-SHA256 Credential=${context.env.S3_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`
   };
+}
+
+export function s3SigningRegion(endpoint: string, configuredRegion: string) {
+  const region = configuredRegion.trim() || "us-east-1";
+  try {
+    const hostname = new URL(endpoint).hostname.toLowerCase();
+    if (hostname.endsWith(".r2.cloudflarestorage.com") && region === "us-east-1") {
+      return "auto";
+    }
+  } catch {
+    return region;
+  }
+
+  return region;
 }
 
 function s3SigningKey(secretKey: string, dateStamp: string, region: string, service: string) {
