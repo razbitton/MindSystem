@@ -466,9 +466,9 @@ function TaskDesktopList({
   const { t } = useI18n();
 
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-xs md:block" role="table">
+    <div className="hidden overflow-x-auto overflow-y-hidden rounded-xl border border-border bg-card shadow-xs md:block" role="table">
       <div
-        className="grid grid-cols-[64px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border bg-background/30 px-6 py-3 text-xs font-semibold text-muted-foreground"
+        className="grid min-w-[58rem] grid-cols-[64px_112px_112px_170px_150px_minmax(220px,1fr)] items-center border-b border-border bg-background/30 px-6 py-3 text-xs font-semibold text-muted-foreground"
         dir="ltr"
         role="row"
       >
@@ -477,6 +477,9 @@ function TaskDesktopList({
         </div>
         <div className="text-center" dir="rtl" role="columnheader">
           {t("common.status")}
+        </div>
+        <div className="text-center" dir="rtl" role="columnheader">
+          {t("common.priority")}
         </div>
         <div className="text-center" dir="rtl" role="columnheader">
           {t("common.due")}
@@ -506,7 +509,7 @@ function TaskDesktopList({
             tabIndex={0}
             aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
             className={cn(
-              "grid cursor-pointer grid-cols-[64px_112px_170px_150px_minmax(260px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "grid min-w-[58rem] cursor-pointer grid-cols-[64px_112px_112px_170px_150px_minmax(220px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               projectColorClass(linkedProject?.color, "row"),
               isDone && "opacity-75"
             )}
@@ -536,6 +539,10 @@ function TaskDesktopList({
 
             <div className="flex justify-center" dir="rtl" role="cell">
               <TaskStatusBadge value={task.status} />
+            </div>
+
+            <div className="flex justify-center" dir="rtl" role="cell">
+              <TaskPriorityBadge value={task.priority} />
             </div>
 
             <div className="truncate text-center text-sm text-foreground" dir="ltr" role="cell">
