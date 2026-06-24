@@ -137,21 +137,21 @@ export default function DashboardView({
         />
       </div>
 
-      <GoogleCalendarPanel />
+      <div className="grid min-w-0 max-w-full gap-6 lg:min-h-[600px] lg:grid-cols-2 lg:[height:calc(100svh_-_18rem)]">
+        <GoogleCalendarPanel className="min-h-[520px] lg:min-h-0" />
 
-      <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-6 lg:min-h-0">
           <DailyObjectivesPanel
             data={data}
             formatDate={formatDate}
             onComplete={completeTask}
             onObjectiveAction={setDailyObjective}
+            className="lg:min-h-0 lg:flex-1"
           />
-        </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
           <Panel
             title={t("home.activeProjects")}
+            className="lg:min-h-0 lg:flex-1"
             action={
               <Button asChild variant="ghost" size="sm">
                 <Link href="/projects">{t("common.open")}</Link>
@@ -172,12 +172,14 @@ function DailyObjectivesPanel({
   data,
   formatDate,
   onComplete,
-  onObjectiveAction
+  onObjectiveAction,
+  className
 }: {
   data: AnyRecord | null;
   formatDate: (value?: string | null) => string;
   onComplete: (id: string) => void | Promise<void>;
   onObjectiveAction: (task: AnyRecord, action: ObjectiveAction) => void | Promise<void>;
+  className?: string;
 }) {
   const { t } = useI18n();
   const sections = (data?.dailyObjectiveSections ?? {}) as AnyRecord;
@@ -188,10 +190,12 @@ function DailyObjectivesPanel({
   const waiting = arrayValue(sections.waiting);
   const reminders = arrayValue(sections.reminders ?? data?.dailyReminders);
   const hasAgenda = focus.length || scheduled.length || deadlines.length || waiting.length || reminders.length;
+  const panelProps = className ? { className } : {};
 
   return (
     <Panel
       title={t("dashboard.dailyObjectives")}
+      {...panelProps}
       action={
         hasAgenda ? (
           <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">

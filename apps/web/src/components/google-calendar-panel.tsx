@@ -8,6 +8,7 @@ import listPlugin from "@fullcalendar/list";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import type {
   DateSelectArg,
+  DatesSetArg,
   EventApi,
   EventClickArg,
   EventDropArg,
@@ -16,6 +17,8 @@ import type {
 } from "@fullcalendar/core";
 import {
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Loader2,
   Plus,
@@ -31,7 +34,7 @@ import {
 } from "../lib/query-cache";
 import { addLocalDays, fromDateTimeInput, toDateTimeInput, toLocalDateString } from "../lib/view-models";
 import { ConfirmDialog } from "./confirm-dialog";
-import { Drawer, EmptyState, Panel } from "./page";
+import { Drawer } from "./page";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -142,10 +145,11 @@ const googleCalendarCachePrefix = "GET /api/google-calendar";
 const attendeeSplitPattern = /[\s,;]+/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function GoogleCalendarPanel() {
-  const { t, direction } = useI18n();
+export function GoogleCalendarPanel({ className }: { className?: string } = {}) {
+  const { t, direction, locale } = useI18n();
   const calendarRef = useRef<FullCalendar | null>(null);
   const timeZone = useMemo(() => resolvedTimeZone(), []);
+  const [calendarTitle, setCalendarTitle] = useState("");
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [calendars, setCalendars] = useState<GoogleCalendarListEntry[]>([]);
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
@@ -415,135 +419,199 @@ export function GoogleCalendarPanel() {
     }
   }
 
-  const panelAction = status?.connected ? (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => void refreshGoogleCalendar()}
-        disabled={loading || calendarLoading}
-        title={t("googleCalendar.refreshCalendars")}
-        aria-label={t("googleCalendar.refreshCalendars")}
-      >
-        <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => void disconnectGoogleCalendar()}
-        disabled={disconnecting}
-        title={t("googleCalendar.disconnect")}
-        aria-label={t("googleCalendar.disconnect")}
-      >
-        {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
-      </Button>
-    </div>
-  ) : null;
+  function navigateCalendar(action: "prev" | "next" | "today") {
+    const api = calendarRef.current?.getApi();
+    if (!api) return;
+    if (action === "prev") api.prev();
+    if (action === "next") api.next();
+    if (action === "today") api.today();
+  }
+
+  function handleDatesSet(arg: DatesSetArg) {
+    setCalendarTitle(new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-US", {
+      day: "numeric",
+      month: "long",
+      weekday: "short"
+    }).format(arg.start));
+  }
 
   return (
-    <Panel title={t("googleCalendar.title")} action={panelAction} className="google-calendar-panel">
-      {loading ? (
-        <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">
-          <Loader2 className="me-2 size-4 animate-spin" aria-hidden />
-          {t("common.loading")}
-        </div>
-      ) : error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : !status?.configured ? (
-        <EmptyState
-          title={t("googleCalendar.notConfigured")}
-          action={
-            <Button type="button" variant="outline" size="sm" onClick={() => void refreshGoogleCalendar()}>
-              <RefreshCw data-icon="inline-start" />
-              {t("common.refresh")}
-            </Button>
-          }
-        >
-          {t("googleCalendar.configureHelp")}
-        </EmptyState>
-      ) : !status.connected ? (
-        <EmptyState
-          title={t("googleCalendar.notConnected")}
-          action={
-            <Button type="button" onClick={() => void connectGoogleCalendar()} disabled={connecting}>
-              {connecting ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <CalendarDays data-icon="inline-start" />}
-              {t("googleCalendar.connect")}
-            </Button>
-          }
-        >
-          {t("googleCalendar.subtitle")}
-        </EmptyState>
-      ) : (
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 flex-col gap-2">
-              <p className="text-xs text-muted-foreground" dir="auto">
+    <section
+      className={cn(
+        "google-calendar-panel flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900 text-slate-200 shadow-sm",
+        className
+      )}
+    >
+      <div className="flex shrink-0 flex-col gap-3 border-b border-slate-800/60 bg-slate-800/20 p-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300">
+            <CalendarDays className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-medium text-slate-100" dir="auto">
+              {calendarTitle || t("googleCalendar.title")}
+            </h2>
+            {status?.connected ? (
+              <p className="truncate text-xs text-slate-500" dir="auto">
                 {t("googleCalendar.connectedAs", {
                   email: status.googleAccountEmail ?? "Google"
                 })}
               </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {status?.connected ? (
+            <div className="flex items-center rounded-lg border border-slate-800 bg-slate-950 p-1">
+              <button
+                type="button"
+                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                onClick={() => navigateCalendar("prev")}
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="px-3 text-sm font-medium text-slate-300 transition-colors hover:text-slate-100"
+                onClick={() => navigateCalendar("today")}
+              >
+                {t("dashboard.today")}
+              </button>
+              <button
+                type="button"
+                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                onClick={() => navigateCalendar("next")}
+                aria-label="Next day"
+              >
+                <ChevronRight className="size-4" aria-hidden />
+              </button>
+            </div>
+          ) : null}
+
+          {status?.connected ? (
+            <>
+              <Button type="button" size="sm" onClick={openCreateEditor} disabled={!defaultWritableCalendar}>
+                <Plus data-icon="inline-start" />
+                {t("googleCalendar.newEvent")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => void refreshGoogleCalendar()}
+                disabled={loading || calendarLoading}
+                title={t("googleCalendar.refreshCalendars")}
+                aria-label={t("googleCalendar.refreshCalendars")}
+                className="text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+              >
+                <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => void disconnectGoogleCalendar()}
+                disabled={disconnecting}
+                title={t("googleCalendar.disconnect")}
+                aria-label={t("googleCalendar.disconnect")}
+                className="text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+              >
+                {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        {loading ? (
+          <CalendarPanelState>
+            <Loader2 className="me-2 size-4 animate-spin" aria-hidden />
+            {t("common.loading")}
+          </CalendarPanelState>
+        ) : error ? (
+          <CalendarPanelState tone="error">{error}</CalendarPanelState>
+        ) : !status?.configured ? (
+          <CalendarPanelState
+            title={t("googleCalendar.notConfigured")}
+            action={
+              <Button type="button" variant="outline" size="sm" onClick={() => void refreshGoogleCalendar()}>
+                <RefreshCw data-icon="inline-start" />
+                {t("common.refresh")}
+              </Button>
+            }
+          >
+            {t("googleCalendar.configureHelp")}
+          </CalendarPanelState>
+        ) : !status.connected ? (
+          <CalendarPanelState
+            title={t("googleCalendar.notConnected")}
+            action={
+              <Button type="button" onClick={() => void connectGoogleCalendar()} disabled={connecting}>
+                {connecting ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <CalendarDays data-icon="inline-start" />}
+                {t("googleCalendar.connect")}
+              </Button>
+            }
+          >
+            {t("googleCalendar.subtitle")}
+          </CalendarPanelState>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="shrink-0 border-b border-slate-800/60 p-3">
               <CalendarToggleList
                 calendars={calendars}
                 selectedCalendarSet={selectedCalendarSet}
                 saving={savingPreferences}
                 onToggle={toggleCalendar}
               />
+              {!selectedCalendarIds.length ? (
+                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-400">
+                  {t("googleCalendar.noSelectedCalendars")}
+                </div>
+              ) : null}
             </div>
-            <Button type="button" size="sm" onClick={openCreateEditor} disabled={!defaultWritableCalendar}>
-              <Plus data-icon="inline-start" />
-              {t("googleCalendar.newEvent")}
-            </Button>
-          </div>
 
-          {!selectedCalendarIds.length ? (
-            <Alert>
-              <AlertDescription>{t("googleCalendar.noSelectedCalendars")}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-background">
-            <FullCalendar
-              ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-              initialView="timeGridWeek"
-              headerToolbar={{
-                left: "prev,next today",
-                center: "title",
-                right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek"
-              }}
-              buttonText={{
-                today: t("dashboard.today"),
-                month: "Month",
-                week: "Week",
-                day: "Day",
-                list: t("common.list")
-              }}
-              direction={direction}
-              firstDay={1}
-              nowIndicator
-              selectable={Boolean(defaultWritableCalendar)}
-              selectMirror
-              editable={Boolean(defaultWritableCalendar)}
-              eventStartEditable
-              eventDurationEditable
-              dayMaxEventRows={3}
-              height="auto"
-              contentHeight="auto"
-              slotMinTime="06:00:00"
-              slotMaxTime="22:00:00"
-              events={loadCalendarEvents}
-              select={handleDateSelect}
-              eventClick={handleEventClick}
-              eventDrop={(info) => void handleEventDrop(info)}
-              eventResize={(info) => void handleEventResize(info)}
-            />
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-900/50 p-4">
+              <div className="min-h-[760px] overflow-hidden rounded-lg border border-slate-800/60 bg-slate-950/20">
+                <FullCalendar
+                  ref={calendarRef}
+                  plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                  initialView="timeGridDay"
+                  headerToolbar={false}
+                  direction={direction}
+                  firstDay={1}
+                  nowIndicator
+                  selectable={Boolean(defaultWritableCalendar)}
+                  selectMirror
+                  editable={Boolean(defaultWritableCalendar)}
+                  eventStartEditable
+                  eventDurationEditable
+                  dayHeaders={false}
+                  allDaySlot={false}
+                  height="100%"
+                  contentHeight="auto"
+                  slotMinTime="08:00:00"
+                  slotMaxTime="23:00:00"
+                  slotDuration="00:30:00"
+                  slotLabelFormat={{
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false
+                  }}
+                  events={loadCalendarEvents}
+                  datesSet={handleDatesSet}
+                  select={handleDateSelect}
+                  eventClick={handleEventClick}
+                  eventDrop={(info) => void handleEventDrop(info)}
+                  eventResize={(info) => void handleEventResize(info)}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <GoogleCalendarEventEditor
         editor={editor}
@@ -571,7 +639,35 @@ export function GoogleCalendarPanel() {
           if (!open && !deleting) setDeleteTarget(null);
         }}
       />
-    </Panel>
+    </section>
+  );
+}
+
+function CalendarPanelState({
+  title,
+  children,
+  action,
+  tone = "default"
+}: {
+  title?: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+  tone?: "default" | "error";
+}) {
+  return (
+    <div className="flex min-h-72 flex-1 items-center justify-center p-6 text-center">
+      <div className="flex max-w-sm flex-col items-center gap-3">
+        {title ? (
+          <p className={cn("text-sm font-medium", tone === "error" ? "text-red-300" : "text-slate-100")} dir="auto">
+            {title}
+          </p>
+        ) : null}
+        <div className={cn("flex items-center text-sm leading-relaxed", tone === "error" ? "text-red-300" : "text-slate-400")} dir="auto">
+          {children}
+        </div>
+        {action ? <div className="pt-1">{action}</div> : null}
+      </div>
+    </div>
   );
 }
 
@@ -589,7 +685,7 @@ function CalendarToggleList({
   const { t } = useI18n();
 
   if (!calendars.length) {
-    return <p className="text-sm text-muted-foreground">{t("googleCalendar.noCalendars")}</p>;
+    return <p className="text-sm text-slate-500">{t("googleCalendar.noCalendars")}</p>;
   }
 
   return (
@@ -600,8 +696,8 @@ function CalendarToggleList({
           <label
             key={calendar.id}
             className={cn(
-              "flex max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-2.5 py-2 text-xs transition-colors",
-              checked && "border-primary/35 bg-primary/10"
+              "flex max-w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-2 text-xs text-slate-400 transition-colors hover:border-slate-700 hover:text-slate-200",
+              checked && "border-indigo-500/35 bg-indigo-500/10 text-slate-200"
             )}
           >
             <Checkbox
@@ -612,12 +708,12 @@ function CalendarToggleList({
             />
             <span
               className="size-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: calendar.backgroundColor || "var(--primary)" }}
+              style={{ backgroundColor: calendar.backgroundColor || "#818cf8" }}
               aria-hidden
             />
             <span className="min-w-0 truncate" dir="auto">{calendar.summary}</span>
             {!calendar.writable ? (
-              <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span className="shrink-0 rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500">
                 {t("googleCalendar.readOnly")}
               </span>
             ) : null}
