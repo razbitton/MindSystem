@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { loadEnv } from "@personal-context-os/config";
 import { createDb, ensureDefaultWorkspace } from "@personal-context-os/db";
+import { registerMcpRoutes } from "@personal-context-os/mcp-server";
 import Fastify from "fastify";
 import { registerRoutes } from "./routes.js";
 import { ensureBootstrapPassword } from "./services/auth.js";
@@ -44,6 +45,7 @@ export async function createApp() {
   });
 
   await registerRoutes(app);
+  await registerMcpRoutes(app, { db: database.db, apiBaseUrl: env.API_BASE_URL });
   return app;
 }
 

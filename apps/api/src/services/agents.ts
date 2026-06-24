@@ -67,7 +67,7 @@ export async function listAgentState(context: AppContext) {
       .limit(25)
   ]);
 
-  return { tokens, runs, auditEvents: audits };
+  return { tokens, runs, auditEvents: audits, mcpServerUrl: context.env.MCP_SERVER_URL };
 }
 
 export async function revokeAgentToken(context: AppContext, id: string, actor: Actor) {

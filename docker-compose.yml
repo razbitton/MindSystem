@@ -47,7 +47,7 @@ services:
       JWT_SECRET: change-me-in-production
       APP_BASE_URL: http://localhost:3000
       API_BASE_URL: http://localhost:4000
-      MCP_SERVER_URL: http://localhost:4100
+      MCP_SERVER_URL: http://localhost:4100/mcp
       BOOTSTRAP_USER_EMAIL: admin@me.com
       BOOTSTRAP_USER_NAME: Local User
       BOOTSTRAP_USER_PASSWORD: admin123
@@ -75,7 +75,7 @@ services:
       JWT_SECRET: change-me-in-production
       APP_BASE_URL: http://localhost:3000
       API_BASE_URL: http://api:4000
-      MCP_SERVER_URL: http://localhost:4100
+      MCP_SERVER_URL: http://localhost:4100/mcp
     depends_on:
       api:
         condition: service_started
@@ -95,7 +95,7 @@ services:
       JWT_SECRET: change-me-in-production
       APP_BASE_URL: http://localhost:3000
       API_BASE_URL: http://api:4000
-      MCP_SERVER_URL: http://localhost:4100
+      MCP_SERVER_URL: http://localhost:4100/mcp
     ports:
       - "4100:4100"
     depends_on:

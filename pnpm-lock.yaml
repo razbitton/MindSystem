@@ -38,6 +38,9 @@ importers:
       '@personal-context-os/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@personal-context-os/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
       '@personal-context-os/shared':
         specifier: workspace:*
         version: link:../../packages/shared

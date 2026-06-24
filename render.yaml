@@ -51,7 +51,7 @@ services:
       - key: API_BASE_URL
         value: https://mindsystem-api.onrender.com
       - key: MCP_SERVER_URL
-        value: https://mindsystem-mcp.onrender.com
+        value: https://mindsystem-api.onrender.com/mcp
       - key: BOOTSTRAP_USER_EMAIL
         sync: false
       - key: BOOTSTRAP_USER_NAME
@@ -104,40 +104,7 @@ services:
       - key: API_BASE_URL
         value: https://mindsystem-api.onrender.com
       - key: MCP_SERVER_URL
-        value: https://mindsystem-mcp.onrender.com
-      - fromGroup: mindsystem-runtime
-
-  - type: web
-    name: mindsystem-mcp
-    runtime: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
-    dockerCommand: pnpm render:start:mcp
-    healthCheckPath: /health
-    autoDeployTrigger: commit
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mindsystem-postgres
-          property: connectionString
-      - key: REDIS_HOST
-        fromService:
-          type: keyvalue
-          name: mindsystem-redis
-          property: host
-      - key: REDIS_PORT
-        fromService:
-          type: keyvalue
-          name: mindsystem-redis
-          property: port
-      - key: APP_BASE_URL
-        value: https://razbitton.com
-      - key: API_BASE_URL
-        value: https://mindsystem-api.onrender.com
-      - key: MCP_SERVER_URL
-        value: https://mindsystem-mcp.onrender.com
+        value: https://mindsystem-api.onrender.com/mcp
       - fromGroup: mindsystem-runtime
 
 databases:

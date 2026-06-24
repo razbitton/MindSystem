@@ -37,9 +37,9 @@ pnpm --filter @personal-context-os/web dev
 ```text
 apps/
   web/          Next.js operational UI
-  api/          Fastify REST API and ingest pipeline
+  api/          Fastify REST API, ingest pipeline, and hosted MCP endpoint
   worker/       BullMQ background jobs
-  mcp-server/   MCP-compatible JSON-RPC server
+  mcp-server/   MCP-compatible JSON-RPC route module and standalone dev server
 
 packages/
   shared/       Zod schemas, scopes, OpenAPI builder
@@ -48,7 +48,7 @@ packages/
   config/       environment validation
 ```
 
-The API is the canonical application boundary. The MCP server authenticates agent tokens, checks scopes, records MCP audit events, and calls REST endpoints for core operations.
+The API is the canonical application boundary. Hosted deployments mount the MCP JSON-RPC endpoint at `/mcp` on the API service. The MCP route authenticates agent tokens, checks scopes, records MCP audit events, and calls REST endpoints for core operations. The standalone `mcp-server` app remains available for local development and backward-compatible deployments.
 
 ## English and Hebrew UI
 
@@ -187,8 +187,7 @@ Example Codex/OpenClaw MCP config:
 This repository includes `render.yaml` for Render Blueprints. It defines:
 
 - `mindsystem-web`: public Next.js web service
-- `mindsystem-api`: public Fastify API service
-- `mindsystem-mcp`: public MCP service for external agents
+- `mindsystem-api`: public Fastify API service and MCP endpoint at `/mcp`
 - `mindsystem-worker`: background worker
 - `mindsystem-postgres`: Render Postgres
 - `mindsystem-redis`: Render Key Value
@@ -208,26 +207,27 @@ To deploy:
 5. Deploy the Blueprint.
 6. Open `https://razbitton.com/login` and sign in with the bootstrap credentials.
 
-The worker uses Render's `starter` plan because Render does not support the `free` instance type for background workers. The web/API/MCP services and datastores are configured with free plans where Render supports them.
+The worker uses Render's `starter` plan because Render does not support the `free` instance type for background workers. The web/API services and datastores are configured with free plans where Render supports them.
 
 The production web domain is `https://razbitton.com`. The Blueprint disables the web service's default `onrender.com` subdomain after the custom domain is attached and verified.
 
 When using a custom domain, keep these Render environment variables aligned:
 
 - On `mindsystem-api`: set `APP_BASE_URL` to `https://razbitton.com`.
-- On `mindsystem-worker` and `mindsystem-mcp`: set `APP_BASE_URL` to the same value for consistency.
+- On `mindsystem-worker`: set `APP_BASE_URL` to the same value for consistency.
 - On `mindsystem-web`: keep `API_BASE_URL` pointed at `https://mindsystem-api.onrender.com` unless you also add a custom API domain.
+- Set `MCP_SERVER_URL` to `https://mindsystem-api.onrender.com/mcp` for hosted agents.
 
 The web app proxies browser calls from `/api/*` to `API_BASE_URL`, so login cookies remain same-origin on the web domain. Do not set `NEXT_PUBLIC_API_BASE_URL` on Render unless you intentionally want browsers to call the API service directly.
 
-For Render or another hosted environment, run Postgres, Redis, the API, worker, MCP server, and web app as separate services or containers. Set these values per environment:
+For Render or another hosted environment, run Postgres, Redis, the API, worker, and web app as separate services or containers. The API hosts `/mcp`; run the standalone MCP server only if you intentionally want a separate MCP process. Set these values per environment:
 
 - `DATABASE_URL`, `REDIS_URL`, S3/MinIO-compatible storage variables
 - `JWT_SECRET` with a long random value
 - `BOOTSTRAP_USER_EMAIL` and `BOOTSTRAP_USER_PASSWORD` for the first login
 - `APP_BASE_URL` to your web domain, for example `https://app.example.com`
 - `API_BASE_URL` to the API service URL
-- `MCP_SERVER_URL` to the public MCP URL if agents connect over the internet
+- `MCP_SERVER_URL` to the public MCP URL if agents connect over the internet, for example `https://mindsystem-api.onrender.com/mcp`
 - `SESSION_COOKIE_DOMAIN` only when sharing the session across subdomains, for example `.example.com`
 
 Use HTTPS for hosted login cookies. Agents should receive scoped MCP/REST tokens, never database credentials.

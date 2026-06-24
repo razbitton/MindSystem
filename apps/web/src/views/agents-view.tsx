@@ -88,7 +88,7 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
         {
           mcpServers: {
             "personal-context-os": {
-              url: "http://localhost:4100/mcp",
+              url: String(data.mcpServerUrl ?? "http://localhost:4100/mcp"),
               headers: {
                 Authorization: `Bearer ${createdToken || "<create_an_agent_token_first>"}`
               }
@@ -98,7 +98,7 @@ export default function AgentsView({ embedded = false }: { embedded?: boolean })
         null,
         2
       ),
-    [createdToken]
+    [createdToken, data.mcpServerUrl]
   );
 
   return (
