@@ -1,5 +1,12 @@
 import { entities, entityEdges, projects, tasks } from "@personal-context-os/db";
-import { createTaskSchema, patchTaskSchema, prioritySchema, setDailyObjectiveSchema, taskStatusSchema } from "@personal-context-os/shared";
+import {
+  createTaskSchema,
+  patchTaskSchema,
+  prioritySchema,
+  setDailyObjectiveSchema,
+  taskKindSchema,
+  taskStatusSchema
+} from "@personal-context-os/shared";
 import { and, desc, eq, lte, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { createGenericEntity } from "./entities.js";
@@ -12,13 +19,16 @@ const taskListQuerySchema = z.object({
   priority: prioritySchema.optional(),
   due_before: z.string().datetime().optional()
 });
+type TaskKind = z.infer<typeof taskKindSchema>;
+type ParsedCreateTask = z.infer<typeof createTaskSchema>;
+type ParsedPatchTask = z.infer<typeof patchTaskSchema>;
 
 export function parseTaskFilters(query: unknown) {
   return taskListQuerySchema.parse(query ?? {});
 }
 
 export async function createTask(context: AppContext, input: z.input<typeof createTaskSchema>, actor: Actor) {
-  const parsed = createTaskSchema.parse(input);
+  const parsed = sanitizeCreateTask(createTaskSchema.parse(input));
   const entity = await createGenericEntity(context, {
     entityType: "task",
     title: parsed.title,
@@ -37,6 +47,7 @@ export async function createTask(context: AppContext, input: z.input<typeof crea
       projectId: parsed.projectId ?? null,
       title: parsed.title,
       description: parsed.description ?? null,
+      kind: parsed.kind,
       status: parsed.status,
       priority: parsed.priority,
       dueAt: parsed.dueAt ? new Date(parsed.dueAt) : null,
@@ -93,11 +104,15 @@ export async function getTask(context: AppContext, id: string) {
   return { task };
 }
 
-export async function patchTask(context: AppContext, id: string, input: z.infer<typeof patchTaskSchema>, actor: Actor) {
+export async function patchTask(context: AppContext, id: string, input: ParsedPatchTask, actor: Actor) {
+  const { task: existingTask } = await getTask(context, id);
   const updates: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
+  const nextKind = taskKindValue(input.kind ?? existingTask.kind);
+
   if (input.title !== undefined) updates.title = input.title;
   if (input.description !== undefined) updates.description = input.description;
   if (input.projectId !== undefined) updates.projectId = input.projectId;
+  if (input.kind !== undefined) updates.kind = taskKindValue(input.kind);
   if (input.status !== undefined) updates.status = input.status;
   if (input.priority !== undefined) updates.priority = input.priority;
   if (input.dueAt !== undefined) updates.dueAt = input.dueAt ? new Date(input.dueAt) : null;
@@ -106,6 +121,17 @@ export async function patchTask(context: AppContext, id: string, input: z.infer<
   if (input.assignee !== undefined) updates.assignee = input.assignee ?? null;
   if (input.dependsOnTaskId !== undefined) updates.dependsOnTaskId = input.dependsOnTaskId ?? null;
   if (input.completedAt !== undefined) updates.completedAt = input.completedAt ? new Date(input.completedAt) : null;
+
+  if (nextKind === "ongoing") {
+    updates.kind = "ongoing";
+    updates.dueAt = null;
+    updates.scheduledFor = null;
+    updates.estimateMinutes = null;
+    updates.completedAt = null;
+    if (updates.status === "done" || (updates.status === undefined && existingTask.status === "done")) {
+      updates.status = "todo";
+    }
+  }
 
   const [task] = await context.db
     .update(tasks)
@@ -132,6 +158,11 @@ export async function patchTask(context: AppContext, id: string, input: z.infer<
 }
 
 export async function completeTask(context: AppContext, id: string, actor: Actor) {
+  const { task: existingTask } = await getTask(context, id);
+  if (taskKindValue(existingTask.kind) === "ongoing") {
+    throw new Error("Ongoing tasks cannot be completed.");
+  }
+
   const completedAt = new Date();
   const [task] = await context.db
     .update(tasks)
@@ -227,6 +258,7 @@ function taskCanonical(task: typeof tasks.$inferSelect) {
     title: task.title,
     description: task.description ?? undefined,
     projectId: task.projectId ?? undefined,
+    kind: taskKindValue(task.kind),
     status: task.status,
     priority: task.priority,
     dueAt: task.dueAt?.toISOString(),
@@ -236,4 +268,22 @@ function taskCanonical(task: typeof tasks.$inferSelect) {
     dependsOnTaskId: task.dependsOnTaskId ?? undefined,
     completedAt: task.completedAt?.toISOString()
   };
+}
+
+function sanitizeCreateTask(task: ParsedCreateTask): ParsedCreateTask {
+  const kind = taskKindValue(task.kind);
+  if (kind !== "ongoing") return { ...task, kind };
+
+  return {
+    ...task,
+    kind,
+    status: task.status === "done" ? "todo" : task.status,
+    dueAt: null,
+    scheduledFor: null,
+    estimateMinutes: null
+  };
+}
+
+function taskKindValue(value: unknown): TaskKind {
+  return value === "ongoing" ? "ongoing" : "one_off";
 }

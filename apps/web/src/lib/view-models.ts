@@ -2,6 +2,7 @@ import type { AnyRecord } from "./api";
 
 export type ViewMode = "cards" | "list";
 export type TaskViewMode = "board" | "list";
+export type TaskKind = "one_off" | "ongoing";
 
 export function recordText(record: AnyRecord, keys: string[]) {
   return keys
@@ -42,6 +43,15 @@ export function fromDateTimeInput(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
+}
+
+export function taskKind(record: AnyRecord | null | undefined): TaskKind {
+  const value = record?.kind ?? record?.taskKind ?? record?.task_kind;
+  return value === "ongoing" ? "ongoing" : "one_off";
+}
+
+export function isOngoingTask(record: AnyRecord | null | undefined) {
+  return taskKind(record) === "ongoing";
 }
 
 export function toLocalDateString(value: Date = new Date()) {

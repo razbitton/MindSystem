@@ -17,6 +17,7 @@ export type EntityType = z.infer<typeof entityTypeSchema>;
 
 export const projectStatusSchema = z.enum(["active", "paused", "completed", "archived"]);
 export const taskStatusSchema = z.enum(["inbox", "todo", "in_progress", "waiting", "done", "cancelled"]);
+export const taskKindSchema = z.enum(["one_off", "ongoing"]);
 export const prioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 export const dailyObjectiveStateSchema = z.enum(["pinned", "dismissed"]);
 export const dailyObjectiveActionSchema = z.enum(["pin", "dismiss", "snooze", "clear"]);
@@ -65,6 +66,7 @@ export const normalizedTaskSchema = z.object({
   title: taskTitleSchema,
   description: z.string().optional(),
   projectTitle: z.string().optional(),
+  kind: taskKindSchema.default("one_off"),
   status: taskStatusSchema.default("todo"),
   priority: prioritySchema.default("medium"),
   dueAt: z.string().datetime().optional(),
@@ -148,6 +150,7 @@ export const createTaskSchema = z.object({
   title: taskTitleSchema,
   description: z.string().optional(),
   projectId: z.string().uuid().nullable().optional(),
+  kind: taskKindSchema.default("one_off"),
   status: taskStatusSchema.default("todo"),
   priority: prioritySchema.default("medium"),
   dueAt: z.string().datetime().nullable().optional(),

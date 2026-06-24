@@ -76,16 +76,14 @@ function NavLink({
   tooltipSide: "left" | "right";
   onNavigate?: () => void;
 }) {
-  const router = useRouter();
-
   function prefetch() {
-    router.prefetch(href);
     void prefetchDataForRoute(href);
   }
 
   const link = (
     <Link
       href={href}
+      prefetch={false}
       onClick={() => onNavigate?.()}
       onFocus={prefetch}
       onMouseEnter={prefetch}

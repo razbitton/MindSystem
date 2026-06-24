@@ -273,6 +273,12 @@ export function StatusBadge({ value }: { value?: string | null }) {
   return <Badge variant={variant}>{translateValue("status", value ?? "active")}</Badge>;
 }
 
+export function TaskKindBadge({ value }: { value?: string | null }) {
+  const { t } = useI18n();
+  const kind = value === "ongoing" ? "ongoing" : "one_off";
+  return <Badge variant={kind === "ongoing" ? "info" : "outline"}>{t(kind === "ongoing" ? "tasks.kindOngoing" : "tasks.kindOneOff")}</Badge>;
+}
+
 export function EntityBadge({ value }: { value?: string | null }) {
   const { translateValue } = useI18n();
   return <Badge variant="outline">{translateValue("entity", value ?? "note")}</Badge>;

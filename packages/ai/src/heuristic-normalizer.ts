@@ -9,6 +9,7 @@ const reminderPattern = /\bremind(?:er)?\s+(?:me\s+)?(?:to\s+)?(.+?)(?:\s+(tomor
 
 type TaskStatus = NormalizerOutput["tasks"][number]["status"];
 type TaskPriority = NormalizerOutput["tasks"][number]["priority"];
+type TaskKind = NormalizerOutput["tasks"][number]["kind"];
 
 const statusTags = new Map<string, TaskStatus>([
   ["todo", "todo"],
@@ -44,6 +45,20 @@ const taskTypeTags = new Map<string, string>([
   ["אישי", "personal"],
   ["project", "project"],
   ["פרויקט", "project"]
+]);
+
+const taskKindTags = new Map<string, TaskKind>([
+  ["one off", "one_off"],
+  ["one-off", "one_off"],
+  ["single", "one_off"],
+  ["finite", "one_off"],
+  ["\u05d7\u05d3 \u05e4\u05e2\u05de\u05d9", "one_off"],
+  ["\u05d7\u05d3-\u05e4\u05e2\u05de\u05d9", "one_off"],
+  ["ongoing", "ongoing"],
+  ["continuous", "ongoing"],
+  ["recurring", "ongoing"],
+  ["\u05de\u05ea\u05de\u05e9\u05da", "ongoing"],
+  ["\u05de\u05ea\u05de\u05e9\u05db\u05ea", "ongoing"]
 ]);
 
 export class HeuristicNormalizer implements FreeTextNormalizer {
@@ -107,14 +122,16 @@ export class HeuristicNormalizer implements FreeTextNormalizer {
       if (taskMatch) {
         const metadata = extractTaskMetadata(line.replace(taskPrefixes, ""));
         const title = cleanTitle(metadata.title);
+        const dueAt = metadata.kind === "ongoing" ? undefined : inferDate(line, now);
         if (title) {
           tasks.push({
             title,
             description: line,
             projectTitle,
+            kind: metadata.kind ?? "one_off",
             status: metadata.status ?? "todo",
             priority: metadata.priority ?? inferPriority(line),
-            dueAt: inferDate(line, now),
+            ...(dueAt ? { dueAt } : {}),
             assignee: metadata.assignee,
             confidence: 0.82,
             customFields: metadata.customFields
@@ -215,6 +232,7 @@ function extractTaskMetadata(value: string): {
   title: string;
   status?: TaskStatus;
   priority?: TaskPriority;
+  kind?: TaskKind;
   assignee?: string;
   customFields: Record<string, unknown>;
 } {
@@ -222,6 +240,7 @@ function extractTaskMetadata(value: string): {
   const unknownTags: string[] = [];
   let status: TaskStatus | undefined;
   let priority: TaskPriority | undefined;
+  let kind: TaskKind | undefined;
   let assignee: string | undefined;
   let taskType: string | undefined;
 
@@ -233,9 +252,11 @@ function extractTaskMetadata(value: string): {
     const nextStatus = statusTags.get(normalized);
     const nextPriority = priorityTags.get(normalized);
     const nextType = taskTypeTags.get(normalized);
+    const nextKind = taskKindTags.get(normalized);
 
     if (nextStatus) status = nextStatus;
     else if (nextPriority) priority = nextPriority;
+    else if (nextKind) kind = nextKind;
     else if (nextType) taskType = nextType;
     else if (!assignee) assignee = tag;
     else unknownTags.push(tag);
@@ -247,6 +268,7 @@ function extractTaskMetadata(value: string): {
     title: remaining,
     ...(status ? { status } : {}),
     ...(priority ? { priority } : {}),
+    ...(kind ? { kind } : {}),
     ...(assignee ? { assignee } : {}),
     customFields: {
       ...(taskType ? { taskType } : {}),

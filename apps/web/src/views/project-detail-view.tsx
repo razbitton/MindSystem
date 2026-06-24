@@ -10,8 +10,8 @@ import {
   peekCachedQuery
 } from "../lib/query-cache";
 import { projectColorClass, projectColorStyle } from "../lib/project-colors";
-import { dateValue, sortByPriority, truncate } from "../lib/view-models";
-import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge } from "../components/page";
+import { dateValue, isOngoingTask, sortByPriority, truncate } from "../lib/view-models";
+import { EmptyState, IconButton, MetaItem, PageHeader, Panel, PriorityBadge, StatusBadge, TaskKindBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
 import { TaskEditorDrawer, type TaskEditorPayload } from "../components/task-editor-drawer";
@@ -253,7 +253,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
         projects={project ? [project] : []}
         onClose={closeTaskDetails}
         onEdit={openTaskEdit}
-        onComplete={completeTask}
+        {...(viewingTask && !isOngoingTask(viewingTask) ? { onComplete: completeTask } : {})}
         onDelete={(task) => {
           closeTaskDetails();
           requestDelete("task", task);
@@ -319,57 +319,62 @@ function TaskRows({
   if (!tasks.length) return <EmptyState>{emptyText}</EmptyState>;
   return (
     <ul className="flex min-w-0 max-w-full flex-col gap-1">
-      {sortByPriority(tasks).map((task) => (
-        <li
-          key={task.id}
-          role="button"
-          tabIndex={0}
-          aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
-          className={cn(
-            "flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between",
-            projectColorClass(projectColor, "row")
-          )}
-          style={projectColorStyle(projectColor)}
-          onClick={() => openTask(task)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              openTask(task);
-            }
-          }}
-        >
-          <div className="flex min-w-0 max-w-full flex-col gap-0.5">
-            <p className="truncate text-sm font-medium text-foreground" dir="auto">
-              {task.title}
-            </p>
-            <p className="truncate text-xs text-muted-foreground" dir="auto">
-              {truncate(task.description, 110) || t("common.noDescription")} · {formatDate(dateValue(task, "dueAt"))}
-            </p>
-          </div>
-          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
-            <PriorityBadge value={task.priority} />
-            <StatusBadge value={task.status} />
-            {task.status !== "done" ? (
-              <IconButton
-                label={t("common.complete")}
-                onClick={(event) => {
+      {sortByPriority(tasks).map((task) => {
+        const isOngoing = isOngoingTask(task);
+        return (
+          <li
+            key={task.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
+            className={cn(
+              "flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between",
+              projectColorClass(projectColor, "row")
+            )}
+            style={projectColorStyle(projectColor)}
+            onClick={() => openTask(task)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openTask(task);
+              }
+            }}
+          >
+            <div className="flex min-w-0 max-w-full flex-col gap-0.5">
+              <p className="truncate text-sm font-medium text-foreground" dir="auto">
+                {task.title}
+              </p>
+              <p className="truncate text-xs text-muted-foreground" dir="auto">
+                {truncate(task.description, 110) || t("common.noDescription")} ·{" "}
+                {isOngoing ? t("tasks.kindOngoing") : formatDate(dateValue(task, "dueAt"))}
+              </p>
+            </div>
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
+              {isOngoing ? <TaskKindBadge value="ongoing" /> : null}
+              <PriorityBadge value={task.priority} />
+              <StatusBadge value={task.status} />
+              {!isOngoing && task.status !== "done" ? (
+                <IconButton
+                  label={t("common.complete")}
+                  onClick={(event) => {
                   event.stopPropagation();
                   completeTask(task.id);
                 }}
+                >
+                  <CheckCircle className="size-4" aria-hidden />
+                </IconButton>
+              ) : null}
+              <IconButton
+                label={t("common.delete")}
+                action="delete"
+                onClick={(event) => deleteTask(task, event)}
               >
-                <CheckCircle className="size-4" aria-hidden />
+                <Trash2 className="size-4" aria-hidden />
               </IconButton>
-            ) : null}
-            <IconButton
-              label={t("common.delete")}
-              action="delete"
-              onClick={(event) => deleteTask(task, event)}
-            >
-              <Trash2 className="size-4" aria-hidden />
-            </IconButton>
-          </div>
-        </li>
-      ))}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

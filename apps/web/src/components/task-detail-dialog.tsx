@@ -1,12 +1,14 @@
 "use client";
 
+import type { ComponentProps, ReactNode } from "react";
 import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Pin, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
-import { dateValue, projectName } from "../lib/view-models";
+import { dateValue, isOngoingTask, projectName } from "../lib/view-models";
 import { useI18n } from "../i18n";
-import { Drawer, PriorityBadge, StatusBadge } from "./page";
+import { Drawer, PriorityBadge, StatusBadge, TaskKindBadge } from "./page";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type TaskDetailDialogProps = {
@@ -46,6 +48,7 @@ export function TaskDetailDialog({
   const updatedAt = dateValue(task, "updatedAt");
   const completedAt = dateValue(task, "completedAt");
   const isDone = task.status === "done";
+  const isOngoing = isOngoingTask(task);
 
   return (
     <Drawer
@@ -77,6 +80,7 @@ export function TaskDetailDialog({
                   {title}
                 </h2>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {isOngoing ? <TaskKindBadge value="ongoing" /> : null}
                   <StatusBadge value={task.status} />
                   <PriorityBadge value={task.priority} />
                 </div>
@@ -97,14 +101,20 @@ export function TaskDetailDialog({
               <div className="grid min-w-0 gap-2 rounded-xl border border-border bg-background/50 p-3 sm:grid-cols-2">
                 <TaskDetailField icon={Folder} label={t("common.project")} value={project || t("common.noProject")} />
                 {assignee ? <TaskDetailField icon={UserRound} label={t("tasks.assignee")} value={assignee} /> : null}
-                <TaskDetailField icon={CalendarClock} label={t("tasks.dueAt")} value={formatDate(dueAt)} />
-                <TaskDetailField icon={CalendarClock} label={t("tasks.scheduledFor")} value={formatDate(scheduledFor)} />
-                {estimateMinutes ? (
-                  <TaskDetailField icon={Clock3} label={t("tasks.estimateMinutes")} value={String(estimateMinutes)} />
-                ) : null}
+                {isOngoing ? (
+                  <TaskDetailField icon={Clock3} label={t("tasks.kind")} value={t("tasks.kindOngoing")} />
+                ) : (
+                  <>
+                    <TaskDetailField icon={CalendarClock} label={t("tasks.dueAt")} value={formatDate(dueAt)} />
+                    <TaskDetailField icon={CalendarClock} label={t("tasks.scheduledFor")} value={formatDate(scheduledFor)} />
+                    {estimateMinutes ? (
+                      <TaskDetailField icon={Clock3} label={t("tasks.estimateMinutes")} value={String(estimateMinutes)} />
+                    ) : null}
+                  </>
+                )}
                 <TaskDetailField icon={Clock3} label={t("common.updated")} value={formatDate(updatedAt)} />
                 {createdAt ? <TaskDetailField icon={Clock3} label={t("common.created")} value={formatDate(createdAt)} /> : null}
-                {completedAt ? <TaskDetailField icon={CheckCircle2} label={t("tasks.completed")} value={formatDate(completedAt)} /> : null}
+                {!isOngoing && completedAt ? <TaskDetailField icon={CheckCircle2} label={t("tasks.completed")} value={formatDate(completedAt)} /> : null}
               </div>
             </div>
           </div>
@@ -112,53 +122,80 @@ export function TaskDetailDialog({
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-3 sm:px-4">
             <div>
               {onDelete ? (
-                <Button
+                <TaskActionIconButton
+                  label={t("common.delete")}
                   type="button"
                   variant="delete"
-                  size="sm"
+                  size="icon-sm"
                   onClick={() => onDelete(task)}
                 >
-                  <Trash2 data-icon="inline-start" />
-                  {t("common.delete")}
-                </Button>
+                  <Trash2 className="size-[18px]" aria-hidden />
+                </TaskActionIconButton>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {onEdit ? (
-                <Button type="button" variant="edit" size="sm" onClick={() => onEdit(task)}>
-                  <Edit2 data-icon="inline-start" />
-                  {t("common.edit")}
-                </Button>
-              ) : null}
-              {onComplete ? (
-                <Button
+              {onPinToday && !isOngoing ? (
+                <TaskActionIconButton
+                  label={t("dashboard.pinToday")}
                   type="button"
-                  size="sm"
-                  variant={isDone ? "secondary" : "default"}
-                  disabled={isDone}
-                  onClick={() => void onComplete(String(task.id))}
-                >
-                  <CheckCircle2 data-icon="inline-start" />
-                  {isDone ? t("tasks.completed") : t("tasks.markDone")}
-                </Button>
-              ) : null}
-              {onPinToday ? (
-                <Button
-                  type="button"
-                  size="sm"
+                  size="icon-sm"
                   variant="secondary"
                   disabled={isDone || task.status === "cancelled"}
                   onClick={() => void onPinToday(task)}
                 >
-                  <Pin data-icon="inline-start" />
-                  {t("dashboard.pinToday")}
-                </Button>
+                  <Pin className="size-[18px]" aria-hidden />
+                </TaskActionIconButton>
+              ) : null}
+              {onEdit ? (
+                <TaskActionIconButton
+                  label={t("common.edit")}
+                  type="button"
+                  variant="edit"
+                  size="icon-sm"
+                  onClick={() => onEdit(task)}
+                >
+                  <Edit2 className="size-[18px]" aria-hidden />
+                </TaskActionIconButton>
+              ) : null}
+              {onComplete && !isOngoing ? (
+                <TaskActionIconButton
+                  label={isDone ? t("tasks.completed") : t("tasks.markDone")}
+                  type="button"
+                  size="icon-sm"
+                  variant={isDone ? "secondary" : "default"}
+                  disabled={isDone}
+                  onClick={() => void onComplete(String(task.id))}
+                >
+                  <CheckCircle2 className="size-[18px]" aria-hidden />
+                </TaskActionIconButton>
               ) : null}
             </div>
           </div>
         </div>
       </article>
     </Drawer>
+  );
+}
+
+function TaskActionIconButton({
+  label,
+  children,
+  ...props
+}: ComponentProps<typeof Button> & {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip delayDuration={1200}>
+      <TooltipTrigger asChild>
+        <Button aria-label={label} {...props}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={8}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

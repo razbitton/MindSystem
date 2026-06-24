@@ -26,6 +26,7 @@ export const entityType = pgEnum("entity_type", [
 ]);
 export const projectStatus = pgEnum("project_status", ["active", "paused", "completed", "archived"]);
 export const taskStatus = pgEnum("task_status", ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"]);
+export const taskKind = pgEnum("task_kind", ["one_off", "ongoing"]);
 export const priority = pgEnum("priority", ["low", "medium", "high", "urgent"]);
 export const dailyObjectiveState = pgEnum("daily_objective_state", ["pinned", "dismissed"]);
 export const relationType = pgEnum("relation_type", [
@@ -146,6 +147,7 @@ export const tasks = pgTable("tasks", {
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
+  kind: taskKind("kind").notNull().default("one_off"),
   status: taskStatus("status").notNull().default("todo"),
   priority: priority("priority").notNull().default("medium"),
   dueAt: timestamp("due_at", { withTimezone: true }),

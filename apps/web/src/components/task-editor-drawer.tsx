@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
 import { projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
-import { dateValue, fromDateTimeInput, toDateTimeInput } from "../lib/view-models";
+import { dateValue, fromDateTimeInput, taskKind as taskKindValue, toDateTimeInput, type TaskKind } from "../lib/view-models";
 import { useI18n } from "../i18n";
-import { Drawer } from "./page";
+import { Drawer, SegmentedControl } from "./page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ type TaskForm = {
   title: string;
   description: string;
   projectId: string;
+  kind: TaskKind;
   status: string;
   priority: string;
   dueAt: string;
@@ -40,6 +41,7 @@ export type TaskEditorPayload = {
   title: string;
   description?: string;
   projectId: string | null;
+  kind: TaskKind;
   status: string;
   priority: string;
   dueAt: string | null;
@@ -74,6 +76,7 @@ export function TaskEditorDrawer({
   const { t, formatDate, translateValue } = useI18n();
   const [form, setForm] = useState<TaskForm>(blankForm());
   const [saving, setSaving] = useState(false);
+  const statusOptions = form.kind === "ongoing" ? statuses.filter((status) => status !== "done") : statuses;
 
   useEffect(() => {
     if (!open) return;
@@ -147,6 +150,18 @@ export function TaskEditorDrawer({
             onChange={(event) => setForm({ ...form, description: event.target.value })}
           />
         </div>
+        <div className="flex flex-col gap-2">
+          <Label>{t("tasks.kind")}</Label>
+          <SegmentedControl
+            label={t("tasks.kind")}
+            value={form.kind}
+            options={[
+              { value: "one_off", label: t("tasks.kindOneOff") },
+              { value: "ongoing", label: t("tasks.kindOngoing") }
+            ]}
+            onChange={(kind) => setForm(normalizeFormForKind({ ...form, kind }))}
+          />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="task-project">{t("common.project")}</Label>
@@ -185,7 +200,7 @@ export function TaskEditorDrawer({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {statuses.map((status) => (
+                {statusOptions.map((status) => (
                   <SelectItem key={status} value={status}>
                     {translateValue("status", status)}
                   </SelectItem>
@@ -220,64 +235,70 @@ export function TaskEditorDrawer({
             />
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="task-due">{t("tasks.dueAt")}</Label>
-            <Input
-              id="task-due"
-              type="datetime-local"
-              value={form.dueAt}
-              onChange={(event) => setForm({ ...form, dueAt: event.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="task-scheduled">{t("tasks.scheduledFor")}</Label>
-            <Input
-              id="task-scheduled"
-              type="datetime-local"
-              value={form.scheduledFor}
-              onChange={(event) => setForm({ ...form, scheduledFor: event.target.value })}
-            />
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="task-estimate">{t("tasks.estimateMinutes")}</Label>
-          <Input
-            id="task-estimate"
-            type="number"
-            min="1"
-            value={form.estimateMinutes}
-            onChange={(event) => setForm({ ...form, estimateMinutes: event.target.value })}
-          />
-        </div>
+        {form.kind === "one_off" ? (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="task-due">{t("tasks.dueAt")}</Label>
+                <Input
+                  id="task-due"
+                  type="datetime-local"
+                  value={form.dueAt}
+                  onChange={(event) => setForm({ ...form, dueAt: event.target.value })}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="task-scheduled">{t("tasks.scheduledFor")}</Label>
+                <Input
+                  id="task-scheduled"
+                  type="datetime-local"
+                  value={form.scheduledFor}
+                  onChange={(event) => setForm({ ...form, scheduledFor: event.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="task-estimate">{t("tasks.estimateMinutes")}</Label>
+              <Input
+                id="task-estimate"
+                type="number"
+                min="1"
+                value={form.estimateMinutes}
+                onChange={(event) => setForm({ ...form, estimateMinutes: event.target.value })}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
     </Drawer>
   );
 }
 
 function formFromTask(task: AnyRecord): TaskForm {
-  return {
+  return normalizeFormForKind({
     title: String(task.title ?? ""),
     description: String(task.description ?? ""),
     projectId: String(task.projectId ?? task.project_id ?? ""),
+    kind: taskKindValue(task),
     status: String(task.status ?? "todo"),
     priority: String(task.priority ?? "medium"),
     dueAt: toDateTimeInput(dateValue(task, "dueAt")),
     scheduledFor: toDateTimeInput(dateValue(task, "scheduledFor")),
     estimateMinutes: task.estimateMinutes ?? task.estimate_minutes ? String(task.estimateMinutes ?? task.estimate_minutes) : "",
     assignee: String(task.assignee ?? "")
-  };
+  });
 }
 
 function payloadFromForm(form: TaskForm): TaskEditorPayload {
   const payload: TaskEditorPayload = {
     title: form.title,
     projectId: form.projectId || null,
-    status: form.status,
+    kind: form.kind,
+    status: form.kind === "ongoing" && form.status === "done" ? "todo" : form.status,
     priority: form.priority,
-    dueAt: fromDateTimeInput(form.dueAt),
-    scheduledFor: fromDateTimeInput(form.scheduledFor),
-    estimateMinutes: form.estimateMinutes.trim() ? Number(form.estimateMinutes) : null,
+    dueAt: form.kind === "ongoing" ? null : fromDateTimeInput(form.dueAt),
+    scheduledFor: form.kind === "ongoing" ? null : fromDateTimeInput(form.scheduledFor),
+    estimateMinutes: form.kind === "ongoing" ? null : form.estimateMinutes.trim() ? Number(form.estimateMinutes) : null,
     assignee: form.assignee.trim() || null
   };
 
@@ -290,11 +311,23 @@ function blankForm(): TaskForm {
     title: "",
     description: "",
     projectId: "",
+    kind: "one_off",
     status: "todo",
     priority: "medium",
     dueAt: "",
     scheduledFor: "",
     estimateMinutes: "",
     assignee: ""
+  };
+}
+
+function normalizeFormForKind(form: TaskForm): TaskForm {
+  if (form.kind !== "ongoing") return form;
+  return {
+    ...form,
+    status: form.status === "done" ? "todo" : form.status,
+    dueAt: "",
+    scheduledFor: "",
+    estimateMinutes: ""
   };
 }

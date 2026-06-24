@@ -11,6 +11,7 @@ import {
 } from "../lib/query-cache";
 import {
   dateValue,
+  isOngoingTask,
   matchesQuery,
   projectName,
   sortByPriority,
@@ -18,7 +19,7 @@ import {
   truncate
 } from "../lib/view-models";
 import { findProjectForRecord, projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
-import { EmptyState } from "../components/page";
+import { EmptyState, TaskKindBadge } from "../components/page";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { TaskDetailDialog } from "../components/task-detail-dialog";
 import { TaskEditorDrawer, type TaskEditorPayload } from "../components/task-editor-drawer";
@@ -343,8 +344,7 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
         projects={projects}
         onClose={closeTaskDetails}
         onEdit={openEdit}
-        onComplete={complete}
-        onPinToday={pinToday}
+        {...(viewingTask && !isOngoingTask(viewingTask) ? { onComplete: complete, onPinToday: pinToday } : {})}
         onDelete={(task) => {
           closeTaskDetails();
           requestDelete(task);
@@ -504,14 +504,16 @@ function TaskDesktopList({
 
       {tasks.map((task) => {
         const isDone = task.status === "done";
+        const isOngoing = isOngoingTask(task);
         const description = truncate(task.description, 120);
         const linkedProject = findProjectForRecord(projects, task);
         const project = linkedProject?.name ?? projectName(projects, String(task.projectId ?? task.project_id ?? ""));
-        const displayDate =
-          dateValue(task, "dueAt") ??
-          dateValue(task, "scheduledFor") ??
-          dateValue(task, "completedAt") ??
-          dateValue(task, "updatedAt");
+        const displayDate = isOngoing
+          ? null
+          : dateValue(task, "dueAt") ??
+            dateValue(task, "scheduledFor") ??
+            dateValue(task, "completedAt") ??
+            dateValue(task, "updatedAt");
 
         return (
           <div
@@ -555,8 +557,8 @@ function TaskDesktopList({
               <TaskPriorityBadge value={task.priority} />
             </div>
 
-            <div className="truncate text-center text-sm text-foreground" dir="ltr" role="cell">
-              {formatDate(displayDate)}
+            <div className="flex justify-center text-center text-sm text-foreground" dir="ltr" role="cell">
+              {isOngoing ? <TaskKindBadge value="ongoing" /> : <span className="truncate">{formatDate(displayDate)}</span>}
             </div>
 
             <div className="flex justify-center" dir="rtl" role="cell">
@@ -575,24 +577,26 @@ function TaskDesktopList({
             </div>
 
             <div className="flex min-w-0 items-start gap-3" dir="rtl" role="cell">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (!isDone) void onComplete(task.id);
-                }}
-                aria-disabled={isDone}
-                title={isDone ? t("tasks.completed") : t("tasks.markDone")}
-                aria-label={isDone ? t("tasks.completed") : t("tasks.markDone")}
-                className={cn(
-                  "mt-0.5 shrink-0 rounded-full text-muted-foreground hover:bg-success/10 hover:text-success",
-                  isDone && "text-success hover:bg-success/10 hover:text-success"
-                )}
-              >
-                <CheckCircle2 className={cn("size-5", isDone && "fill-success/20")} aria-hidden />
-              </Button>
+              {!isOngoing ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!isDone) void onComplete(task.id);
+                  }}
+                  aria-disabled={isDone}
+                  title={isDone ? t("tasks.completed") : t("tasks.markDone")}
+                  aria-label={isDone ? t("tasks.completed") : t("tasks.markDone")}
+                  className={cn(
+                    "mt-0.5 shrink-0 rounded-full text-muted-foreground hover:bg-success/10 hover:text-success",
+                    isDone && "text-success hover:bg-success/10 hover:text-success"
+                  )}
+                >
+                  <CheckCircle2 className={cn("size-5", isDone && "fill-success/20")} aria-hidden />
+                </Button>
+              ) : null}
               <div className="min-w-0 flex-1 text-right">
                 <h3
                   className={cn(
@@ -666,15 +670,17 @@ function TaskCard({
 }) {
   const { t } = useI18n();
   const isDone = task.status === "done";
+  const isOngoing = isOngoingTask(task);
   const description = truncate(task.description, 140);
   const assignee = String(task.assignee ?? "").trim();
   const linkedProject = findProjectForRecord(projects, task);
   const project = linkedProject?.name ?? projectName(projects, String(task.projectId ?? task.project_id ?? ""));
-  const displayDate =
-    dateValue(task, "dueAt") ??
-    dateValue(task, "scheduledFor") ??
-    dateValue(task, "completedAt") ??
-    dateValue(task, "updatedAt");
+  const displayDate = isOngoing
+    ? null
+    : dateValue(task, "dueAt") ??
+      dateValue(task, "scheduledFor") ??
+      dateValue(task, "completedAt") ??
+      dateValue(task, "updatedAt");
 
   return (
     <article
@@ -699,6 +705,7 @@ function TaskCard({
           {task.title}
         </h3>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {isOngoing ? <TaskKindBadge value="ongoing" /> : null}
           <TaskStatusBadge value={task.status} />
           <TaskPriorityBadge value={task.priority} />
         </div>
@@ -708,10 +715,14 @@ function TaskCard({
         {assignee ? <TaskMetaRow label={t("tasks.assignee")} value={assignee} /> : null}
         <TaskMetaRow label={t("common.project")} value={project || t("common.noProject")} />
         {description ? <TaskMetaRow label={t("common.description")} value={description} /> : null}
-        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <Clock className="size-3 shrink-0" aria-hidden />
-          <span className="truncate">{formatDate(displayDate)}</span>
-        </div>
+        {isOngoing ? (
+          <TaskMetaRow label={t("tasks.kind")} value={t("tasks.kindOngoing")} />
+        ) : (
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="size-3 shrink-0" aria-hidden />
+            <span className="truncate">{formatDate(displayDate)}</span>
+          </div>
+        )}
       </div>
 
       <div className="mt-1 flex items-center justify-between border-t border-border pt-2">
@@ -728,25 +739,29 @@ function TaskCard({
           </Button>
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            if (!isDone) void onComplete(task.id);
-          }}
-          aria-disabled={isDone}
-          className={cn(
-            "rounded-lg px-3 text-sm font-semibold",
-            isDone
-              ? "bg-success/10 text-success hover:bg-success/15 hover:text-success"
-              : "border border-border bg-secondary/60 text-secondary-foreground hover:bg-secondary"
-          )}
-        >
-          <CheckCircle2 className={cn("size-4", isDone && "fill-success/20")} aria-hidden />
-          {isDone ? t("tasks.completed") : t("tasks.markDone")}
-        </Button>
+        {isOngoing ? (
+          <TaskKindBadge value="ongoing" />
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!isDone) void onComplete(task.id);
+            }}
+            aria-disabled={isDone}
+            className={cn(
+              "rounded-lg px-3 text-sm font-semibold",
+              isDone
+                ? "bg-success/10 text-success hover:bg-success/15 hover:text-success"
+                : "border border-border bg-secondary/60 text-secondary-foreground hover:bg-secondary"
+            )}
+          >
+            <CheckCircle2 className={cn("size-4", isDone && "fill-success/20")} aria-hidden />
+            {isDone ? t("tasks.completed") : t("tasks.markDone")}
+          </Button>
+        )}
       </div>
     </article>
   );

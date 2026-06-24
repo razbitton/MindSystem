@@ -35,7 +35,6 @@ export function CommandPalette() {
 
   function go(href: string) {
     setOpen(false);
-    router.prefetch(href);
     void prefetchDataForRoute(href);
     router.push(href);
   }
@@ -79,11 +78,9 @@ export function CommandPalette() {
               key={item.href}
               value={`${t(item.labelKey as never)} ${item.href}`}
               onFocus={() => {
-                router.prefetch(item.href);
                 void prefetchDataForRoute(item.href);
               }}
               onMouseEnter={() => {
-                router.prefetch(item.href);
                 void prefetchDataForRoute(item.href);
               }}
               onSelect={() => go(item.href)}

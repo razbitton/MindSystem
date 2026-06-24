@@ -26,14 +26,15 @@ import {
   setCachedQuery
 } from "../lib/query-cache";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
-import { addLocalDays, dateValue, localDayQuery, sortByPriority, toLocalDateString, truncate } from "../lib/view-models";
+import { addLocalDays, dateValue, isOngoingTask, localDayQuery, sortByPriority, toLocalDateString, truncate } from "../lib/view-models";
 import {
   EmptyState,
   EntityBadge,
   PageHeader,
   Panel,
   PriorityBadge,
-  StatusBadge
+  StatusBadge,
+  TaskKindBadge
 } from "../components/page";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -469,6 +470,7 @@ function DailyObjectiveRow({
   const scheduledFor = dateValue(task, "scheduledFor");
   const estimateMinutes = task.estimateMinutes ?? task.estimate_minutes;
   const isPinned = task.isPinned || task.objectiveState === "pinned" || task.objective_state === "pinned";
+  const isOngoing = isOngoingTask(task);
 
   return (
     <li
@@ -479,28 +481,26 @@ function DailyObjectiveRow({
       style={projectColorStyle(task.projectColor ?? task.project_color)}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 items-center">
           <Link href="/tasks" className="min-w-0 flex-1 text-sm font-medium text-foreground hover:underline" dir="auto">
             <span className="line-clamp-2 [overflow-wrap:anywhere]">{task.title}</span>
           </Link>
-          <PriorityBadge value={task.priority} />
-          <StatusBadge value={task.status} />
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {scheduledFor ? (
+          {!isOngoing && scheduledFor ? (
             <span className="inline-flex min-w-0 items-center gap-1">
               <CalendarClock className="size-3 shrink-0" aria-hidden />
               <span className="truncate">{formatDate(scheduledFor)}</span>
             </span>
           ) : null}
-          {dueAt ? (
+          {!isOngoing && dueAt ? (
             <span className="inline-flex min-w-0 items-center gap-1">
               <AlertTriangle className="size-3 shrink-0" aria-hidden />
               <span className="truncate">{formatDate(dueAt)}</span>
             </span>
           ) : null}
-          {estimateMinutes ? (
+          {!isOngoing && estimateMinutes ? (
             <span className="inline-flex items-center gap-1">
               <Clock3 className="size-3 shrink-0" aria-hidden />
               {t("dashboard.minutes", { count: Number(estimateMinutes) })}
@@ -522,49 +522,59 @@ function DailyObjectiveRow({
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          type="button"
-          onClick={() => void onComplete(String(task.id))}
-          title={t("tasks.markDone")}
-          aria-label={t("tasks.markDone")}
-        >
-          <CheckCircle2 className="size-[18px]" aria-hidden />
-        </Button>
-        {isPinned ? (
+      <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+          {isOngoing ? <TaskKindBadge value="ongoing" /> : null}
+          <PriorityBadge value={task.priority} />
+          <StatusBadge value={task.status} />
+        </div>
+
+        <div className="flex items-center justify-end gap-1">
           <Button
-            variant="secondary"
+            variant="ghost"
             size="icon-sm"
             type="button"
-            onClick={() => void onObjectiveAction(task, "clear")}
-            title={t("dashboard.unpinObjective")}
-            aria-label={t("dashboard.unpinObjective")}
+            onClick={() => void onObjectiveAction(task, "dismiss")}
+            title={t("dashboard.dismissToday")}
+            aria-label={t("dashboard.dismissToday")}
           >
-            <PinOff className="size-[18px]" aria-hidden />
+            <XCircle className="size-[18px]" aria-hidden />
           </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          type="button"
-          onClick={() => void onObjectiveAction(task, "snooze")}
-          title={t("dashboard.snoozeTomorrow")}
-          aria-label={t("dashboard.snoozeTomorrow")}
-        >
-          <TimerReset className="size-[18px]" aria-hidden />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          type="button"
-          onClick={() => void onObjectiveAction(task, "dismiss")}
-          title={t("dashboard.dismissToday")}
-          aria-label={t("dashboard.dismissToday")}
-        >
-          <XCircle className="size-[18px]" aria-hidden />
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            type="button"
+            onClick={() => void onObjectiveAction(task, "snooze")}
+            title={t("dashboard.snoozeTomorrow")}
+            aria-label={t("dashboard.snoozeTomorrow")}
+          >
+            <TimerReset className="size-[18px]" aria-hidden />
+          </Button>
+          {isPinned ? (
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              type="button"
+              onClick={() => void onObjectiveAction(task, "clear")}
+              title={t("dashboard.unpinObjective")}
+              aria-label={t("dashboard.unpinObjective")}
+            >
+              <PinOff className="size-[18px]" aria-hidden />
+            </Button>
+          ) : null}
+          {!isOngoing ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              onClick={() => void onComplete(String(task.id))}
+              title={t("tasks.markDone")}
+              aria-label={t("tasks.markDone")}
+            >
+              <CheckCircle2 className="size-[18px]" aria-hidden />
+            </Button>
+          ) : null}
+        </div>
       </div>
     </li>
   );

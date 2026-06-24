@@ -104,14 +104,24 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       reviewItems.push(await createReviewItem(context, rawItem.id, "low_confidence_task", "create_task", task));
       continue;
     }
+    const taskKind = task.kind === "ongoing" ? "ongoing" : "one_off";
+    const taskStatus = taskKind === "ongoing" && task.status === "done" ? "todo" : task.status;
+    const canonicalTask = {
+      ...task,
+      kind: taskKind,
+      status: taskStatus,
+      dueAt: taskKind === "ongoing" ? undefined : task.dueAt,
+      scheduledFor: taskKind === "ongoing" ? undefined : task.scheduledFor,
+      estimateMinutes: taskKind === "ongoing" ? undefined : task.estimateMinutes
+    };
     const projectId = await resolveProjectId(context, input.projectId, task.projectTitle, projectTitleToId);
     const entity = await createGenericEntity(context, {
       entityType: "task",
       title: task.title,
       summary: task.description ?? null,
       body: task.description ?? null,
-      status: task.status,
-      canonical: task,
+      status: taskStatus,
+      canonical: canonicalTask,
       customFields: task.customFields,
       sourceRawItemId: rawItem.id,
       confidenceScore: task.confidence
@@ -124,11 +134,12 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
         projectId,
         title: task.title,
         description: task.description ?? null,
-        status: task.status,
+        kind: taskKind,
+        status: taskStatus,
         priority: task.priority,
-        dueAt: task.dueAt ? new Date(task.dueAt) : null,
-        scheduledFor: task.scheduledFor ? new Date(task.scheduledFor) : null,
-        estimateMinutes: task.estimateMinutes ?? null,
+        dueAt: taskKind === "ongoing" || !task.dueAt ? null : new Date(task.dueAt),
+        scheduledFor: taskKind === "ongoing" || !task.scheduledFor ? null : new Date(task.scheduledFor),
+        estimateMinutes: taskKind === "ongoing" ? null : task.estimateMinutes ?? null,
         assignee: task.assignee ?? null
       })
       .returning();

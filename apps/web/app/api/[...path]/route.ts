@@ -53,7 +53,8 @@ async function proxyApiRequest(request: NextRequest, context: RouteContext) {
   const init: RequestInit = {
     method: request.method,
     headers,
-    redirect: "manual"
+    redirect: "manual",
+    cache: "no-store"
   };
 
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -62,6 +63,7 @@ async function proxyApiRequest(request: NextRequest, context: RouteContext) {
 
   const upstream = await fetch(target, init);
   const responseHeaders = copyResponseHeaders(upstream.headers);
+  responseHeaders.set("cache-control", "no-store");
 
   return new Response(upstream.body, {
     status: upstream.status,
