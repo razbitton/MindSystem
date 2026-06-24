@@ -69,10 +69,15 @@ export async function getDashboard(context: AppContext, query: unknown = {}) {
               daily_objective_overrides.state as objective_state
        from tasks
        left join projects on projects.id = tasks.project_id and projects.workspace_id = tasks.workspace_id
-       left join daily_objective_overrides
-         on daily_objective_overrides.workspace_id = tasks.workspace_id
-        and daily_objective_overrides.task_id = tasks.id
-        and daily_objective_overrides.local_date = $4::date
+       left join lateral (
+         select state
+         from daily_objective_overrides
+         where daily_objective_overrides.workspace_id = tasks.workspace_id
+           and daily_objective_overrides.task_id = tasks.id
+           and daily_objective_overrides.local_date <= $4::date
+         order by daily_objective_overrides.local_date desc, daily_objective_overrides.updated_at desc
+         limit 1
+       ) daily_objective_overrides on true
        where tasks.workspace_id = $1
          and tasks.status not in ('done', 'cancelled')
          and coalesce(daily_objective_overrides.state::text, '') <> 'dismissed'

@@ -171,6 +171,62 @@ export const dashboardTodayQuerySchema = z.object({
   end: z.string().datetime().optional()
 });
 
+export const googleCalendarSendUpdatesSchema = z.enum(["all", "externalOnly", "none"]);
+
+export const googleCalendarAttendeeSchema = z.object({
+  email: z.string().email()
+});
+
+const googleCalendarDateTimeSchema = z.string().datetime({ offset: true });
+export const googleCalendarEventTimeSchema = z.string().min(1);
+
+const googleCalendarCreateEventBaseSchema = z.object({
+  calendarId: z.string().min(1),
+  summary: z.string().trim().min(1),
+  description: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  start: googleCalendarEventTimeSchema,
+  end: googleCalendarEventTimeSchema,
+  allDay: z.boolean().default(false),
+  timeZone: z.string().min(1).optional(),
+  attendees: z.array(googleCalendarAttendeeSchema).default([]),
+  sendUpdates: googleCalendarSendUpdatesSchema.default("all")
+});
+
+export const googleCalendarCreateEventSchema = googleCalendarCreateEventBaseSchema.superRefine(validateGoogleCalendarEventTime);
+
+export type GoogleCalendarCreateEventInput = z.infer<typeof googleCalendarCreateEventSchema>;
+
+export const googleCalendarPatchEventSchema = googleCalendarCreateEventBaseSchema.partial().extend({
+  calendarId: z.string().min(1)
+}).superRefine((value, context) => {
+  if ((value.start !== undefined || value.end !== undefined) && (!value.start || !value.end)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "start and end must be provided together when changing event time.",
+      path: value.start ? ["end"] : ["start"]
+    });
+    return;
+  }
+  if (value.start && value.end) validateGoogleCalendarEventTime(value as z.infer<typeof googleCalendarCreateEventSchema>, context);
+});
+
+export type GoogleCalendarPatchEventInput = z.infer<typeof googleCalendarPatchEventSchema>;
+
+export const googleCalendarEventsQuerySchema = z.object({
+  timeMin: googleCalendarDateTimeSchema,
+  timeMax: googleCalendarDateTimeSchema,
+  timeZone: z.string().min(1).optional(),
+  calendarIds: z.union([z.string().min(1), z.array(z.string().min(1))]).optional()
+}).refine((value) => new Date(value.timeMin) < new Date(value.timeMax), {
+  message: "timeMin must be earlier than timeMax.",
+  path: ["timeMax"]
+});
+
+export const googleCalendarPreferencesSchema = z.object({
+  selectedCalendarIds: z.array(z.string().min(1)).default([])
+});
+
 export const setDailyObjectiveSchema = z.object({
   date: localDateSchema,
   action: dailyObjectiveActionSchema,
@@ -273,3 +329,53 @@ export const loginSchema = z.object({
   password: z.string().min(1)
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+function validateGoogleCalendarEventTime(
+  value: {
+    start?: string;
+    end?: string;
+    allDay?: boolean;
+  },
+  context: z.RefinementCtx
+) {
+  if (!value.start || !value.end) return;
+  const startIsDate = localDateSchema.safeParse(value.start).success;
+  const endIsDate = localDateSchema.safeParse(value.end).success;
+  const startIsDateTime = googleCalendarDateTimeSchema.safeParse(value.start).success;
+  const endIsDateTime = googleCalendarDateTimeSchema.safeParse(value.end).success;
+
+  if (value.allDay) {
+    if (!startIsDate || !endIsDate) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "All-day Google Calendar events require YYYY-MM-DD start and end values.",
+        path: ["start"]
+      });
+      return;
+    }
+    if (value.start >= value.end) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "All-day event end date must be after start date.",
+        path: ["end"]
+      });
+    }
+    return;
+  }
+
+  if (!startIsDateTime || !endIsDateTime) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Timed Google Calendar events require ISO date-time start and end values.",
+      path: ["start"]
+    });
+    return;
+  }
+  if (new Date(value.start) >= new Date(value.end)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Event end time must be after start time.",
+      path: ["end"]
+    });
+  }
+}

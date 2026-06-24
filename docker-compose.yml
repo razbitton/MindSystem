@@ -52,6 +52,9 @@ services:
       BOOTSTRAP_USER_NAME: Local User
       BOOTSTRAP_USER_PASSWORD: admin123
       SESSION_COOKIE_DOMAIN: ""
+      GOOGLE_OAUTH_CLIENT_ID: ""
+      GOOGLE_OAUTH_CLIENT_SECRET: ""
+      GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY: ""
     ports:
       - "4000:4000"
     depends_on:

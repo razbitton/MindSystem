@@ -63,6 +63,22 @@ export const users = pgTable("users", {
   workspaceEmailIdx: uniqueIndex("users_workspace_email_idx").on(table.workspaceId, table.email)
 }));
 
+export const googleCalendarConnections = pgTable("google_calendar_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  googleAccountEmail: text("google_account_email"),
+  accessTokenCiphertext: text("access_token_ciphertext"),
+  refreshTokenCiphertext: text("refresh_token_ciphertext").notNull(),
+  tokenType: text("token_type"),
+  scope: text("scope").array().notNull().default(sql`ARRAY[]::text[]`),
+  expiryDate: timestamp("expiry_date", { withTimezone: true }),
+  selectedCalendarIds: text("selected_calendar_ids").array().notNull().default(sql`ARRAY[]::text[]`),
+  ...timestamps
+}, (table) => ({
+  workspaceUserIdx: uniqueIndex("google_calendar_connections_workspace_user_idx").on(table.workspaceId, table.userId)
+}));
+
 export const apiClients = pgTable("api_clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

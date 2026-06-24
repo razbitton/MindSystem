@@ -32,6 +32,7 @@ import {
   StatusBadge,
   TaskKindBadge
 } from "../components/page";
+import { GoogleCalendarPanel } from "../components/google-calendar-panel";
 import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -135,6 +136,8 @@ export default function DashboardView({
           icon={Inbox}
         />
       </div>
+
+      <GoogleCalendarPanel />
 
       <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">

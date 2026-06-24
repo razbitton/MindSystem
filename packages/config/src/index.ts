@@ -21,7 +21,10 @@ const rawEnvSchema = z.object({
   BOOTSTRAP_USER_NAME: z.string().default("Local User"),
   BOOTSTRAP_USER_PASSWORD: z.string().min(8).optional().or(z.literal("")),
   SESSION_COOKIE_DOMAIN: z.string().optional().or(z.literal("")),
-  OPENAI_API_KEY: z.string().optional().or(z.literal(""))
+  OPENAI_API_KEY: z.string().optional().or(z.literal("")),
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional().or(z.literal("")),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional().or(z.literal("")),
+  GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY: z.string().optional().or(z.literal(""))
 });
 
 export const envSchema = rawEnvSchema.transform((env) => ({

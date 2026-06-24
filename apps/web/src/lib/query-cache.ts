@@ -26,7 +26,8 @@ const workspaceDataPrefixes = [
   "GET /api/admin/data-inventory",
   "GET /api/retrieval-logs",
   "GET /api/audit-events",
-  "GET /api/agents"
+  "GET /api/agents",
+  "GET /api/google-calendar"
 ];
 
 export function apiQueryKey(path: string, query?: AnyRecord) {

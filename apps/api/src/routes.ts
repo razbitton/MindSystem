@@ -7,6 +7,9 @@ import {
   createProjectSchema,
   createReminderSchema,
   createTaskSchema,
+  googleCalendarCreateEventSchema,
+  googleCalendarPatchEventSchema,
+  googleCalendarPreferencesSchema,
   ingestFreeTextSchema,
   hasScope,
   loginSchema,
@@ -43,6 +46,19 @@ import {
   type RequestIdentity
 } from "./services/auth.js";
 import { getDashboard } from "./services/dashboard.js";
+import {
+  completeGoogleCalendarOAuth,
+  createGoogleCalendarAuthorizationUrl,
+  createGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  disconnectGoogleCalendar,
+  getGoogleCalendarStatus,
+  googleCalendarDeleteEventQuerySchema,
+  listGoogleCalendarEvents,
+  listGoogleCalendars,
+  patchGoogleCalendarEvent,
+  updateGoogleCalendarPreferences
+} from "./services/google-calendar.js";
 import { ingestFreeText } from "./services/ingest.js";
 import { createDocument, deleteDocument, getDocument, getDocumentFile, isDocumentFileError, listDocuments, patchDocument } from "./services/documents.js";
 import { deleteEntity, getEntity, listEntities } from "./services/entities.js";
@@ -92,6 +108,7 @@ import {
 import type { Actor, AppContext } from "./services/types.js";
 
 const idParam = z.object({ id: z.string().uuid() });
+const eventIdParam = z.object({ eventId: z.string().min(1) });
 const documentDownloadQuery = z.object({ disposition: z.enum(["inline", "attachment"]).default("attachment") });
 type AuthenticatedRequest = FastifyRequest & { identity: RequestIdentity };
 
@@ -449,6 +466,50 @@ export async function registerRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/dashboard/today", async (request) => getDashboard(requestContext(app, request), request.query));
+
+  app.get("/api/google-calendar/status", async (request) => getGoogleCalendarStatus(requestContext(app, request)));
+
+  app.post("/api/google-calendar/connect", async (request) => createGoogleCalendarAuthorizationUrl(requestContext(app, request)));
+
+  app.get("/api/google-calendar/oauth/callback", async (request, reply) => {
+    const dashboardUrl = new URL("/dashboard", app.context.env.APP_BASE_URL);
+    try {
+      await completeGoogleCalendarOAuth(requestContext(app, request), request.query, actorFor(request));
+      dashboardUrl.searchParams.set("googleCalendar", "connected");
+    } catch (error) {
+      dashboardUrl.searchParams.set("googleCalendar", "error");
+      dashboardUrl.searchParams.set("message", error instanceof Error ? error.message : "Google Calendar authorization failed.");
+    }
+    return reply.code(302).header("location", dashboardUrl.toString()).send();
+  });
+
+  app.post("/api/google-calendar/disconnect", async (request) => disconnectGoogleCalendar(requestContext(app, request), actorFor(request)));
+
+  app.get("/api/google-calendar/calendars", async (request) => listGoogleCalendars(requestContext(app, request)));
+
+  app.patch("/api/google-calendar/preferences", async (request) => {
+    const input = googleCalendarPreferencesSchema.parse(request.body);
+    return updateGoogleCalendarPreferences(requestContext(app, request), input, actorFor(request));
+  });
+
+  app.get("/api/google-calendar/events", async (request) => listGoogleCalendarEvents(requestContext(app, request), request.query));
+
+  app.post("/api/google-calendar/events", async (request) => {
+    const input = googleCalendarCreateEventSchema.parse(request.body);
+    return createGoogleCalendarEvent(requestContext(app, request), input, actorFor(request));
+  });
+
+  app.patch("/api/google-calendar/events/:eventId", async (request) => {
+    const { eventId } = eventIdParam.parse(request.params);
+    const input = googleCalendarPatchEventSchema.parse(request.body);
+    return patchGoogleCalendarEvent(requestContext(app, request), eventId, input, actorFor(request));
+  });
+
+  app.delete("/api/google-calendar/events/:eventId", async (request) => {
+    const { eventId } = eventIdParam.parse(request.params);
+    const query = googleCalendarDeleteEventQuerySchema.parse(request.query);
+    return deleteGoogleCalendarEvent(requestContext(app, request), eventId, query, actorFor(request));
+  });
 
   app.get("/api/review-queue", async (request) => listReviewQueue(requestContext(app, request), request.query));
 

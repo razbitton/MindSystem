@@ -13,6 +13,12 @@ envVarGroups:
         value: personal-context-os
       - key: S3_REGION
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        value: replace-with-google-oauth-client-id
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        value: replace-with-google-oauth-client-secret
+      - key: GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY
+        value: replace-with-base64-32-byte-token-encryption-key
 
 services:
   - type: keyvalue

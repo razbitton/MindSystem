@@ -6,6 +6,9 @@ import {
   createReminderSchema,
   createTaskSchema,
   deleteRawItemSchema,
+  googleCalendarCreateEventSchema,
+  googleCalendarPatchEventSchema,
+  googleCalendarPreferencesSchema,
   ingestFreeTextSchema,
   loginSchema,
   patchDocumentSchema,
@@ -228,6 +231,80 @@ export function buildOpenApiSpec() {
             { name: "end", in: "query", schema: { type: "string", format: "date-time" } }
           ],
           responses: { "200": { description: "Dashboard" } }
+        }
+      },
+      "/google-calendar/status": {
+        get: {
+          summary: "Get Google Calendar connection status",
+          responses: { "200": { description: "Google Calendar connection status" } }
+        }
+      },
+      "/google-calendar/connect": {
+        post: {
+          summary: "Start Google Calendar OAuth connection",
+          responses: { "200": { description: "Google authorization URL" } }
+        }
+      },
+      "/google-calendar/oauth/callback": {
+        get: {
+          summary: "Complete Google Calendar OAuth connection",
+          parameters: [
+            { name: "code", in: "query", schema: { type: "string" } },
+            { name: "state", in: "query", schema: { type: "string" } }
+          ],
+          responses: { "302": { description: "Redirects back to dashboard" } }
+        }
+      },
+      "/google-calendar/disconnect": {
+        post: {
+          summary: "Disconnect Google Calendar and revoke stored token when possible",
+          responses: { "200": { description: "Disconnected" } }
+        }
+      },
+      "/google-calendar/calendars": {
+        get: {
+          summary: "List Google calendars available to the connected account",
+          responses: { "200": { description: "Calendars" } }
+        }
+      },
+      "/google-calendar/preferences": {
+        patch: {
+          summary: "Update selected Google calendars",
+          requestBody: { required: true, content: { "application/json": { schema: json(googleCalendarPreferencesSchema) } } },
+          responses: { "200": { description: "Calendar preferences" } }
+        }
+      },
+      "/google-calendar/events": {
+        get: {
+          summary: "List Google Calendar events for a visible date range",
+          parameters: [
+            { name: "timeMin", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "timeMax", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "timeZone", in: "query", schema: { type: "string" } },
+            { name: "calendarIds", in: "query", schema: { type: "string" } }
+          ],
+          responses: { "200": { description: "Google Calendar events" } }
+        },
+        post: {
+          summary: "Create a Google Calendar event",
+          requestBody: { required: true, content: { "application/json": { schema: json(googleCalendarCreateEventSchema) } } },
+          responses: { "200": { description: "Created Google Calendar event" } }
+        }
+      },
+      "/google-calendar/events/{eventId}": {
+        patch: {
+          summary: "Update a Google Calendar event",
+          requestBody: { required: true, content: { "application/json": { schema: json(googleCalendarPatchEventSchema) } } },
+          responses: { "200": { description: "Updated Google Calendar event" } }
+        },
+        delete: {
+          summary: "Delete a Google Calendar event",
+          parameters: [
+            { name: "eventId", in: "path", required: true, schema: { type: "string" } },
+            { name: "calendarId", in: "query", required: true, schema: { type: "string" } },
+            { name: "sendUpdates", in: "query", schema: { type: "string", enum: ["all", "externalOnly", "none"] } }
+          ],
+          responses: { "200": { description: "Deleted" } }
         }
       },
       "/review-queue": {

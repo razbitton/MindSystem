@@ -1,4 +1,4 @@
-import { dailyObjectiveOverrides, entities, entityEdges, projects, tasks } from "@personal-context-os/db";
+import { entities, entityEdges, projects, tasks } from "@personal-context-os/db";
 import {
   createTaskSchema,
   localDateSchema,
@@ -87,29 +87,23 @@ export async function listTasks(context: AppContext, query: unknown) {
 
   if (filters.objective_date) {
     const rows = await context.db
-      .select({
-        task: tasks,
-        objectiveState: dailyObjectiveOverrides.state
-      })
+      .select()
       .from(tasks)
-      .leftJoin(
-        dailyObjectiveOverrides,
-        and(
-          eq(dailyObjectiveOverrides.workspaceId, tasks.workspaceId),
-          eq(dailyObjectiveOverrides.taskId, tasks.id),
-          eq(dailyObjectiveOverrides.localDate, filters.objective_date)
-        )
-      )
       .where(and(...where))
       .orderBy(desc(tasks.updatedAt))
       .limit(200);
+    const objectiveStates = await getEffectiveDailyObjectiveStates(
+      context,
+      rows.map((task) => task.id),
+      filters.objective_date
+    );
 
     return {
-      tasks: rows.map((row) => ({
-        ...row.task,
-        objectiveState: row.objectiveState,
-        objective_state: row.objectiveState,
-        isPinned: row.objectiveState === "pinned"
+      tasks: rows.map((task) => ({
+        ...task,
+        objectiveState: objectiveStates.get(task.id) ?? null,
+        objective_state: objectiveStates.get(task.id) ?? null,
+        isPinned: objectiveStates.get(task.id) === "pinned"
       }))
     };
   }
@@ -172,6 +166,10 @@ export async function patchTask(context: AppContext, id: string, input: ParsedPa
 
   if (!task) throw new Error("Task not found");
 
+  if (task.status === "done" || task.status === "cancelled") {
+    await clearDailyObjectiveOverrides(context, task.id);
+  }
+
   await context.db
     .update(entities)
     .set({
@@ -203,6 +201,8 @@ export async function completeTask(context: AppContext, id: string, actor: Actor
 
   if (!task) throw new Error("Task not found");
 
+  await clearDailyObjectiveOverrides(context, task.id);
+
   await context.db
     .update(entities)
     .set({ status: "done", canonical: taskCanonical(task), updatedAt: new Date() })
@@ -216,11 +216,7 @@ export async function setDailyObjective(context: AppContext, id: string, input: 
   const { task } = await getTask(context, id);
 
   if (parsed.action === "clear") {
-    await context.pool.query(
-      `delete from daily_objective_overrides
-       where workspace_id = $1 and task_id = $2 and local_date = $3::date`,
-      [context.workspaceId, task.id, parsed.date]
-    );
+    await clearDailyObjectiveOverrides(context, task.id);
   } else if (parsed.action === "snooze") {
     await upsertDailyObjectiveOverride(context, task.id, parsed.date, "dismissed");
     await upsertDailyObjectiveOverride(context, task.id, parsed.targetDate!, "pinned");
@@ -262,6 +258,30 @@ export async function deleteTask(context: AppContext, id: string, actor: Actor) 
 
 function taskIdentityWhere(id: string): SQL {
   return or(eq(tasks.id, id), eq(tasks.entityId, id)) ?? eq(tasks.id, id);
+}
+
+async function getEffectiveDailyObjectiveStates(context: AppContext, taskIds: string[], localDate: string) {
+  if (taskIds.length === 0) return new Map<string, "pinned" | "dismissed">();
+
+  const result = await context.pool.query<{ task_id: string; state: "pinned" | "dismissed" }>(
+    `select distinct on (task_id) task_id, state
+     from daily_objective_overrides
+     where workspace_id = $1
+       and task_id = any($2::uuid[])
+       and local_date <= $3::date
+     order by task_id, local_date desc, updated_at desc`,
+    [context.workspaceId, taskIds, localDate]
+  );
+
+  return new Map(result.rows.map((row) => [row.task_id, row.state]));
+}
+
+async function clearDailyObjectiveOverrides(context: AppContext, taskId: string) {
+  await context.pool.query(
+    `delete from daily_objective_overrides
+     where workspace_id = $1 and task_id = $2`,
+    [context.workspaceId, taskId]
+  );
 }
 
 async function upsertDailyObjectiveOverride(

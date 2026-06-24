@@ -319,6 +319,89 @@
 }
 
 @layer utilities {
+  .google-calendar-panel .fc {
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: var(--background);
+    --fc-neutral-bg-color: var(--secondary);
+    --fc-list-event-hover-bg-color: color-mix(in oklch, var(--accent) 55%, transparent);
+    --fc-today-bg-color: color-mix(in oklch, var(--primary) 9%, transparent);
+    --fc-now-indicator-color: var(--destructive);
+    color: var(--foreground);
+    font-size: 0.875rem;
+  }
+
+  .google-calendar-panel .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .google-calendar-panel .fc .fc-toolbar-title {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  .google-calendar-panel .fc .fc-button {
+    border-color: var(--border);
+    border-radius: 0.5rem;
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow: none;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-transform: none;
+  }
+
+  .google-calendar-panel .fc .fc-button:hover,
+  .google-calendar-panel .fc .fc-button:focus {
+    border-color: var(--ring);
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .google-calendar-panel .fc .fc-button-primary:not(:disabled).fc-button-active,
+  .google-calendar-panel .fc .fc-button-primary:not(:disabled):active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .google-calendar-panel .fc .fc-scrollgrid {
+    border: 0;
+  }
+
+  .google-calendar-panel .fc th {
+    background: color-mix(in oklch, var(--secondary) 70%, transparent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+
+  .google-calendar-panel .fc .fc-daygrid-day-number,
+  .google-calendar-panel .fc .fc-col-header-cell-cushion,
+  .google-calendar-panel .fc .fc-list-day-text,
+  .google-calendar-panel .fc .fc-list-day-side-text {
+    color: var(--foreground);
+    text-decoration: none;
+  }
+
+  .google-calendar-panel .fc .fc-event {
+    border-radius: 0.375rem;
+    border-width: 1px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .google-calendar-panel .fc .fc-event-title,
+  .google-calendar-panel .fc .fc-event-time {
+    overflow-wrap: anywhere;
+  }
+
+  .google-calendar-panel .fc .fc-list {
+    border: 0;
+  }
+
   .project-color-card {
     border-color: color-mix(in srgb, var(--project-color) 34%, var(--border));
     background-color: color-mix(in srgb, var(--project-color) 9%, var(--card));

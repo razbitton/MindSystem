@@ -32,6 +32,27 @@ pnpm --filter @personal-context-os/mcp-server dev
 pnpm --filter @personal-context-os/web dev
 ```
 
+## Google Calendar Integration
+
+The dashboard can connect to the signed-in user's real Google Calendar account. Configure a Google Cloud OAuth web client with these authorized redirect URIs:
+
+- Local: `http://localhost:3000/api/google-calendar/oauth/callback`
+- Production: `https://razbitton.com/api/google-calendar/oauth/callback`
+
+Set these API environment variables:
+
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
+- `GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY`
+
+Generate the encryption key as a base64-encoded 32-byte secret:
+
+```bash
+openssl rand -base64 32
+```
+
+The integration requests Google Calendar event read/write access and calendar-list read access. Public production access to these sensitive scopes may require Google OAuth app verification.
+
 ## Architecture
 
 ```text
@@ -204,6 +225,9 @@ To deploy:
    - `S3_ENDPOINT`
    - `S3_ACCESS_KEY`
    - `S3_SECRET_KEY`
+   - `GOOGLE_OAUTH_CLIENT_ID`
+   - `GOOGLE_OAUTH_CLIENT_SECRET`
+   - `GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY`
 5. Deploy the Blueprint.
 6. Open `https://razbitton.com/login` and sign in with the bootstrap credentials.
 
