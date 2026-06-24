@@ -18,6 +18,9 @@ export type EntityType = z.infer<typeof entityTypeSchema>;
 export const projectStatusSchema = z.enum(["active", "paused", "completed", "archived"]);
 export const taskStatusSchema = z.enum(["inbox", "todo", "in_progress", "waiting", "done", "cancelled"]);
 export const prioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+export const dailyObjectiveStateSchema = z.enum(["pinned", "dismissed"]);
+export const dailyObjectiveActionSchema = z.enum(["pin", "dismiss", "snooze", "clear"]);
+export const localDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD date.");
 export const projectColorSchema = z.string().trim().regex(/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/).nullable().optional();
 export const relationTypeSchema = z.enum([
   "belongs_to",
@@ -159,6 +162,21 @@ export const patchTaskSchema = createTaskSchema.partial().extend({
   completedAt: z.string().datetime().nullable().optional()
 });
 
+export const dashboardTodayQuerySchema = z.object({
+  date: localDateSchema.optional(),
+  start: z.string().datetime().optional(),
+  end: z.string().datetime().optional()
+});
+
+export const setDailyObjectiveSchema = z.object({
+  date: localDateSchema,
+  action: dailyObjectiveActionSchema,
+  targetDate: localDateSchema.optional()
+}).refine((value) => value.action !== "snooze" || Boolean(value.targetDate), {
+  message: "targetDate is required when snoozing a daily objective.",
+  path: ["targetDate"]
+});
+
 export const createNoteSchema = z.object({
   title: z.string().min(1),
   body: z.string().min(1),
@@ -204,7 +222,8 @@ export const purgeDataTypeSchema = z.enum([
   "agent_runs",
   "retrieval_logs",
   "schema_definitions",
-  "project_schema_overrides"
+  "project_schema_overrides",
+  "daily_objective_overrides"
 ]);
 export type PurgeDataType = z.infer<typeof purgeDataTypeSchema>;
 
@@ -216,7 +235,8 @@ export const defaultPurgeDataTypes: PurgeDataType[] = [
   "agent_runs",
   "retrieval_logs",
   "schema_definitions",
-  "project_schema_overrides"
+  "project_schema_overrides",
+  "daily_objective_overrides"
 ];
 
 export const purgeWorkspaceDataSchema = z.object({

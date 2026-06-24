@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   numeric,
+  date,
   pgEnum,
   pgTable,
   text,
@@ -26,6 +27,7 @@ export const entityType = pgEnum("entity_type", [
 export const projectStatus = pgEnum("project_status", ["active", "paused", "completed", "archived"]);
 export const taskStatus = pgEnum("task_status", ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"]);
 export const priority = pgEnum("priority", ["low", "medium", "high", "urgent"]);
+export const dailyObjectiveState = pgEnum("daily_objective_state", ["pinned", "dismissed"]);
 export const relationType = pgEnum("relation_type", [
   "belongs_to",
   "depends_on",
@@ -195,6 +197,19 @@ export const reminders = pgTable("reminders", {
   status: text("status").notNull().default("scheduled"),
   ...timestamps
 });
+
+export const dailyObjectiveOverrides = pgTable("daily_objective_overrides", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  localDate: date("local_date", { mode: "string" }).notNull(),
+  state: dailyObjectiveState("state").notNull(),
+  ...timestamps
+}, (table) => ({
+  uniqueTaskDateIdx: uniqueIndex("daily_objective_overrides_unique_idx").on(table.workspaceId, table.taskId, table.localDate),
+  workspaceDateIdx: index("daily_objective_overrides_workspace_date_idx").on(table.workspaceId, table.localDate),
+  taskIdx: index("daily_objective_overrides_task_idx").on(table.taskId)
+}));
 
 export const entityEdges = pgTable("entity_edges", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -44,6 +44,30 @@ export function fromDateTimeInput(value: string) {
   return date.toISOString();
 }
 
+export function toLocalDateString(value: Date = new Date()) {
+  const timezoneOffset = value.getTimezoneOffset() * 60000;
+  return new Date(value.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
+export function addLocalDays(value: Date, days: number) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+export function localDayQuery(value: Date = new Date()) {
+  const start = new Date(value);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(value);
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    date: toLocalDateString(value),
+    start: start.toISOString(),
+    end: end.toISOString()
+  };
+}
+
 export function truncate(value?: string | null, max = 180) {
   const text = String(value ?? "").trim();
   if (text.length <= max) return text;

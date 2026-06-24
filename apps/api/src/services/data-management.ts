@@ -15,10 +15,16 @@ const inventoryTables = [
   ["agentRuns", "agent_runs"],
   ["retrievalLogs", "retrieval_logs"],
   ["schemaDefinitions", "schema_definitions"],
-  ["projectSchemaOverrides", "project_schema_overrides"]
+  ["projectSchemaOverrides", "project_schema_overrides"],
+  ["dailyObjectiveOverrides", "daily_objective_overrides"]
 ] as const;
 
 const purgeStatements: { type: PurgeDataType; resultKey: string; sql: string }[] = [
+  {
+    type: "daily_objective_overrides",
+    resultKey: "deletedDailyObjectiveOverrides",
+    sql: "delete from daily_objective_overrides where workspace_id = $1"
+  },
   {
     type: "project_schema_overrides",
     resultKey: "deletedProjectSchemaOverrides",

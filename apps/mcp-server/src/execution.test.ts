@@ -103,6 +103,13 @@ const routeCases: RouteCase[] = [
   { name: "delete_task", args: { id: "task-id" }, method: "DELETE", path: "/api/tasks/task-id" },
   { name: "complete_task", args: { id: "task-id" }, method: "POST", path: "/api/tasks/task-id/complete", body: {} },
   { name: "cancel_task", args: { id: "task-id" }, method: "PATCH", path: "/api/tasks/task-id", body: { status: "cancelled" } },
+  {
+    name: "set_daily_objective",
+    args: { id: "task-id", date: "2026-06-24", action: "snooze", targetDate: "2026-06-25" },
+    method: "POST",
+    path: "/api/tasks/task-id/daily-objective",
+    body: { date: "2026-06-24", action: "snooze", targetDate: "2026-06-25" }
+  },
   { name: "list_notes", args: { project_id: "project-id" }, method: "GET", path: "/api/notes", query: { project_id: "project-id" } },
   { name: "create_note", args: { title: "Note", body: "Body" }, method: "POST", path: "/api/notes", body: { title: "Note", body: "Body" } },
   { name: "get_note", args: { id: "note-id" }, method: "GET", path: "/api/notes/note-id" },
@@ -126,7 +133,13 @@ const routeCases: RouteCase[] = [
   { name: "delete_reminder", args: { id: "reminder-id" }, method: "DELETE", path: "/api/reminders/reminder-id" },
   { name: "get_project_context", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
   { name: "create_context_pack", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
-  { name: "get_daily_dashboard", args: {}, method: "GET", path: "/api/dashboard/today" },
+  {
+    name: "get_daily_dashboard",
+    args: { date: "2026-06-24", start: "2026-06-23T21:00:00.000Z", end: "2026-06-24T20:59:59.999Z" },
+    method: "GET",
+    path: "/api/dashboard/today",
+    query: { date: "2026-06-24", start: "2026-06-23T21:00:00.000Z", end: "2026-06-24T20:59:59.999Z" }
+  },
   { name: "get_urgent_tasks", args: { limit: 10 }, method: "GET", path: "/api/tasks", query: { priority: "urgent", limit: "10" } },
   { name: "list_review_queue", args: { status: "all" }, method: "GET", path: "/api/review-queue", query: { status: "all" } },
   {

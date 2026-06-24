@@ -86,7 +86,8 @@ import {
   deleteTask,
   getTask,
   listTasks,
-  patchTask
+  patchTask,
+  setDailyObjective
 } from "./services/tasks.js";
 import type { Actor, AppContext } from "./services/types.js";
 
@@ -166,6 +167,7 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/tasks/:id" && method === "PATCH") return "tasks:write";
   if (route === "/api/tasks/:id" && method === "DELETE") return "tasks:write";
   if (route === "/api/tasks/:id/complete" && method === "POST") return "tasks:write";
+  if (route === "/api/tasks/:id/daily-objective" && method === "POST") return "tasks:write";
 
   if (route === "/api/notes" && method === "GET") return "memory:read";
   if (route === "/api/notes" && method === "POST") return "memory:write";
@@ -353,6 +355,11 @@ export async function registerRoutes(app: FastifyInstance) {
     return completeTask(requestContext(app, request), id, actorFor(request));
   });
 
+  app.post("/api/tasks/:id/daily-objective", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return setDailyObjective(requestContext(app, request), id, request.body ?? {}, actorFor(request));
+  });
+
   app.post("/api/notes", async (request) => {
     const input = createNoteSchema.parse(request.body);
     return createNote(requestContext(app, request), input, actorFor(request));
@@ -441,7 +448,7 @@ export async function registerRoutes(app: FastifyInstance) {
     return deleteReminder(requestContext(app, request), id, actorFor(request));
   });
 
-  app.get("/api/dashboard/today", async (request) => getDashboard(requestContext(app, request)));
+  app.get("/api/dashboard/today", async (request) => getDashboard(requestContext(app, request), request.query));
 
   app.get("/api/review-queue", async (request) => listReviewQueue(requestContext(app, request), request.query));
 

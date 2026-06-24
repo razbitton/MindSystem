@@ -26,6 +26,7 @@ const expectedScopes: Record<string, AgentScope> = {
   delete_task: "tasks:write",
   complete_task: "tasks:write",
   cancel_task: "tasks:write",
+  set_daily_objective: "tasks:write",
   list_notes: "memory:read",
   create_note: "memory:write",
   get_note: "memory:read",

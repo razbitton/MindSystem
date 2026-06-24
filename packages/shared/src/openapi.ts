@@ -14,7 +14,8 @@ import {
   patchReminderSchema,
   patchTaskSchema,
   purgeWorkspaceDataSchema,
-  reviewDecisionSchema
+  reviewDecisionSchema,
+  setDailyObjectiveSchema
 } from "./schemas.js";
 
 export function buildOpenApiSpec() {
@@ -142,6 +143,13 @@ export function buildOpenApiSpec() {
       "/tasks/{id}/complete": {
         post: { summary: "Complete a task", responses: { "200": { description: "Task" } } }
       },
+      "/tasks/{id}/daily-objective": {
+        post: {
+          summary: "Pin, dismiss, snooze, or clear a task in the daily objective agenda",
+          requestBody: { required: true, content: { "application/json": { schema: json(setDailyObjectiveSchema) } } },
+          responses: { "200": { description: "Daily objective override" } }
+        }
+      },
       "/notes": {
         post: {
           summary: "Create a note",
@@ -212,7 +220,15 @@ export function buildOpenApiSpec() {
         delete: { summary: "Delete a reminder", responses: { "200": { description: "Deleted" } } }
       },
       "/dashboard/today": {
-        get: { summary: "Get dashboard data for today", responses: { "200": { description: "Dashboard" } } }
+        get: {
+          summary: "Get dashboard data for today",
+          parameters: [
+            { name: "date", in: "query", schema: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } },
+            { name: "start", in: "query", schema: { type: "string", format: "date-time" } },
+            { name: "end", in: "query", schema: { type: "string", format: "date-time" } }
+          ],
+          responses: { "200": { description: "Dashboard" } }
+        }
       },
       "/review-queue": {
         get: { summary: "List pending review items", responses: { "200": { description: "Review items" } } }

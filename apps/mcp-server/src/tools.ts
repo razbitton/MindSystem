@@ -39,6 +39,7 @@ const priorityValues = ["low", "medium", "high", "urgent"];
 const entityTypeValues = ["project", "task", "note", "document", "decision", "reminder", "person", "goal"];
 const sourceTypeValues = ["web", "whatsapp", "openclaw", "codex", "api", "manual"];
 const reviewStatusValues = ["pending", "approved", "rejected", "all"];
+const dailyObjectiveActionValues = ["pin", "dismiss", "snooze", "clear"];
 const purgeDataTypeValues = [
   "raw_items",
   "entities",
@@ -47,7 +48,8 @@ const purgeDataTypeValues = [
   "agent_runs",
   "retrieval_logs",
   "schema_definitions",
-  "project_schema_overrides"
+  "project_schema_overrides",
+  "daily_objective_overrides"
 ];
 
 const projectProperties = {
@@ -102,6 +104,18 @@ const taskFilterProperties = {
   project_id: { type: "string", description: "Project table id." },
   priority: { type: "string", enum: priorityValues },
   due_before: dateTimeSchema("Return tasks due on or before this ISO 8601 datetime.")
+};
+
+const dailyObjectiveProperties = {
+  date: { type: "string", description: "Local date in YYYY-MM-DD format." },
+  action: { type: "string", enum: dailyObjectiveActionValues },
+  targetDate: { type: "string", description: "Target local date in YYYY-MM-DD format. Required for snooze." }
+};
+
+const dashboardQueryProperties = {
+  date: { type: "string", description: "Local date in YYYY-MM-DD format." },
+  start: dateTimeSchema("Start of the local day as ISO 8601 datetime."),
+  end: dateTimeSchema("End of the local day as ISO 8601 datetime.")
 };
 
 const noteFilterProperties = {
@@ -342,6 +356,18 @@ export const mcpRestTools: RestToolDefinition[] = [
     inputSchema: objectSchema({ id: idSchema("Task table id. entityId is accepted by the REST API for compatibility.") }, ["id"])
   },
   {
+    name: "set_daily_objective",
+    description: "Pin, dismiss, snooze, or clear a task in the daily objective agenda.",
+    requiredScope: "tasks:write",
+    method: "POST",
+    path: (args) => `/api/tasks/${String(args.id)}/daily-objective`,
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Task table id. entityId is accepted by the REST API for compatibility."),
+      ...dailyObjectiveProperties
+    }, ["id", "date", "action"])
+  },
+  {
     name: "list_notes",
     description: "List notes with REST-supported filters.",
     requiredScope: "memory:read",
@@ -486,7 +512,7 @@ export const mcpRestTools: RestToolDefinition[] = [
     requiredScope: "memory:read",
     method: "GET",
     path: "/api/dashboard/today",
-    inputSchema: objectSchema({})
+    inputSchema: objectSchema(dashboardQueryProperties)
   },
   {
     name: "get_urgent_tasks",

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Trash2, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Pin, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
 import { dateValue, projectName } from "../lib/view-models";
@@ -16,6 +16,7 @@ type TaskDetailDialogProps = {
   onClose: () => void;
   onEdit?: (task: AnyRecord) => void;
   onComplete?: (id: string) => void | Promise<void>;
+  onPinToday?: (task: AnyRecord) => void | Promise<void>;
   onDelete?: (task: AnyRecord) => void;
 };
 
@@ -26,6 +27,7 @@ export function TaskDetailDialog({
   onClose,
   onEdit,
   onComplete,
+  onPinToday,
   onDelete
 }: TaskDetailDialogProps) {
   const { t, formatDate } = useI18n();
@@ -138,6 +140,18 @@ export function TaskDetailDialog({
                 >
                   <CheckCircle2 data-icon="inline-start" />
                   {isDone ? t("tasks.completed") : t("tasks.markDone")}
+                </Button>
+              ) : null}
+              {onPinToday ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={isDone || task.status === "cancelled"}
+                  onClick={() => void onPinToday(task)}
+                >
+                  <Pin data-icon="inline-start" />
+                  {t("dashboard.pinToday")}
                 </Button>
               ) : null}
             </div>

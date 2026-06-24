@@ -14,6 +14,7 @@ import {
   matchesQuery,
   projectName,
   sortByPriority,
+  toLocalDateString,
   truncate
 } from "../lib/view-models";
 import { findProjectForRecord, projectColorClass, projectColorStyle, projectColorValue } from "../lib/project-colors";
@@ -138,6 +139,19 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
     await apiPost(`/api/tasks/${id}/complete`, {});
     invalidateTaskQueryCache();
     await load(filters, true);
+  }
+
+  async function pinToday(task: AnyRecord) {
+    try {
+      await apiPost(`/api/tasks/${task.id}/daily-objective`, {
+        date: toLocalDateString(),
+        action: "pin"
+      });
+      invalidateTaskQueryCache();
+      toast.success(t("dashboard.pinnedToday"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
+    }
   }
 
   function requestDelete(task: AnyRecord, event?: { stopPropagation: () => void }) {
@@ -335,6 +349,7 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
         onClose={closeTaskDetails}
         onEdit={openEdit}
         onComplete={complete}
+        onPinToday={pinToday}
         onDelete={(task) => {
           closeTaskDetails();
           requestDelete(task);

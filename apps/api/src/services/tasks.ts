@@ -1,5 +1,5 @@
 import { entities, entityEdges, projects, tasks } from "@personal-context-os/db";
-import { createTaskSchema, patchTaskSchema, prioritySchema, taskStatusSchema } from "@personal-context-os/shared";
+import { createTaskSchema, patchTaskSchema, prioritySchema, setDailyObjectiveSchema, taskStatusSchema } from "@personal-context-os/shared";
 import { and, desc, eq, lte, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { createGenericEntity } from "./entities.js";
@@ -149,6 +149,43 @@ export async function completeTask(context: AppContext, id: string, actor: Actor
   return { task };
 }
 
+export async function setDailyObjective(context: AppContext, id: string, input: unknown, actor: Actor) {
+  const parsed = setDailyObjectiveSchema.parse(input);
+  const { task } = await getTask(context, id);
+
+  if (parsed.action === "clear") {
+    await context.pool.query(
+      `delete from daily_objective_overrides
+       where workspace_id = $1 and task_id = $2 and local_date = $3::date`,
+      [context.workspaceId, task.id, parsed.date]
+    );
+  } else if (parsed.action === "snooze") {
+    await upsertDailyObjectiveOverride(context, task.id, parsed.date, "dismissed");
+    await upsertDailyObjectiveOverride(context, task.id, parsed.targetDate!, "pinned");
+  } else {
+    await upsertDailyObjectiveOverride(
+      context,
+      task.id,
+      parsed.date,
+      parsed.action === "pin" ? "pinned" : "dismissed"
+    );
+  }
+
+  await writeAuditEvent(context, {
+    ...actor,
+    action: "set daily objective",
+    entityId: task.entityId,
+    metadata: {
+      taskId: task.id,
+      date: parsed.date,
+      action: parsed.action,
+      targetDate: parsed.targetDate
+    }
+  });
+
+  return { ok: true, task, date: parsed.date, action: parsed.action, targetDate: parsed.targetDate ?? null };
+}
+
 export async function deleteTask(context: AppContext, id: string, actor: Actor) {
   const { task } = await getTask(context, id);
 
@@ -168,6 +205,21 @@ export async function deleteTask(context: AppContext, id: string, actor: Actor) 
 
 function taskIdentityWhere(id: string): SQL {
   return or(eq(tasks.id, id), eq(tasks.entityId, id)) ?? eq(tasks.id, id);
+}
+
+async function upsertDailyObjectiveOverride(
+  context: AppContext,
+  taskId: string,
+  localDate: string,
+  state: "pinned" | "dismissed"
+) {
+  await context.pool.query(
+    `insert into daily_objective_overrides (workspace_id, task_id, local_date, state, updated_at)
+     values ($1, $2, $3::date, $4::daily_objective_state, now())
+     on conflict (workspace_id, task_id, local_date)
+     do update set state = excluded.state, updated_at = now()`,
+    [context.workspaceId, taskId, localDate, state]
+  );
 }
 
 function taskCanonical(task: typeof tasks.$inferSelect) {

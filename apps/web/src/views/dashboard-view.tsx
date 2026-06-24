@@ -4,10 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  Bell,
+  CalendarClock,
+  CheckCircle2,
   ClipboardList,
+  Clock3,
   Inbox,
+  Pin,
+  PinOff,
   Search,
   Send,
+  TimerReset,
+  XCircle,
   type LucideIcon
 } from "lucide-react";
 import { apiPost, type AnyRecord } from "../lib/api";
@@ -18,7 +26,7 @@ import {
   setCachedQuery
 } from "../lib/query-cache";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
-import { dateValue, sortByPriority, truncate } from "../lib/view-models";
+import { addLocalDays, dateValue, localDayQuery, sortByPriority, toLocalDateString, truncate } from "../lib/view-models";
 import {
   EmptyState,
   EntityBadge,
@@ -62,8 +70,9 @@ export default function DashboardView({
   async function load(force = false) {
     setError(null);
     try {
+      const dashboardQuery = localDayQuery();
       const [dashboardData, noteData, projectData] = await Promise.all([
-        cachedApiGet<AnyRecord>("/api/dashboard/today", undefined, { force }),
+        cachedApiGet<AnyRecord>("/api/dashboard/today", dashboardQuery, { force }),
         cachedApiGet<{ notes: AnyRecord[] }>("/api/notes", undefined, { force }),
         cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force })
       ]);
@@ -91,8 +100,7 @@ export default function DashboardView({
   }, [initialDashboard, initialNotes, initialProjects]);
 
   useEffect(() => {
-    if (initialDashboard && initialNotes && initialProjects) return;
-    void load();
+    void load(Boolean(initialDashboard));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,6 +121,37 @@ export default function DashboardView({
     }
   }
 
+  async function completeTask(id: string) {
+    setError(null);
+    try {
+      await apiPost(`/api/tasks/${id}/complete`, {});
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.failed"));
+    }
+  }
+
+  async function setDailyObjective(task: AnyRecord, action: "pin" | "dismiss" | "snooze" | "clear") {
+    setError(null);
+    const now = new Date();
+    const body: AnyRecord = {
+      date: toLocalDateString(now),
+      action
+    };
+    if (action === "snooze") {
+      body.targetDate = toLocalDateString(addLocalDays(now, 1));
+    }
+
+    try {
+      await apiPost(`/api/tasks/${task.id}/daily-objective`, body);
+      invalidateWorkspaceQueryCache();
+      await load(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.failed"));
+    }
+  }
+
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-6">
       <PageHeader title={t("home.title")} subtitle={t("home.subtitle")} />
@@ -125,6 +164,13 @@ export default function DashboardView({
 
       <div className="grid min-w-0 max-w-full gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+          <DailyObjectivesPanel
+            data={data}
+            formatDate={formatDate}
+            onComplete={completeTask}
+            onObjectiveAction={setDailyObjective}
+          />
+
           <Panel title={t("home.captureTitle")}>
             <div className="flex min-w-0 max-w-full flex-col gap-3">
               <Textarea
@@ -280,6 +326,301 @@ export default function DashboardView({
       </div>
     </div>
   );
+}
+
+type ObjectiveAction = "pin" | "dismiss" | "snooze" | "clear";
+
+function DailyObjectivesPanel({
+  data,
+  formatDate,
+  onComplete,
+  onObjectiveAction
+}: {
+  data: AnyRecord | null;
+  formatDate: (value?: string | null) => string;
+  onComplete: (id: string) => void | Promise<void>;
+  onObjectiveAction: (task: AnyRecord, action: ObjectiveAction) => void | Promise<void>;
+}) {
+  const { t } = useI18n();
+  const sections = (data?.dailyObjectiveSections ?? {}) as AnyRecord;
+  const summary = (data?.objectiveSummary ?? {}) as AnyRecord;
+  const focus = arrayValue(sections.focus ?? data?.dailyObjectives);
+  const scheduled = arrayValue(sections.scheduled);
+  const deadlines = arrayValue(sections.deadlines);
+  const waiting = arrayValue(sections.waiting);
+  const reminders = arrayValue(sections.reminders ?? data?.dailyReminders);
+  const hasAgenda = focus.length || scheduled.length || deadlines.length || waiting.length || reminders.length;
+
+  return (
+    <Panel
+      title={t("dashboard.dailyObjectives")}
+      action={
+        hasAgenda ? (
+          <span className="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground">
+            {t("dashboard.focusCount", { count: Number(summary.focus ?? focus.length) })}
+          </span>
+        ) : null
+      }
+    >
+      {!hasAgenda ? (
+        <EmptyState title={t("dashboard.noDailyObjectives")}>{t("dashboard.noDailyObjectivesBody")}</EmptyState>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-4">
+          <ObjectiveTaskSection
+            title={t("dashboard.objectiveFocus")}
+            icon={Pin}
+            tasks={focus}
+            emptyText={t("dashboard.noFocusObjectives")}
+            formatDate={formatDate}
+            onComplete={onComplete}
+            onObjectiveAction={onObjectiveAction}
+          />
+          <ObjectiveTaskSection
+            title={t("dashboard.objectiveScheduled")}
+            icon={CalendarClock}
+            tasks={scheduled}
+            formatDate={formatDate}
+            onComplete={onComplete}
+            onObjectiveAction={onObjectiveAction}
+          />
+          <ObjectiveTaskSection
+            title={t("dashboard.objectiveDeadlines")}
+            icon={AlertTriangle}
+            tasks={deadlines}
+            formatDate={formatDate}
+            onComplete={onComplete}
+            onObjectiveAction={onObjectiveAction}
+          />
+          <ObjectiveTaskSection
+            title={t("dashboard.objectiveWaiting")}
+            icon={Clock3}
+            tasks={waiting}
+            formatDate={formatDate}
+            onComplete={onComplete}
+            onObjectiveAction={onObjectiveAction}
+          />
+          <ReminderSection reminders={reminders} formatDate={formatDate} />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function ObjectiveTaskSection({
+  title,
+  icon: Icon,
+  tasks,
+  emptyText,
+  formatDate,
+  onComplete,
+  onObjectiveAction
+}: {
+  title: string;
+  icon: LucideIcon;
+  tasks: AnyRecord[];
+  emptyText?: string;
+  formatDate: (value?: string | null) => string;
+  onComplete: (id: string) => void | Promise<void>;
+  onObjectiveAction: (task: AnyRecord, action: ObjectiveAction) => void | Promise<void>;
+}) {
+  if (!tasks.length && !emptyText) return null;
+
+  return (
+    <section className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+        <span>{title}</span>
+      </div>
+      {!tasks.length ? (
+        <div className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+          {emptyText}
+        </div>
+      ) : (
+        <ul className="flex min-w-0 flex-col gap-2">
+          {tasks.map((task) => (
+            <DailyObjectiveRow
+              key={`${title}-${task.id}`}
+              task={task}
+              formatDate={formatDate}
+              onComplete={onComplete}
+              onObjectiveAction={onObjectiveAction}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function DailyObjectiveRow({
+  task,
+  formatDate,
+  onComplete,
+  onObjectiveAction
+}: {
+  task: AnyRecord;
+  formatDate: (value?: string | null) => string;
+  onComplete: (id: string) => void | Promise<void>;
+  onObjectiveAction: (task: AnyRecord, action: ObjectiveAction) => void | Promise<void>;
+}) {
+  const { t } = useI18n();
+  const reasons = arrayValue(task.objectiveReasons).map(String);
+  const dueAt = dateValue(task, "dueAt");
+  const scheduledFor = dateValue(task, "scheduledFor");
+  const estimateMinutes = task.estimateMinutes ?? task.estimate_minutes;
+  const isPinned = task.isPinned || task.objectiveState === "pinned" || task.objective_state === "pinned";
+
+  return (
+    <li
+      className={cn(
+        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/55 p-3 sm:flex-row sm:items-start sm:justify-between",
+        projectColorClass(task.projectColor ?? task.project_color, "row")
+      )}
+      style={projectColorStyle(task.projectColor ?? task.project_color)}
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Link href="/tasks" className="min-w-0 flex-1 text-sm font-medium text-foreground hover:underline" dir="auto">
+            <span className="line-clamp-2 [overflow-wrap:anywhere]">{task.title}</span>
+          </Link>
+          <PriorityBadge value={task.priority} />
+          <StatusBadge value={task.status} />
+        </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {scheduledFor ? (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <CalendarClock className="size-3 shrink-0" aria-hidden />
+              <span className="truncate">{formatDate(scheduledFor)}</span>
+            </span>
+          ) : null}
+          {dueAt ? (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <AlertTriangle className="size-3 shrink-0" aria-hidden />
+              <span className="truncate">{formatDate(dueAt)}</span>
+            </span>
+          ) : null}
+          {estimateMinutes ? (
+            <span className="inline-flex items-center gap-1">
+              <Clock3 className="size-3 shrink-0" aria-hidden />
+              {t("dashboard.minutes", { count: Number(estimateMinutes) })}
+            </span>
+          ) : null}
+          {task.project_name ? (
+            <span className="truncate" dir="auto">
+              {task.project_name}
+            </span>
+          ) : null}
+        </div>
+
+        {reasons.length ? (
+          <div className="flex min-w-0 flex-wrap gap-1.5">
+            {reasons.map((reason) => (
+              <ReasonChip key={reason} reason={reason} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          onClick={() => void onComplete(String(task.id))}
+          title={t("tasks.markDone")}
+          aria-label={t("tasks.markDone")}
+        >
+          <CheckCircle2 className="size-[18px]" aria-hidden />
+        </Button>
+        <Button
+          variant={isPinned ? "secondary" : "ghost"}
+          size="icon-sm"
+          type="button"
+          onClick={() => void onObjectiveAction(task, isPinned ? "clear" : "pin")}
+          title={isPinned ? t("dashboard.unpinObjective") : t("dashboard.pinObjective")}
+          aria-label={isPinned ? t("dashboard.unpinObjective") : t("dashboard.pinObjective")}
+        >
+          {isPinned ? <PinOff className="size-[18px]" aria-hidden /> : <Pin className="size-[18px]" aria-hidden />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          onClick={() => void onObjectiveAction(task, "snooze")}
+          title={t("dashboard.snoozeTomorrow")}
+          aria-label={t("dashboard.snoozeTomorrow")}
+        >
+          <TimerReset className="size-[18px]" aria-hidden />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          onClick={() => void onObjectiveAction(task, "dismiss")}
+          title={t("dashboard.dismissToday")}
+          aria-label={t("dashboard.dismissToday")}
+        >
+          <XCircle className="size-[18px]" aria-hidden />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function ReminderSection({
+  reminders,
+  formatDate
+}: {
+  reminders: AnyRecord[];
+  formatDate: (value?: string | null) => string;
+}) {
+  const { t } = useI18n();
+  if (!reminders.length) return null;
+
+  return (
+    <section className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Bell className="size-3.5 shrink-0" aria-hidden />
+        <span>{t("dashboard.objectiveReminders")}</span>
+      </div>
+      <ul className="flex min-w-0 flex-col gap-2">
+        {reminders.map((reminder) => (
+          <li
+            key={reminder.id}
+            className={cn(
+              "flex min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-background/55 p-3",
+              projectColorClass(reminder.projectColor ?? reminder.project_color, "row")
+            )}
+            style={projectColorStyle(reminder.projectColor ?? reminder.project_color)}
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground" dir="auto">
+                {reminder.title}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {formatDate(dateValue(reminder, "remindAt"))}
+              </p>
+            </div>
+            <ReasonChip reason="reminder" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ReasonChip({ reason }: { reason: string }) {
+  const { t } = useI18n();
+  return (
+    <span className="rounded-md bg-secondary/80 px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+      {t(`objectiveReason.${reason}` as Parameters<typeof t>[0])}
+    </span>
+  );
+}
+
+function arrayValue(value: unknown): AnyRecord[] {
+  return Array.isArray(value) ? value as AnyRecord[] : [];
 }
 
 function MetricCard({
