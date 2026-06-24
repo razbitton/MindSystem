@@ -247,6 +247,31 @@
     text-align: right;
   }
 
+  :where(
+    button,
+    a[href],
+    label[for],
+    [role="button"],
+    [data-slot="button"],
+    [data-slot="checkbox"],
+    [data-slot="command-item"],
+    [data-slot="dialog-close"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="select-item"],
+    [data-slot="select-scroll-down-button"],
+    [data-slot="select-scroll-up-button"],
+    [data-slot="select-trigger"],
+    [data-slot="sheet-close"],
+    [data-slot="switch"],
+    [data-slot="tabs-trigger"],
+    summary
+  ):where(:not(:disabled, [aria-disabled="true"], [data-disabled], [data-disabled="true"])) {
+    cursor: pointer;
+  }
+
   @media (pointer: coarse) {
     input,
     textarea,
