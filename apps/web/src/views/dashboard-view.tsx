@@ -137,21 +137,19 @@ export default function DashboardView({
         />
       </div>
 
-      <div className="grid min-w-0 max-w-full gap-6 lg:min-h-[600px] lg:grid-cols-2 lg:[height:calc(100svh_-_18rem)]">
-        <GoogleCalendarPanel className="min-h-[520px] lg:min-h-0" />
+      <div className="grid min-w-0 max-w-full items-start gap-6 lg:grid-cols-2">
+        <GoogleCalendarPanel className="min-h-[560px]" />
 
-        <div className="flex min-w-0 flex-col gap-6 lg:min-h-0">
+        <div className="flex min-w-0 flex-col gap-6">
           <DailyObjectivesPanel
             data={data}
             formatDate={formatDate}
             onComplete={completeTask}
             onObjectiveAction={setDailyObjective}
-            className="lg:min-h-0 lg:flex-1"
           />
 
           <Panel
             title={t("home.activeProjects")}
-            className="lg:min-h-0 lg:flex-1"
             action={
               <Button asChild variant="ghost" size="sm">
                 <Link href="/projects">{t("common.open")}</Link>

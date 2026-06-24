@@ -438,21 +438,21 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
   return (
     <section
       className={cn(
-        "google-calendar-panel flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-800/60 bg-slate-900 text-slate-200 shadow-sm",
+        "google-calendar-panel bounded-surface flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs",
         className
       )}
     >
-      <div className="flex shrink-0 flex-col gap-3 border-b border-slate-800/60 bg-slate-800/20 p-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-4 sm:px-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <CalendarDays className="size-5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-base font-medium text-slate-100" dir="auto">
+            <h2 className="truncate text-sm font-medium text-foreground" dir="auto">
               {calendarTitle || t("googleCalendar.title")}
             </h2>
             {status?.connected ? (
-              <p className="truncate text-xs text-slate-500" dir="auto">
+              <p className="truncate text-xs text-muted-foreground" dir="auto">
                 {t("googleCalendar.connectedAs", {
                   email: status.googleAccountEmail ?? "Google"
                 })}
@@ -463,10 +463,10 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
 
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {status?.connected ? (
-            <div className="flex items-center rounded-lg border border-slate-800 bg-slate-950 p-1">
+            <div className="flex items-center rounded-lg border border-border bg-secondary/60 p-1">
               <button
                 type="button"
-                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 onClick={() => navigateCalendar("prev")}
                 aria-label="Previous day"
               >
@@ -474,14 +474,14 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
               </button>
               <button
                 type="button"
-                className="px-3 text-sm font-medium text-slate-300 transition-colors hover:text-slate-100"
+                className="px-3 text-sm font-medium text-foreground transition-colors hover:text-primary"
                 onClick={() => navigateCalendar("today")}
               >
                 {t("dashboard.today")}
               </button>
               <button
                 type="button"
-                className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 onClick={() => navigateCalendar("next")}
                 aria-label="Next day"
               >
@@ -504,7 +504,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                 disabled={loading || calendarLoading}
                 title={t("googleCalendar.refreshCalendars")}
                 aria-label={t("googleCalendar.refreshCalendars")}
-                className="text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
               </Button>
@@ -516,7 +516,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                 disabled={disconnecting}
                 title={t("googleCalendar.disconnect")}
                 aria-label={t("googleCalendar.disconnect")}
-                className="text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                className="text-muted-foreground hover:text-foreground"
               >
                 {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
               </Button>
@@ -559,7 +559,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
           </CalendarPanelState>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-slate-800/60 p-3">
+            <div className="shrink-0 border-b border-border p-3 sm:px-5">
               <CalendarToggleList
                 calendars={calendars}
                 selectedCalendarSet={selectedCalendarSet}
@@ -567,14 +567,14 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                 onToggle={toggleCalendar}
               />
               {!selectedCalendarIds.length ? (
-                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-400">
+                <div className="mt-3 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
                   {t("googleCalendar.noSelectedCalendars")}
                 </div>
               ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-900/50 p-4">
-              <div className="min-h-[760px] overflow-hidden rounded-lg border border-slate-800/60 bg-slate-950/20">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-background/35 p-4 sm:p-5">
+              <div className="min-h-[720px] overflow-hidden rounded-lg border border-border bg-background">
                 <FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
@@ -658,11 +658,11 @@ function CalendarPanelState({
     <div className="flex min-h-72 flex-1 items-center justify-center p-6 text-center">
       <div className="flex max-w-sm flex-col items-center gap-3">
         {title ? (
-          <p className={cn("text-sm font-medium", tone === "error" ? "text-red-300" : "text-slate-100")} dir="auto">
+          <p className={cn("text-sm font-medium", tone === "error" ? "text-destructive" : "text-foreground")} dir="auto">
             {title}
           </p>
         ) : null}
-        <div className={cn("flex items-center text-sm leading-relaxed", tone === "error" ? "text-red-300" : "text-slate-400")} dir="auto">
+        <div className={cn("flex items-center text-sm leading-relaxed", tone === "error" ? "text-destructive" : "text-muted-foreground")} dir="auto">
           {children}
         </div>
         {action ? <div className="pt-1">{action}</div> : null}
@@ -685,7 +685,7 @@ function CalendarToggleList({
   const { t } = useI18n();
 
   if (!calendars.length) {
-    return <p className="text-sm text-slate-500">{t("googleCalendar.noCalendars")}</p>;
+    return <p className="text-sm text-muted-foreground">{t("googleCalendar.noCalendars")}</p>;
   }
 
   return (
@@ -696,8 +696,8 @@ function CalendarToggleList({
           <label
             key={calendar.id}
             className={cn(
-              "flex max-w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-2 text-xs text-slate-400 transition-colors hover:border-slate-700 hover:text-slate-200",
-              checked && "border-indigo-500/35 bg-indigo-500/10 text-slate-200"
+              "flex max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/45 px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground",
+              checked && "border-primary/35 bg-primary/10 text-foreground"
             )}
           >
             <Checkbox
@@ -708,12 +708,12 @@ function CalendarToggleList({
             />
             <span
               className="size-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: calendar.backgroundColor || "#818cf8" }}
+              style={{ backgroundColor: calendar.backgroundColor || "var(--primary)" }}
               aria-hidden
             />
             <span className="min-w-0 truncate" dir="auto">{calendar.summary}</span>
             {!calendar.writable ? (
-              <span className="shrink-0 rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500">
+              <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {t("googleCalendar.readOnly")}
               </span>
             ) : null}

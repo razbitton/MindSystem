@@ -320,12 +320,12 @@
 
 @layer utilities {
   .google-calendar-panel .fc {
-    --fc-border-color: rgb(30 41 59 / 0.62);
+    --fc-border-color: var(--border);
     --fc-page-bg-color: transparent;
-    --fc-neutral-bg-color: rgb(15 23 42 / 0.58);
-    --fc-today-bg-color: rgb(99 102 241 / 0.07);
-    --fc-now-indicator-color: rgb(248 113 113);
-    color: rgb(203 213 225);
+    --fc-neutral-bg-color: color-mix(in oklch, var(--secondary) 72%, transparent);
+    --fc-today-bg-color: color-mix(in oklch, var(--primary) 8%, transparent);
+    --fc-now-indicator-color: var(--destructive);
+    color: var(--foreground);
     font-size: 0.875rem;
   }
 
@@ -344,13 +344,13 @@
   }
 
   .google-calendar-panel .fc .fc-scrollgrid-section > * {
-    border-color: rgb(30 41 59 / 0.62);
+    border-color: var(--border);
   }
 
   .google-calendar-panel .fc .fc-timegrid-axis,
   .google-calendar-panel .fc .fc-timegrid-slot-label {
-    background: rgb(15 23 42 / 0.34);
-    color: rgb(100 116 139);
+    background: color-mix(in oklch, var(--secondary) 48%, transparent);
+    color: var(--muted-foreground);
     font-size: 0.6875rem;
     font-weight: 600;
   }
@@ -364,22 +364,22 @@
 
   .google-calendar-panel .fc .fc-timegrid-slot {
     height: 32px;
-    border-color: rgb(30 41 59 / 0.34);
+    border-color: color-mix(in oklch, var(--border) 68%, transparent);
   }
 
   .google-calendar-panel .fc .fc-timegrid-slot-lane {
-    background: rgb(15 23 42 / 0.16);
+    background: color-mix(in oklch, var(--background) 84%, var(--card));
   }
 
   .google-calendar-panel .fc .fc-timegrid-col {
-    background: rgb(15 23 42 / 0.18);
+    background: color-mix(in oklch, var(--background) 88%, var(--card));
   }
 
   .google-calendar-panel .fc .fc-event {
     border-radius: 0.5rem;
     border-width: 1px;
     border-inline-start-width: 4px;
-    box-shadow: 0 10px 22px rgb(2 6 23 / 0.26);
+    box-shadow: 0 8px 18px rgb(0 0 0 / 0.12);
     font-size: 0.75rem;
     line-height: 1.2;
     transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
@@ -388,7 +388,7 @@
   .google-calendar-panel .fc .fc-event:hover {
     filter: brightness(1.08);
     transform: scale(1.01);
-    box-shadow: 0 14px 28px rgb(2 6 23 / 0.34);
+    box-shadow: 0 12px 24px rgb(0 0 0 / 0.16);
   }
 
   .google-calendar-panel .fc .fc-timegrid-event .fc-event-main {
@@ -396,7 +396,7 @@
   }
 
   .google-calendar-panel .fc .fc-event-time {
-    color: rgb(226 232 240 / 0.72);
+    color: color-mix(in oklch, currentColor 75%, transparent);
     font-size: 0.6875rem;
     font-weight: 500;
   }
@@ -407,28 +407,28 @@
   }
 
   .google-calendar-panel .fc .fc-now-indicator-line {
-    border-color: rgb(248 113 113);
+    border-color: var(--destructive);
   }
 
   .google-calendar-panel .fc .fc-now-indicator-arrow {
-    border-color: rgb(248 113 113);
+    border-color: var(--destructive);
     border-block-color: transparent;
   }
 
   .google-calendar-panel .fc .fc-highlight {
-    background: rgb(99 102 241 / 0.18);
+    background: color-mix(in oklch, var(--primary) 18%, transparent);
   }
 
   .google-calendar-panel * {
-    scrollbar-color: rgb(51 65 85) transparent;
+    scrollbar-color: var(--border) transparent;
   }
 
   .google-calendar-panel *::-webkit-scrollbar-thumb {
-    background: rgb(51 65 85);
+    background: var(--border);
   }
 
   .google-calendar-panel *::-webkit-scrollbar-thumb:hover {
-    background: rgb(71 85 105);
+    background: color-mix(in oklch, var(--border) 72%, var(--foreground));
   }
 
   .project-color-card {
