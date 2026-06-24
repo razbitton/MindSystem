@@ -5,7 +5,7 @@ import { Check, Folder, PenSquare, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
-  invalidateCachedQueries,
+  invalidateWorkspaceQueryCache,
   peekCachedQuery,
   setCachedQuery
 } from "../lib/query-cache";
@@ -83,11 +83,7 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
   }
 
   function invalidateNoteQueryCache() {
-    invalidateCachedQueries((key) =>
-      key.startsWith("GET /api/notes") ||
-      key.startsWith("GET /api/dashboard") ||
-      key.startsWith("GET /api/projects/")
-    );
+    invalidateWorkspaceQueryCache();
   }
 
   useEffect(() => {
@@ -102,8 +98,7 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
   }, [initialNotes, initialProjects]);
 
   useEffect(() => {
-    if (initialNotes && initialProjects) return;
-    void load();
+    void load(Boolean(initialNotes || initialProjects));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

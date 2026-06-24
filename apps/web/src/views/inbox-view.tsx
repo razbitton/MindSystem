@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
 import { apiPost, type AnyRecord } from "../lib/api";
+import { invalidateWorkspaceQueryCache } from "../lib/query-cache";
 import { truncate } from "../lib/view-models";
 import { EmptyState, EntityBadge, PageHeader, Panel, StatusBadge } from "../components/page";
 import { useI18n } from "../i18n";
@@ -26,6 +27,7 @@ export default function InboxView() {
       const response = await apiPost("/api/ingest/free-text", { text, sourceType: "manual" });
       setResult(response);
       setText("");
+      invalidateWorkspaceQueryCache();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("inbox.captureFailed"));
     } finally {

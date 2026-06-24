@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Filter, Plus, Search, Trash2 } from "lucide-react"
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
-  invalidateCachedQueries,
+  invalidateWorkspaceQueryCache,
   peekCachedQuery,
   setCachedQuery
 } from "../lib/query-cache";
@@ -74,11 +74,7 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
   }
 
   function invalidateTaskQueryCache() {
-    invalidateCachedQueries((key) =>
-      key.startsWith("GET /api/tasks") ||
-      key.startsWith("GET /api/dashboard") ||
-      key.startsWith("GET /api/projects/")
-    );
+    invalidateWorkspaceQueryCache();
   }
 
   useEffect(() => {
@@ -93,8 +89,7 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
   }, [initialTasks, initialProjects]);
 
   useEffect(() => {
-    if (initialTasks && initialProjects) return;
-    void load();
+    void load(filters, Boolean(initialTasks || initialProjects));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

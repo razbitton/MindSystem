@@ -533,16 +533,18 @@ function DailyObjectiveRow({
         >
           <CheckCircle2 className="size-[18px]" aria-hidden />
         </Button>
-        <Button
-          variant={isPinned ? "secondary" : "ghost"}
-          size="icon-sm"
-          type="button"
-          onClick={() => void onObjectiveAction(task, isPinned ? "clear" : "pin")}
-          title={isPinned ? t("dashboard.unpinObjective") : t("dashboard.pinObjective")}
-          aria-label={isPinned ? t("dashboard.unpinObjective") : t("dashboard.pinObjective")}
-        >
-          {isPinned ? <PinOff className="size-[18px]" aria-hidden /> : <Pin className="size-[18px]" aria-hidden />}
-        </Button>
+        {isPinned ? (
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            type="button"
+            onClick={() => void onObjectiveAction(task, "clear")}
+            title={t("dashboard.unpinObjective")}
+            aria-label={t("dashboard.unpinObjective")}
+          >
+            <PinOff className="size-[18px]" aria-hidden />
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           size="icon-sm"
