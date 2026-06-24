@@ -1,6 +1,7 @@
-import { entities, entityEdges, projects, tasks } from "@personal-context-os/db";
+import { dailyObjectiveOverrides, entities, entityEdges, projects, tasks } from "@personal-context-os/db";
 import {
   createTaskSchema,
+  localDateSchema,
   patchTaskSchema,
   prioritySchema,
   setDailyObjectiveSchema,
@@ -17,7 +18,8 @@ const taskListQuerySchema = z.object({
   status: taskStatusSchema.optional(),
   project_id: z.string().uuid().optional(),
   priority: prioritySchema.optional(),
-  due_before: z.string().datetime().optional()
+  due_before: z.string().datetime().optional(),
+  objective_date: localDateSchema.optional()
 });
 type TaskKind = z.infer<typeof taskKindSchema>;
 type ParsedCreateTask = z.infer<typeof createTaskSchema>;
@@ -82,6 +84,35 @@ export async function listTasks(context: AppContext, query: unknown) {
   if (filters.project_id) where.push(eq(tasks.projectId, filters.project_id));
   if (filters.priority) where.push(eq(tasks.priority, filters.priority));
   if (filters.due_before) where.push(lte(tasks.dueAt, new Date(filters.due_before)));
+
+  if (filters.objective_date) {
+    const rows = await context.db
+      .select({
+        task: tasks,
+        objectiveState: dailyObjectiveOverrides.state
+      })
+      .from(tasks)
+      .leftJoin(
+        dailyObjectiveOverrides,
+        and(
+          eq(dailyObjectiveOverrides.workspaceId, tasks.workspaceId),
+          eq(dailyObjectiveOverrides.taskId, tasks.id),
+          eq(dailyObjectiveOverrides.localDate, filters.objective_date)
+        )
+      )
+      .where(and(...where))
+      .orderBy(desc(tasks.updatedAt))
+      .limit(200);
+
+    return {
+      tasks: rows.map((row) => ({
+        ...row.task,
+        objectiveState: row.objectiveState,
+        objective_state: row.objectiveState,
+        isPinned: row.objectiveState === "pinned"
+      }))
+    };
+  }
 
   const rows = await context.db
     .select()

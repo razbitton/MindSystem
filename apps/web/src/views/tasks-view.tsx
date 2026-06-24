@@ -12,6 +12,7 @@ import {
 import {
   dateValue,
   isOngoingTask,
+  isTaskPinnedForToday,
   matchesQuery,
   projectName,
   sortByPriority,
@@ -66,8 +67,9 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
   const [deleting, setDeleting] = useState(false);
 
   async function load(nextFilters = filters, force = false) {
+    const taskQuery = taskListQuery(nextFilters);
     const [taskData, projectData] = await Promise.all([
-      cachedApiGet<{ tasks: AnyRecord[] }>("/api/tasks", nextFilters, { force }),
+      cachedApiGet<{ tasks: AnyRecord[] }>("/api/tasks", taskQuery, { force }),
       cachedApiGet<{ projects: AnyRecord[] }>("/api/projects", undefined, { force })
     ]);
     setTasks(taskData.tasks);
@@ -138,13 +140,25 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
   }
 
   async function pinToday(task: AnyRecord) {
+    const isPinned = isTaskPinnedForToday(task);
     try {
       await apiPost(`/api/tasks/${task.id}/daily-objective`, {
         date: toLocalDateString(),
-        action: "pin"
+        action: isPinned ? "clear" : "pin"
       });
       invalidateTaskQueryCache();
-      toast.success(t("dashboard.pinnedToday"));
+      setViewingTask((current) =>
+        current?.id === task.id
+          ? {
+              ...current,
+              isPinned: !isPinned,
+              objectiveState: isPinned ? null : "pinned",
+              objective_state: isPinned ? null : "pinned"
+            }
+          : current
+      );
+      await load(filters, true);
+      toast.success(isPinned ? t("dashboard.unpinObjective") : t("dashboard.pinnedToday"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
     }
@@ -367,6 +381,13 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
       />
     </div>
   );
+}
+
+function taskListQuery(filters: TaskFilters) {
+  return {
+    ...filters,
+    objective_date: toLocalDateString()
+  };
 }
 
 function TaskFilterPanel({

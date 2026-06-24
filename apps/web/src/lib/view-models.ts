@@ -54,6 +54,15 @@ export function isOngoingTask(record: AnyRecord | null | undefined) {
   return taskKind(record) === "ongoing";
 }
 
+export function taskObjectiveState(record: AnyRecord | null | undefined) {
+  const value = record?.objectiveState ?? record?.objective_state;
+  return typeof value === "string" ? value : null;
+}
+
+export function isTaskPinnedForToday(record: AnyRecord | null | undefined) {
+  return Boolean(record?.isPinned ?? record?.is_pinned) || taskObjectiveState(record) === "pinned";
+}
+
 export function toLocalDateString(value: Date = new Date()) {
   const timezoneOffset = value.getTimezoneOffset() * 60000;
   return new Date(value.getTime() - timezoneOffset).toISOString().slice(0, 10);

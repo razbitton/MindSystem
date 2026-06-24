@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Pin, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
-import { dateValue, isOngoingTask, projectName } from "../lib/view-models";
+import { dateValue, isOngoingTask, isTaskPinnedForToday, projectName } from "../lib/view-models";
 import { useI18n } from "../i18n";
 import { Drawer, PriorityBadge, StatusBadge, TaskKindBadge } from "./page";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ export function TaskDetailDialog({
   const completedAt = dateValue(task, "completedAt");
   const isDone = task.status === "done";
   const isOngoing = isOngoingTask(task);
+  const isPinnedToday = isTaskPinnedForToday(task);
 
   return (
     <Drawer
@@ -135,14 +136,16 @@ export function TaskDetailDialog({
             <div className="flex flex-wrap items-center justify-end gap-2">
               {onPinToday && !isOngoing ? (
                 <TaskActionIconButton
-                  label={t("dashboard.pinToday")}
+                  label={isPinnedToday ? t("dashboard.unpinObjective") : t("dashboard.pinToday")}
                   type="button"
                   size="icon-sm"
                   variant="ghost"
-                  disabled={isDone || task.status === "cancelled"}
+                  aria-pressed={isPinnedToday}
+                  className={cn(isPinnedToday && "text-foreground")}
+                  disabled={!isPinnedToday && (isDone || task.status === "cancelled")}
                   onClick={() => void onPinToday(task)}
                 >
-                  <Pin className="size-[18px]" aria-hidden />
+                  <Pin className={cn("size-[18px]", isPinnedToday && "fill-current")} aria-hidden />
                 </TaskActionIconButton>
               ) : null}
               {onEdit ? (
