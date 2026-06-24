@@ -96,6 +96,7 @@ type AuthenticatedRequest = FastifyRequest & { identity: RequestIdentity };
 
 const publicPaths = new Set([
   "/health",
+  "/mcp",
   "/api/openapi.json",
   "/api/auth/login",
   "/api/auth/logout",
