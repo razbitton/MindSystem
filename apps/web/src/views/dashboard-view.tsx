@@ -15,7 +15,6 @@ import {
   Search,
   Send,
   TimerReset,
-  XCircle,
   type LucideIcon
 } from "lucide-react";
 import { apiPost, type AnyRecord } from "../lib/api";
@@ -133,7 +132,7 @@ export default function DashboardView({
     }
   }
 
-  async function setDailyObjective(task: AnyRecord, action: "pin" | "dismiss" | "snooze" | "clear") {
+  async function setDailyObjective(task: AnyRecord, action: "pin" | "snooze" | "clear") {
     setError(null);
     const now = new Date();
     const body: AnyRecord = {
@@ -329,7 +328,7 @@ export default function DashboardView({
   );
 }
 
-type ObjectiveAction = "pin" | "dismiss" | "snooze" | "clear";
+type ObjectiveAction = "pin" | "snooze" | "clear";
 
 function DailyObjectivesPanel({
   data,
@@ -475,7 +474,7 @@ function DailyObjectiveRow({
   return (
     <li
       className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/55 p-3 sm:flex-row sm:items-start sm:justify-between",
+        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/55 p-3 sm:flex-row sm:items-stretch sm:justify-between",
         projectColorClass(task.projectColor ?? task.project_color, "row")
       )}
       style={projectColorStyle(task.projectColor ?? task.project_color)}
@@ -522,7 +521,7 @@ function DailyObjectiveRow({
         ) : null}
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-2">
+      <div className="flex shrink-0 flex-col items-end gap-2 sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
           {isOngoing ? <TaskKindBadge value="ongoing" /> : null}
           <PriorityBadge value={task.priority} />
@@ -530,16 +529,6 @@ function DailyObjectiveRow({
         </div>
 
         <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            type="button"
-            onClick={() => void onObjectiveAction(task, "dismiss")}
-            title={t("dashboard.dismissToday")}
-            aria-label={t("dashboard.dismissToday")}
-          >
-            <XCircle className="size-[18px]" aria-hidden />
-          </Button>
           <Button
             variant="ghost"
             size="icon-sm"

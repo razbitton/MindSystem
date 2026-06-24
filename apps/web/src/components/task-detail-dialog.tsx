@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Pin, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
@@ -8,7 +8,6 @@ import { dateValue, isOngoingTask, projectName } from "../lib/view-models";
 import { useI18n } from "../i18n";
 import { Drawer, PriorityBadge, StatusBadge, TaskKindBadge } from "./page";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type TaskDetailDialogProps = {
@@ -179,24 +178,11 @@ export function TaskDetailDialog({
 
 function TaskActionIconButton({
   label,
-  children,
   ...props
 }: ComponentProps<typeof Button> & {
   label: string;
-  children: ReactNode;
 }) {
-  return (
-    <Tooltip delayDuration={1200}>
-      <TooltipTrigger asChild>
-        <Button aria-label={label} {...props}>
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
-  );
+  return <Button aria-label={label} title={label} {...props} />;
 }
 
 function TaskDetailField({

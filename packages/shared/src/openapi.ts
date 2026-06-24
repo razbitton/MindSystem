@@ -145,7 +145,7 @@ export function buildOpenApiSpec() {
       },
       "/tasks/{id}/daily-objective": {
         post: {
-          summary: "Pin, dismiss, snooze, or clear a task in the daily objective agenda",
+          summary: "Pin, snooze, or clear a task in the daily objective agenda",
           requestBody: { required: true, content: { "application/json": { schema: json(setDailyObjectiveSchema) } } },
           responses: { "200": { description: "Daily objective override" } }
         }

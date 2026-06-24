@@ -194,12 +194,7 @@ export async function setDailyObjective(context: AppContext, id: string, input: 
     await upsertDailyObjectiveOverride(context, task.id, parsed.date, "dismissed");
     await upsertDailyObjectiveOverride(context, task.id, parsed.targetDate!, "pinned");
   } else {
-    await upsertDailyObjectiveOverride(
-      context,
-      task.id,
-      parsed.date,
-      parsed.action === "pin" ? "pinned" : "dismissed"
-    );
+    await upsertDailyObjectiveOverride(context, task.id, parsed.date, "pinned");
   }
 
   await writeAuditEvent(context, {

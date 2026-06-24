@@ -25,7 +25,6 @@ describe("task service validation", () => {
 
   it("validates daily objective actions", () => {
     expect(setDailyObjectiveSchema.parse({ date: "2026-06-24", action: "pin" }).action).toBe("pin");
-    expect(setDailyObjectiveSchema.parse({ date: "2026-06-24", action: "dismiss" }).action).toBe("dismiss");
     expect(
       setDailyObjectiveSchema.parse({
         date: "2026-06-24",
@@ -34,6 +33,7 @@ describe("task service validation", () => {
       }).targetDate
     ).toBe("2026-06-25");
     expect(setDailyObjectiveSchema.parse({ date: "2026-06-24", action: "clear" }).action).toBe("clear");
+    expect(() => setDailyObjectiveSchema.parse({ date: "2026-06-24", action: "dismiss" })).toThrow();
   });
 
   it("rejects invalid daily objective dates and snoozes without a target date", () => {

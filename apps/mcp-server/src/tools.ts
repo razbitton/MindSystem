@@ -39,7 +39,7 @@ const priorityValues = ["low", "medium", "high", "urgent"];
 const entityTypeValues = ["project", "task", "note", "document", "decision", "reminder", "person", "goal"];
 const sourceTypeValues = ["web", "whatsapp", "openclaw", "codex", "api", "manual"];
 const reviewStatusValues = ["pending", "approved", "rejected", "all"];
-const dailyObjectiveActionValues = ["pin", "dismiss", "snooze", "clear"];
+const dailyObjectiveActionValues = ["pin", "snooze", "clear"];
 const purgeDataTypeValues = [
   "raw_items",
   "entities",
@@ -357,7 +357,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "set_daily_objective",
-    description: "Pin, dismiss, snooze, or clear a task in the daily objective agenda.",
+    description: "Pin, snooze, or clear a task in the daily objective agenda.",
     requiredScope: "tasks:write",
     method: "POST",
     path: (args) => `/api/tasks/${String(args.id)}/daily-objective`,
