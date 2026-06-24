@@ -529,6 +529,18 @@ function DailyObjectiveRow({
         </div>
 
         <div className="flex items-center justify-end gap-1">
+          {isPinned ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              onClick={() => void onObjectiveAction(task, "clear")}
+              title={t("dashboard.unpinObjective")}
+              aria-label={t("dashboard.unpinObjective")}
+            >
+              <PinOff className="size-[18px]" aria-hidden />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -539,18 +551,6 @@ function DailyObjectiveRow({
           >
             <TimerReset className="size-[18px]" aria-hidden />
           </Button>
-          {isPinned ? (
-            <Button
-              variant="secondary"
-              size="icon-sm"
-              type="button"
-              onClick={() => void onObjectiveAction(task, "clear")}
-              title={t("dashboard.unpinObjective")}
-              aria-label={t("dashboard.unpinObjective")}
-            >
-              <PinOff className="size-[18px]" aria-hidden />
-            </Button>
-          ) : null}
           {!isOngoing ? (
             <Button
               variant="ghost"

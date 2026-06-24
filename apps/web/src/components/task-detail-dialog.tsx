@@ -138,7 +138,7 @@ export function TaskDetailDialog({
                   label={t("dashboard.pinToday")}
                   type="button"
                   size="icon-sm"
-                  variant="secondary"
+                  variant="ghost"
                   disabled={isDone || task.status === "cancelled"}
                   onClick={() => void onPinToday(task)}
                 >
@@ -149,7 +149,7 @@ export function TaskDetailDialog({
                 <TaskActionIconButton
                   label={t("common.edit")}
                   type="button"
-                  variant="edit"
+                  variant="ghost"
                   size="icon-sm"
                   onClick={() => onEdit(task)}
                 >
@@ -161,7 +161,7 @@ export function TaskDetailDialog({
                   label={isDone ? t("tasks.completed") : t("tasks.markDone")}
                   type="button"
                   size="icon-sm"
-                  variant={isDone ? "secondary" : "default"}
+                  variant="ghost"
                   disabled={isDone}
                   onClick={() => void onComplete(String(task.id))}
                 >
