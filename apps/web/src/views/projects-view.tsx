@@ -214,7 +214,7 @@ export default function ProjectsView() {
         />
       </div>
 
-      <section className="flex min-w-0 max-w-full flex-col gap-4 overflow-hidden">
+      <section className="flex min-w-0 max-w-full flex-col gap-4 overflow-visible">
           <div className="relative w-full max-w-md md:hidden">
             <Search
               className="pointer-events-none absolute inset-y-0 start-3 my-auto size-4 text-muted-foreground"
@@ -238,7 +238,7 @@ export default function ProjectsView() {
           {!filteredProjects.length && !error ? (
             <EmptyState title={t("projects.empty")}>{t("common.emptySearch")}</EmptyState>
           ) : (
-            <div className="grid min-w-0 max-w-full gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid min-w-0 max-w-full gap-4 pt-1 sm:grid-cols-2 xl:grid-cols-3">
               {filteredProjects.map((project) => (
                 <article
                   key={project.id}

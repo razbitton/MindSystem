@@ -282,7 +282,7 @@ export default function DocumentsView() {
               {hasActiveFilters ? t("common.emptySearch") : t("documents.subtitle")}
             </EmptyState>
           ) : (
-            <div className="grid min-w-0 max-w-full gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid min-w-0 max-w-full gap-4 pt-1 md:grid-cols-2 xl:grid-cols-3">
               {filteredDocuments.map((document) => (
                 <DocumentCard
                   key={document.id}

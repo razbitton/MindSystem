@@ -131,7 +131,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
     .slice(0, 10);
 
   return (
-    <div className="flex min-w-0 max-w-full flex-col gap-6 overflow-hidden">
+    <div className="flex min-w-0 max-w-full flex-col gap-6 overflow-visible">
       <PageHeader
         backHref="/projects"
         backLabel={t("common.back")}

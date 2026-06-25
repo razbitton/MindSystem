@@ -92,16 +92,16 @@ function NavLink({
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={cn(
-        "interactive-sidebar-tab group/nav flex items-center rounded-lg text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/45",
+        "interactive-sidebar-tab group/nav flex items-center rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/45",
         collapsed ? "size-10 justify-center px-0 py-0" : "gap-2.5 px-3 py-2",
         active
-          ? "bg-sidebar-accent/85 text-sidebar-accent-foreground shadow-sm"
-          : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+          ? "bg-sidebar-accent/70 font-semibold text-sidebar-accent-foreground shadow-xs"
+          : "font-medium text-sidebar-foreground/75 hover:bg-sidebar-accent/45 hover:text-sidebar-foreground"
       )}
     >
       <Icon
         className={cn(
-          "size-[18px] transition-[color,transform] duration-200 group-hover/nav:scale-110",
+          "size-[18px] transition-colors duration-200",
           active ? "text-sidebar-primary" : "text-sidebar-foreground/55 group-hover/nav:text-sidebar-primary"
         )}
         aria-hidden

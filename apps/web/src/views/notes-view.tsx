@@ -261,7 +261,7 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
             {query || projectFilter ? t("common.emptySearch") : t("home.captureHelp")}
           </EmptyState>
         ) : (
-          <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
+          <div className="columns-1 gap-3 pt-1 sm:columns-2 lg:columns-3 [&>*]:mb-3 [&>*]:break-inside-avoid">
             {filteredNotes.map((note) => {
               const linkedProjectId = String(note.projectId ?? note.project_id ?? "");
               const linkedProjectRecord = findProjectForRecord(projects, note);

@@ -658,7 +658,7 @@ function TaskCards({
   onDelete: (task: AnyRecord, event?: { stopPropagation: () => void }) => void;
 }) {
   return (
-    <div className="grid min-w-0 max-w-full gap-4 xl:grid-cols-2">
+    <div className="grid min-w-0 max-w-full gap-4 pt-1 xl:grid-cols-2">
       {tasks.map((task) => (
         <TaskCard
           key={task.id}

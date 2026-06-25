@@ -89,8 +89,6 @@
   --interactive-shadow-rest: 0 1px 2px rgb(15 23 42 / 0.06);
   --interactive-shadow-hover: 0 18px 42px rgb(15 23 42 / 0.12), 0 5px 14px rgb(15 23 42 / 0.06);
   --interactive-shadow-active: 0 12px 28px rgb(15 23 42 / 0.10);
-  --interactive-glow: color-mix(in oklch, var(--ring) 24%, transparent);
-  --interactive-wash: color-mix(in oklch, var(--ring) 10%, transparent);
 }
 
 [data-theme="dark"] {
@@ -162,8 +160,6 @@
   --interactive-shadow-rest: 0 1px 2px rgb(0 0 0 / 0.22);
   --interactive-shadow-hover: 0 20px 46px rgb(0 0 0 / 0.34), 0 5px 16px rgb(0 0 0 / 0.22);
   --interactive-shadow-active: 0 12px 30px rgb(0 0 0 / 0.28);
-  --interactive-glow: color-mix(in oklch, var(--ring) 32%, transparent);
-  --interactive-wash: color-mix(in oklch, var(--ring) 14%, transparent);
 }
 
 @theme inline {
@@ -351,9 +347,8 @@
     box-shadow: var(--interactive-shadow-rest);
   }
 
-  .interactive-card::after,
   .interactive-row::before,
-  .interactive-sidebar-tab::before {
+  .interactive-sidebar-tab::after {
     position: absolute;
     inset: 0;
     border-radius: inherit;
@@ -371,12 +366,6 @@
     z-index: 1;
   }
 
-  .interactive-card::after {
-    background:
-      radial-gradient(circle at 14% 12%, var(--interactive-glow), transparent 34%),
-      linear-gradient(135deg, var(--interactive-wash), transparent 48%);
-  }
-
   .interactive-sidebar-tab {
     overflow: hidden;
   }
@@ -384,6 +373,7 @@
   .interactive-row::before {
     inset-block: 22%;
     inset-inline-start: 0;
+    inset-inline-end: auto;
     width: 3px;
     border-radius: 999px;
     background: color-mix(in oklch, var(--ring) 52%, transparent);
@@ -395,19 +385,14 @@
     background: color-mix(in srgb, var(--project-color) 72%, transparent);
   }
 
-  .interactive-sidebar-tab::before {
-    background:
-      linear-gradient(135deg, color-mix(in oklch, var(--sidebar-primary) 18%, transparent), transparent 54%),
-      linear-gradient(90deg, color-mix(in oklch, var(--chart-2) 12%, transparent), transparent);
-  }
-
   .interactive-sidebar-tab::after {
     position: absolute;
     inset-block: 22%;
     inset-inline-start: 0;
+    inset-inline-end: auto;
     width: 3px;
     border-radius: 999px;
-    background: var(--sidebar-primary);
+    background: color-mix(in oklch, var(--sidebar-primary) 72%, var(--sidebar-accent));
     content: "";
     z-index: 0;
     opacity: 0;
@@ -422,9 +407,7 @@
     box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 28%, transparent), var(--interactive-shadow-active);
   }
 
-  .interactive-sidebar-tab[data-active="true"]::before,
   .interactive-sidebar-tab[data-active="true"]::after,
-  .interactive-sidebar-tab[aria-current="page"]::before,
   .interactive-sidebar-tab[aria-current="page"]::after {
     opacity: 1;
     transform: scaleY(1);
@@ -439,13 +422,10 @@
     .interactive-card:hover {
       border-color: color-mix(in oklch, var(--ring) 36%, var(--border));
       box-shadow: var(--interactive-shadow-hover);
-      transform: translateY(-3px);
+      transform: translateY(-2px);
     }
 
-    .interactive-card:hover::after,
-    .interactive-row:hover::before,
-    .interactive-sidebar-tab:hover::before,
-    .interactive-sidebar-tab:hover::after {
+    .interactive-row:hover::before {
       opacity: 1;
     }
 
@@ -453,7 +433,7 @@
     .interactive-row:active,
     .interactive-sidebar-tab:active {
       box-shadow: var(--interactive-shadow-active);
-      transform: translateY(-1px) scale(0.995);
+      transform: scale(0.995);
       transition-duration: 90ms;
     }
 
@@ -473,7 +453,8 @@
       transform: translateY(-1px);
     }
 
-    .interactive-sidebar-tab:hover::after {
+    .interactive-sidebar-tab:not([data-active="true"]):not([aria-current="page"]):hover::after {
+      opacity: 0.72;
       transform: scaleY(0.72);
     }
 
