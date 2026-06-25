@@ -320,6 +320,7 @@
 
 @layer utilities {
   .google-calendar-panel .fc {
+    --calendar-time-axis-width: 4.75rem;
     --fc-border-color: var(--border);
     --fc-page-bg-color: transparent;
     --fc-neutral-bg-color: color-mix(in oklch, var(--secondary) 72%, transparent);
@@ -327,6 +328,10 @@
     --fc-now-indicator-color: var(--destructive);
     color: var(--foreground);
     font-size: 0.875rem;
+  }
+
+  .google-calendar-panel .calendar-frame {
+    contain: layout paint;
   }
 
   .google-calendar-panel .fc,
@@ -347,19 +352,42 @@
     border-color: var(--border);
   }
 
+  .google-calendar-panel .fc .fc-timegrid-slots col:first-child,
+  .google-calendar-panel .fc .fc-timegrid-cols col:first-child {
+    inline-size: var(--calendar-time-axis-width) !important;
+    width: var(--calendar-time-axis-width) !important;
+  }
+
   .google-calendar-panel .fc .fc-timegrid-axis,
   .google-calendar-panel .fc .fc-timegrid-slot-label {
     background: color-mix(in oklch, var(--secondary) 48%, transparent);
     color: var(--muted-foreground);
     font-size: 0.6875rem;
     font-weight: 600;
+    inline-size: var(--calendar-time-axis-width);
+    max-inline-size: var(--calendar-time-axis-width);
+    min-inline-size: var(--calendar-time-axis-width);
   }
 
   .google-calendar-panel .fc .fc-timegrid-axis-frame,
   .google-calendar-panel .fc .fc-timegrid-slot-label-frame {
-    justify-content: flex-start;
-    padding-inline: 0.5rem;
-    text-align: start;
+    justify-content: center;
+    overflow: hidden;
+    padding-inline: 0;
+    text-align: center;
+  }
+
+  .google-calendar-panel .fc .fc-timegrid-axis-cushion,
+  .google-calendar-panel .fc .fc-timegrid-slot-label-cushion {
+    display: block;
+    inline-size: 100%;
+    overflow: hidden;
+    padding-inline: 0.65rem;
+    direction: ltr;
+    text-align: center;
+    text-overflow: clip;
+    unicode-bidi: isolate;
+    white-space: nowrap;
   }
 
   .google-calendar-panel .fc .fc-timegrid-slot {
@@ -375,6 +403,25 @@
     background: color-mix(in oklch, var(--background) 88%, var(--card));
   }
 
+  .google-calendar-panel .fc .fc-timegrid-col-events {
+    margin-inline: 0.35rem;
+  }
+
+  .google-calendar-panel .fc .fc-col-header-cell,
+  .google-calendar-panel .fc .fc-list-day-cushion {
+    background: color-mix(in oklch, var(--secondary) 54%, transparent);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .google-calendar-panel .fc .fc-daygrid-day-number {
+    padding: 0.5rem;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
   .google-calendar-panel .fc .fc-event {
     border-radius: 0.5rem;
     border-width: 1px;
@@ -382,6 +429,7 @@
     box-shadow: 0 8px 18px rgb(0 0 0 / 0.12);
     font-size: 0.75rem;
     line-height: 1.2;
+    overflow: hidden;
     transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
   }
 
@@ -392,18 +440,52 @@
   }
 
   .google-calendar-panel .fc .fc-timegrid-event .fc-event-main {
+    min-inline-size: 0;
+    overflow: hidden;
     padding: 0.35rem 0.55rem;
   }
 
-  .google-calendar-panel .fc .fc-event-time {
+  .google-calendar-panel .fc .google-calendar-event-content {
+    display: flex;
+    min-inline-size: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+    overflow: hidden;
+  }
+
+  .google-calendar-panel .fc .google-calendar-event-time {
     color: color-mix(in oklch, currentColor 75%, transparent);
     font-size: 0.6875rem;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    unicode-bidi: isolate;
+    white-space: nowrap;
   }
 
-  .google-calendar-panel .fc .fc-event-title,
-  .google-calendar-panel .fc .fc-event-time {
+  .google-calendar-panel .fc .google-calendar-event-title {
+    display: -webkit-box;
+    min-inline-size: 0;
+    overflow: hidden;
     overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .google-calendar-panel .fc .fc-daygrid-event .google-calendar-event-content,
+  .google-calendar-panel .fc .fc-list-event .google-calendar-event-content {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .google-calendar-panel .fc .fc-list {
+    border: 0;
+  }
+
+  .google-calendar-panel .fc .fc-list-event:hover td {
+    background: color-mix(in oklch, var(--accent) 48%, transparent);
   }
 
   .google-calendar-panel .fc .fc-now-indicator-line {

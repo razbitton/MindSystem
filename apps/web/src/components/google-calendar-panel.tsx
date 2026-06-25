@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
+import heLocale from "@fullcalendar/core/locales/he";
 import interactionPlugin, { type EventResizeDoneArg } from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import type {
+  EventContentArg,
   DateSelectArg,
   DatesSetArg,
   EventApi,
@@ -20,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Filter,
   Loader2,
   Plus,
   RefreshCw,
@@ -48,6 +51,11 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -141,15 +149,20 @@ type EventEditorState = {
   htmlLink: string;
 };
 
+type CalendarView = "timeGridDay" | "timeGridWeek" | "dayGridMonth" | "listWeek";
+
 const googleCalendarCachePrefix = "GET /api/google-calendar";
 const attendeeSplitPattern = /[\s,;]+/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const oneDayMs = 24 * 60 * 60 * 1000;
 
 export function GoogleCalendarPanel({ className }: { className?: string } = {}) {
   const { t, direction, locale } = useI18n();
   const calendarRef = useRef<FullCalendar | null>(null);
   const timeZone = useMemo(() => resolvedTimeZone(), []);
   const [calendarTitle, setCalendarTitle] = useState("");
+  const [calendarView, setCalendarView] = useState<CalendarView>("timeGridDay");
+  const [calendarDate, setCalendarDate] = useState(() => toLocalDateString());
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [calendars, setCalendars] = useState<GoogleCalendarListEntry[]>([]);
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
@@ -173,6 +186,12 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       null
     );
   }, [calendars, selectedCalendarSet]);
+  const calendarViewLabels: Record<CalendarView, string> = {
+    timeGridDay: t("googleCalendar.viewDay"),
+    timeGridWeek: t("googleCalendar.viewWeek"),
+    dayGridMonth: t("googleCalendar.viewMonth"),
+    listWeek: t("googleCalendar.viewAgenda")
+  };
 
   async function loadGoogleCalendar(force = false) {
     setError(null);
@@ -427,12 +446,21 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
     if (action === "today") api.today();
   }
 
+  function changeCalendarView(view: CalendarView) {
+    setCalendarView(view);
+    calendarRef.current?.getApi().changeView(view);
+  }
+
+  function jumpToDate(value: string) {
+    if (!value) return;
+    setCalendarDate(value);
+    calendarRef.current?.getApi().gotoDate(value);
+  }
+
   function handleDatesSet(arg: DatesSetArg) {
-    setCalendarTitle(new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-US", {
-      day: "numeric",
-      month: "long",
-      weekday: "short"
-    }).format(arg.start));
+    if (isCalendarView(arg.view.type)) setCalendarView(arg.view.type);
+    setCalendarDate(toLocalDateString(calendarRef.current?.getApi().getDate() ?? arg.view.currentStart ?? arg.start));
+    setCalendarTitle(formatCalendarTitle(arg, locale));
   }
 
   return (
@@ -463,27 +491,28 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
 
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {status?.connected ? (
-            <div className="flex items-center rounded-lg border border-border bg-secondary/60 p-1">
+            <div className="flex min-w-0 items-center rounded-lg border border-border bg-secondary/60 p-1">
               <button
                 type="button"
                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 onClick={() => navigateCalendar("prev")}
-                aria-label="Previous day"
+                aria-label={t("googleCalendar.previousRange")}
               >
                 <ChevronLeft className="size-4" aria-hidden />
               </button>
-              <button
-                type="button"
-                className="px-3 text-sm font-medium text-foreground transition-colors hover:text-primary"
-                onClick={() => navigateCalendar("today")}
-              >
-                {t("dashboard.today")}
-              </button>
+              <Input
+                type="date"
+                value={calendarDate}
+                onInput={(event) => jumpToDate(event.currentTarget.value)}
+                onChange={(event) => jumpToDate(event.target.value)}
+                aria-label={t("googleCalendar.datePicker")}
+                className="h-8 w-[9.5rem] border-0 bg-transparent px-2 text-xs font-medium shadow-none focus-visible:ring-0"
+              />
               <button
                 type="button"
                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 onClick={() => navigateCalendar("next")}
-                aria-label="Next day"
+                aria-label={t("googleCalendar.nextRange")}
               >
                 <ChevronRight className="size-4" aria-hidden />
               </button>
@@ -492,6 +521,72 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
 
           {status?.connected ? (
             <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigateCalendar("today")}
+              >
+                <CalendarDays data-icon="inline-start" />
+                {t("googleCalendar.todayAction")}
+              </Button>
+              <div
+                className="flex items-center rounded-lg border border-border bg-secondary/60 p-1"
+                role="group"
+                aria-label={t("common.view")}
+              >
+                {(Object.keys(calendarViewLabels) as CalendarView[]).map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    aria-pressed={calendarView === view}
+                    className={cn(
+                      "rounded px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                      calendarView === view && "bg-background text-foreground shadow-xs"
+                    )}
+                    onClick={() => changeCalendarView(view)}
+                  >
+                    {calendarViewLabels[view]}
+                  </button>
+                ))}
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    <Filter data-icon="inline-start" />
+                    {t("common.filter")}
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] text-secondary-foreground">
+                      {t("googleCalendar.selectedCalendars", {
+                        selected: selectedCalendarIds.length,
+                        total: calendars.length
+                      })}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align={direction === "rtl" ? "start" : "end"} className="w-[min(22rem,calc(100vw-2rem))] p-0">
+                  <div className="flex items-start justify-between gap-3 border-b border-border p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{t("googleCalendar.filterCalendars")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("googleCalendar.filterSummary", {
+                          selected: selectedCalendarIds.length,
+                          total: calendars.length
+                        })}
+                      </p>
+                    </div>
+                    {savingPreferences ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : null}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto p-3">
+                    <CalendarToggleList
+                      calendars={calendars}
+                      selectedCalendarSet={selectedCalendarSet}
+                      saving={savingPreferences}
+                      variant="panel"
+                      onToggle={toggleCalendar}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Button type="button" size="sm" onClick={openCreateEditor} disabled={!defaultWritableCalendar}>
                 <Plus data-icon="inline-start" />
                 {t("googleCalendar.newEvent")}
@@ -559,28 +654,24 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
           </CalendarPanelState>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-border p-3 sm:px-5">
-              <CalendarToggleList
-                calendars={calendars}
-                selectedCalendarSet={selectedCalendarSet}
-                saving={savingPreferences}
-                onToggle={toggleCalendar}
-              />
-              {!selectedCalendarIds.length ? (
-                <div className="mt-3 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
+            {!selectedCalendarIds.length ? (
+              <div className="shrink-0 border-b border-border px-4 py-3 sm:px-5">
+                <div className="rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
                   {t("googleCalendar.noSelectedCalendars")}
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             <div className="min-h-0 flex-1 overflow-y-auto bg-background/35 p-4 sm:p-5">
-              <div className="min-h-[720px] overflow-hidden rounded-lg border border-border bg-background">
+              <div className="calendar-frame h-[640px] min-h-[560px] overflow-hidden rounded-lg border border-border bg-background sm:h-[720px]">
                 <FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-                  initialView="timeGridDay"
+                  initialView={calendarView}
+                  initialDate={calendarDate}
                   headerToolbar={false}
                   direction={direction}
+                  locale={locale === "he" ? heLocale : "en"}
                   firstDay={1}
                   nowIndicator
                   selectable={Boolean(defaultWritableCalendar)}
@@ -588,8 +679,8 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                   editable={Boolean(defaultWritableCalendar)}
                   eventStartEditable
                   eventDurationEditable
-                  dayHeaders={false}
-                  allDaySlot={false}
+                  dayHeaders={calendarView !== "timeGridDay"}
+                  allDaySlot={calendarView === "timeGridWeek"}
                   height="100%"
                   contentHeight="auto"
                   slotMinTime="08:00:00"
@@ -600,10 +691,19 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                     minute: "2-digit",
                     hour12: false
                   }}
+                  eventTimeFormat={{
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false
+                  }}
+                  displayEventEnd
+                  dayMaxEvents={3}
+                  eventMaxStack={3}
                   events={loadCalendarEvents}
                   datesSet={handleDatesSet}
                   select={handleDateSelect}
                   eventClick={handleEventClick}
+                  eventContent={renderCalendarEventContent}
                   eventDrop={(info) => void handleEventDrop(info)}
                   eventResize={(info) => void handleEventResize(info)}
                 />
@@ -675,11 +775,13 @@ function CalendarToggleList({
   calendars,
   selectedCalendarSet,
   saving,
+  variant = "inline",
   onToggle
 }: {
   calendars: GoogleCalendarListEntry[];
   selectedCalendarSet: Set<string>;
   saving: boolean;
+  variant?: "inline" | "panel";
   onToggle: (calendarId: string, checked: boolean) => void | Promise<void>;
 }) {
   const { t } = useI18n();
@@ -689,14 +791,21 @@ function CalendarToggleList({
   }
 
   return (
-    <div className="flex min-w-0 flex-wrap gap-2" aria-label={t("googleCalendar.calendars")}>
+    <div
+      className={cn(
+        "min-w-0",
+        variant === "panel" ? "flex flex-col gap-2" : "flex flex-wrap gap-2"
+      )}
+      aria-label={t("googleCalendar.calendars")}
+    >
       {calendars.map((calendar) => {
         const checked = selectedCalendarSet.has(calendar.id);
         return (
           <label
             key={calendar.id}
             className={cn(
-              "flex max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/45 px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground",
+              "flex max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/45 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground",
+              variant === "panel" ? "w-full px-3" : "px-2.5",
               checked && "border-primary/35 bg-primary/10 text-foreground"
             )}
           >
@@ -711,7 +820,7 @@ function CalendarToggleList({
               style={{ backgroundColor: calendar.backgroundColor || "var(--primary)" }}
               aria-hidden
             />
-            <span className="min-w-0 truncate" dir="auto">{calendar.summary}</span>
+            <span className="min-w-0 flex-1 truncate" dir="auto">{calendar.summary}</span>
             {!calendar.writable ? (
               <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 {t("googleCalendar.readOnly")}
@@ -720,6 +829,21 @@ function CalendarToggleList({
           </label>
         );
       })}
+    </div>
+  );
+}
+
+function renderCalendarEventContent(arg: EventContentArg) {
+  return (
+    <div className="google-calendar-event-content" dir="auto">
+      {arg.timeText ? (
+        <span className="google-calendar-event-time" dir="ltr">
+          {arg.timeText}
+        </span>
+      ) : null}
+      <span className="google-calendar-event-title" dir="auto">
+        {arg.event.title}
+      </span>
     </div>
   );
 }
@@ -1158,4 +1282,38 @@ function resolvedTimeZone() {
 
 function invalidateGoogleCalendarCache() {
   invalidateCachedQueries(googleCalendarCachePrefix);
+}
+
+function isCalendarView(value: string): value is CalendarView {
+  return value === "timeGridDay" || value === "timeGridWeek" || value === "dayGridMonth" || value === "listWeek";
+}
+
+function formatCalendarTitle(arg: DatesSetArg, locale: string) {
+  const intlLocale = locale === "he" ? "he-IL" : "en-US";
+  const viewType = arg.view.type;
+
+  if (viewType === "dayGridMonth") {
+    return new Intl.DateTimeFormat(intlLocale, {
+      month: "long",
+      year: "numeric"
+    }).format(arg.view.currentStart);
+  }
+
+  if (viewType === "timeGridWeek" || viewType === "listWeek") {
+    const inclusiveEnd = new Date(arg.end.getTime() - oneDayMs);
+    const formatter = new Intl.DateTimeFormat(intlLocale, {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
+    return typeof formatter.formatRange === "function"
+      ? formatter.formatRange(arg.start, inclusiveEnd)
+      : `${formatter.format(arg.start)} - ${formatter.format(inclusiveEnd)}`;
+  }
+
+  return new Intl.DateTimeFormat(intlLocale, {
+    day: "numeric",
+    month: "long",
+    weekday: "short"
+  }).format(arg.start);
 }
