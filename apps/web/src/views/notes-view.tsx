@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Folder, PenSquare, Search, Trash2 } from "lucide-react";
+import { Folder, PenSquare, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -535,14 +535,16 @@ function NoteEditorPanel({
             )}
           />
           {!expanded ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               aria-label={t("notes.newNote")}
               onClick={expandIfNeeded}
-              className="absolute end-0 top-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="absolute end-0 top-0 text-muted-foreground hover:text-foreground"
             >
               <PenSquare className="size-4" aria-hidden />
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -564,7 +566,6 @@ function NoteEditorPanel({
             <Button
               type="button"
               variant="delete"
-              size="sm"
               onClick={onDelete}
             >
               <Trash2 data-icon="inline-start" />
@@ -572,18 +573,16 @@ function NoteEditorPanel({
             </Button>
           ) : null}
           {mode === "edit" && onClose ? (
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose}>
               {t("common.cancel")}
             </Button>
           ) : null}
           <Button
             type="button"
-            size="sm"
             onMouseDown={(event) => event.preventDefault()}
             onClick={onSave}
             disabled={saveDisabled}
           >
-            <Check data-icon="inline-start" />
             {t("common.save")}
           </Button>
         </div>
