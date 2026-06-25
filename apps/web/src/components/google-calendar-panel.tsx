@@ -546,6 +546,19 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                 </PopoverContent>
               </Popover>
 
+              <Button
+                type="button"
+                size="sm"
+                onClick={openCreateEditor}
+                disabled={!defaultWritableCalendar}
+                className="h-8 max-w-[9.5rem] shrink-0 justify-center rounded-lg px-3"
+              >
+                <Plus className="size-4 shrink-0" aria-hidden />
+                <span className="truncate">{t("googleCalendar.newEvent")}</span>
+              </Button>
+            </div>
+
+            <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
                   type="button"
@@ -554,48 +567,35 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                   onClick={() => navigateCalendar("today")}
                   disabled={todayInCurrentRange}
                   title={t("googleCalendar.returnToToday")}
-                  className="h-7 rounded-md border-border bg-secondary/70 px-2.5 text-xs"
+                  className="h-8 rounded-lg border-border bg-secondary/70 px-2.5 text-xs"
                 >
                   {t("googleCalendar.returnToToday")}
                 </Button>
 
-                <div className="flex h-7 overflow-hidden rounded-md border border-border bg-secondary/70">
+                <div className="flex h-8 overflow-hidden rounded-lg border border-border bg-secondary/70">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => navigateCalendar("prev")}
                     aria-label={t("googleCalendar.previousRange")}
-                    className="h-7 w-7 rounded-none text-muted-foreground hover:text-foreground"
+                    className="h-8 w-8 rounded-none text-muted-foreground hover:text-foreground"
                   >
                     {direction === "rtl" ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
                   </Button>
-                  <div className="my-1.5 w-px bg-border" aria-hidden />
+                  <div className="my-2 w-px bg-border" aria-hidden />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => navigateCalendar("next")}
                     aria-label={t("googleCalendar.nextRange")}
-                    className="h-7 w-7 rounded-none text-muted-foreground hover:text-foreground"
+                    className="h-8 w-8 rounded-none text-muted-foreground hover:text-foreground"
                   >
                     {direction === "rtl" ? <ChevronLeft className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}
                   </Button>
                 </div>
               </div>
-            </div>
-
-            <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
-              <Button
-                type="button"
-                size="sm"
-                onClick={openCreateEditor}
-                disabled={!defaultWritableCalendar}
-                className="h-8 min-w-0 flex-1 justify-center rounded-lg px-3"
-              >
-                <Plus className="size-4 shrink-0" aria-hidden />
-                <span className="truncate">{t("googleCalendar.newEvent")}</span>
-              </Button>
 
               <div
                 className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-border bg-secondary/70 p-0.5"

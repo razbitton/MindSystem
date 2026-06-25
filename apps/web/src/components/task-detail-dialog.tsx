@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Pin, Trash2, UserRound } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock3, Edit2, Folder, Pin, PinOff, Trash2, UserRound } from "lucide-react";
 import { type AnyRecord } from "../lib/api";
 import { findProjectForRecord, projectColorClass, projectColorStyle } from "../lib/project-colors";
 import { dateValue, isOngoingTask, isTaskPinnedForToday, projectName } from "../lib/view-models";
@@ -145,7 +145,11 @@ export function TaskDetailDialog({
                   disabled={!isPinnedToday && (isDone || task.status === "cancelled")}
                   onClick={() => void onPinToday(task)}
                 >
-                  <Pin className={cn("size-[18px]", isPinnedToday && "fill-current")} aria-hidden />
+                  {isPinnedToday ? (
+                    <PinOff className="size-[18px]" aria-hidden />
+                  ) : (
+                    <Pin className="size-[18px]" aria-hidden />
+                  )}
                 </TaskActionIconButton>
               ) : null}
               {onEdit ? (
