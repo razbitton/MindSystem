@@ -19,6 +19,8 @@ import type {
 } from "@fullcalendar/core";
 import {
   CalendarDays,
+  CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -42,6 +44,13 @@ import { useI18n } from "../i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -149,19 +158,30 @@ type EventEditorState = {
   htmlLink: string;
 };
 
-type CalendarView = "timeGridDay" | "timeGridWeek" | "dayGridMonth" | "listWeek";
+type CalendarScope = "day" | "week" | "month" | "year" | "schedule" | "fourDays";
+type CalendarView = "timeGridDay" | "timeGridWeek" | "dayGridMonth" | "dayGridYear" | "listWeek" | "timeGridFourDay";
 
 const googleCalendarCachePrefix = "GET /api/google-calendar";
 const attendeeSplitPattern = /[\s,;]+/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const oneDayMs = 24 * 60 * 60 * 1000;
+const calendarScopeOptions: CalendarScope[] = ["day", "week", "month", "year", "schedule", "fourDays"];
+const calendarScopeShortcuts: Record<CalendarScope, string> = {
+  day: "D",
+  week: "W",
+  month: "M",
+  year: "Y",
+  schedule: "A",
+  fourDays: "X"
+};
 
 export function GoogleCalendarPanel({ className }: { className?: string } = {}) {
   const { t, direction, locale } = useI18n();
   const calendarRef = useRef<FullCalendar | null>(null);
   const timeZone = useMemo(() => resolvedTimeZone(), []);
   const [calendarTitle, setCalendarTitle] = useState("");
-  const [calendarView, setCalendarView] = useState<CalendarView>("timeGridDay");
+  const [calendarScope, setCalendarScope] = useState<CalendarScope>("day");
+  const [lastGridScope, setLastGridScope] = useState<Exclude<CalendarScope, "schedule">>("day");
   const [calendarDate, setCalendarDate] = useState(() => toLocalDateString());
   const [status, setStatus] = useState<GoogleCalendarStatus | null>(null);
   const [calendars, setCalendars] = useState<GoogleCalendarListEntry[]>([]);
@@ -186,11 +206,14 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       null
     );
   }, [calendars, selectedCalendarSet]);
-  const calendarViewLabels: Record<CalendarView, string> = {
-    timeGridDay: t("googleCalendar.viewDay"),
-    timeGridWeek: t("googleCalendar.viewWeek"),
-    dayGridMonth: t("googleCalendar.viewMonth"),
-    listWeek: t("googleCalendar.viewAgenda")
+  const calendarView = calendarScopeToView(calendarScope);
+  const calendarScopeLabels: Record<CalendarScope, string> = {
+    day: t("googleCalendar.viewDay"),
+    week: t("googleCalendar.viewWeek"),
+    month: t("googleCalendar.viewMonth"),
+    year: t("googleCalendar.viewYear"),
+    schedule: t("googleCalendar.viewSchedule"),
+    fourDays: t("googleCalendar.viewFourDays")
   };
 
   async function loadGoogleCalendar(force = false) {
@@ -446,9 +469,14 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
     if (action === "today") api.today();
   }
 
-  function changeCalendarView(view: CalendarView) {
-    setCalendarView(view);
-    calendarRef.current?.getApi().changeView(view);
+  function changeCalendarScope(scope: CalendarScope) {
+    setCalendarScope(scope);
+    if (scope !== "schedule") setLastGridScope(scope);
+    calendarRef.current?.getApi().changeView(calendarScopeToView(scope));
+  }
+
+  function toggleScheduleMode(schedule: boolean) {
+    changeCalendarScope(schedule ? "schedule" : lastGridScope);
   }
 
   function jumpToDate(value: string) {
@@ -458,7 +486,11 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
   }
 
   function handleDatesSet(arg: DatesSetArg) {
-    if (isCalendarView(arg.view.type)) setCalendarView(arg.view.type);
+    const nextScope = scopeFromCalendarView(arg.view.type);
+    if (nextScope) {
+      setCalendarScope(nextScope);
+      if (nextScope !== "schedule") setLastGridScope(nextScope);
+    }
     setCalendarDate(toLocalDateString(calendarRef.current?.getApi().getDate() ?? arg.view.currentStart ?? arg.start));
     setCalendarTitle(formatCalendarTitle(arg, locale));
   }
@@ -470,152 +502,207 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
         className
       )}
     >
-      <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-4 sm:px-5 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <CalendarDays className="size-5" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-medium text-foreground" dir="auto">
-              {calendarTitle || t("googleCalendar.title")}
-            </h2>
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-4 sm:px-5">
+        <div className="flex min-w-0 flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3" dir="ltr">
             {status?.connected ? (
-              <p className="truncate text-xs text-muted-foreground" dir="auto">
-                {t("googleCalendar.connectedAs", {
-                  email: status.googleAccountEmail ?? "Google"
-                })}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {status?.connected ? (
-            <div className="flex min-w-0 items-center rounded-lg border border-border bg-secondary/60 p-1">
-              <button
-                type="button"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                onClick={() => navigateCalendar("prev")}
-                aria-label={t("googleCalendar.previousRange")}
-              >
-                <ChevronLeft className="size-4" aria-hidden />
-              </button>
-              <Input
-                type="date"
-                value={calendarDate}
-                onInput={(event) => jumpToDate(event.currentTarget.value)}
-                onChange={(event) => jumpToDate(event.target.value)}
-                aria-label={t("googleCalendar.datePicker")}
-                className="h-8 w-[9.5rem] border-0 bg-transparent px-2 text-xs font-medium shadow-none focus-visible:ring-0"
-              />
-              <button
-                type="button"
-                className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                onClick={() => navigateCalendar("next")}
-                aria-label={t("googleCalendar.nextRange")}
-              >
-                <ChevronRight className="size-4" aria-hidden />
-              </button>
-            </div>
-          ) : null}
-
-          {status?.connected ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => navigateCalendar("today")}
-              >
-                <CalendarDays data-icon="inline-start" />
-                {t("googleCalendar.todayAction")}
-              </Button>
-              <div
-                className="flex items-center rounded-lg border border-border bg-secondary/60 p-1"
-                role="group"
-                aria-label={t("common.view")}
-              >
-                {(Object.keys(calendarViewLabels) as CalendarView[]).map((view) => (
-                  <button
-                    key={view}
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateCalendar("today")}
+                  className="h-9 rounded-full px-5"
+                >
+                  {t("googleCalendar.todayAction")}
+                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
                     type="button"
-                    aria-pressed={calendarView === view}
-                    className={cn(
-                      "rounded px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-                      calendarView === view && "bg-background text-foreground shadow-xs"
-                    )}
-                    onClick={() => changeCalendarView(view)}
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => navigateCalendar("prev")}
+                    aria-label={t("googleCalendar.previousRange")}
+                    className="rounded-full text-muted-foreground hover:text-foreground"
                   >
-                    {calendarViewLabels[view]}
-                  </button>
-                ))}
-              </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" size="sm">
-                    <Filter data-icon="inline-start" />
-                    {t("common.filter")}
-                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[11px] text-secondary-foreground">
-                      {t("googleCalendar.selectedCalendars", {
-                        selected: selectedCalendarIds.length,
-                        total: calendars.length
-                      })}
-                    </span>
+                    <ChevronLeft className="size-4" aria-hidden />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent align={direction === "rtl" ? "start" : "end"} className="w-[min(22rem,calc(100vw-2rem))] p-0">
-                  <div className="flex items-start justify-between gap-3 border-b border-border p-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{t("googleCalendar.filterCalendars")}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t("googleCalendar.filterSummary", {
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => navigateCalendar("next")}
+                    aria-label={t("googleCalendar.nextRange")}
+                    className="rounded-full text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronRight className="size-4" aria-hidden />
+                  </Button>
+                </div>
+                <div className="min-w-0">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="min-w-0 truncate rounded-md px-1 text-start text-xl font-medium text-foreground outline-none transition-colors hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        aria-label={t("googleCalendar.datePicker")}
+                        dir="auto"
+                      >
+                        {calendarTitle || t("googleCalendar.title")}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-auto p-3">
+                      <Label className="mb-2 block text-xs font-medium text-muted-foreground">
+                        {t("googleCalendar.datePicker")}
+                      </Label>
+                      <Input
+                        type="date"
+                        value={calendarDate}
+                        onInput={(event) => jumpToDate(event.currentTarget.value)}
+                        onChange={(event) => jumpToDate(event.target.value)}
+                        aria-label={t("googleCalendar.datePicker")}
+                        className="w-[10rem]"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </>
+            ) : (
+              <h2 className="text-sm font-medium text-foreground">{t("googleCalendar.title")}</h2>
+            )}
+          </div>
+
+          {status?.connected ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full border-border bg-background/30 px-4"
+                  >
+                    {calendarScopeLabels[calendarScope]}
+                    <ChevronDown className="size-4 opacity-70" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-56 p-2">
+                  {calendarScopeOptions.map((scope) => (
+                    <DropdownMenuItem
+                      key={scope}
+                      className={cn(
+                        "h-10 justify-between rounded-md font-medium",
+                        calendarScope === scope && "bg-accent text-accent-foreground"
+                      )}
+                      onSelect={() => changeCalendarScope(scope)}
+                    >
+                      <span>{calendarScopeLabels[scope]}</span>
+                      <DropdownMenuShortcut>{calendarScopeShortcuts[scope]}</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <div
+                className="flex h-9 overflow-hidden rounded-full border border-border bg-secondary/60"
+                role="group"
+                aria-label={t("googleCalendar.displayMode")}
+              >
+                <button
+                  type="button"
+                  aria-pressed={calendarScope !== "schedule"}
+                  className={cn(
+                    "flex w-12 items-center justify-center border-e border-border text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                    calendarScope !== "schedule" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => toggleScheduleMode(false)}
+                  title={t("googleCalendar.viewCalendar")}
+                  aria-label={t("googleCalendar.viewCalendar")}
+                >
+                  <CalendarDays className="size-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={calendarScope === "schedule"}
+                  className={cn(
+                    "flex w-12 items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                    calendarScope === "schedule" && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
+                  )}
+                  onClick={() => toggleScheduleMode(true)}
+                  title={t("googleCalendar.viewSchedule")}
+                  aria-label={t("googleCalendar.viewSchedule")}
+                >
+                  <CheckCircle2 className="size-4" aria-hidden />
+                </button>
+              </div>
+
+              <div className="flex min-w-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => void disconnectGoogleCalendar()}
+                  disabled={disconnecting}
+                  title={t("googleCalendar.disconnect")}
+                  aria-label={t("googleCalendar.disconnect")}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => void refreshGoogleCalendar()}
+                  disabled={loading || calendarLoading}
+                  title={t("googleCalendar.refreshCalendars")}
+                  aria-label={t("googleCalendar.refreshCalendars")}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
+                </Button>
+                <Button type="button" size="sm" onClick={openCreateEditor} disabled={!defaultWritableCalendar}>
+                  {t("googleCalendar.newEvent")}
+                  <Plus className="size-4" aria-hidden />
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="rounded-lg bg-background/30">
+                      <span className="text-xs tabular-nums">
+                        {t("googleCalendar.selectedCalendars", {
                           selected: selectedCalendarIds.length,
                           total: calendars.length
                         })}
-                      </p>
+                      </span>
+                      {t("common.filter")}
+                      <Filter className="size-4" aria-hidden />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align={direction === "rtl" ? "start" : "end"} className="w-[min(22rem,calc(100vw-2rem))] p-0">
+                    <div className="flex items-start justify-between gap-3 border-b border-border p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{t("googleCalendar.filterCalendars")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("googleCalendar.filterSummary", {
+                            selected: selectedCalendarIds.length,
+                            total: calendars.length
+                          })}
+                        </p>
+                      </div>
+                      {savingPreferences ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : null}
                     </div>
-                    {savingPreferences ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : null}
-                  </div>
-                  <div className="max-h-72 overflow-y-auto p-3">
-                    <CalendarToggleList
-                      calendars={calendars}
-                      selectedCalendarSet={selectedCalendarSet}
-                      saving={savingPreferences}
-                      variant="panel"
-                      onToggle={toggleCalendar}
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <Button type="button" size="sm" onClick={openCreateEditor} disabled={!defaultWritableCalendar}>
-                <Plus data-icon="inline-start" />
-                {t("googleCalendar.newEvent")}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => void refreshGoogleCalendar()}
-                disabled={loading || calendarLoading}
-                title={t("googleCalendar.refreshCalendars")}
-                aria-label={t("googleCalendar.refreshCalendars")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => void disconnectGoogleCalendar()}
-                disabled={disconnecting}
-                title={t("googleCalendar.disconnect")}
-                aria-label={t("googleCalendar.disconnect")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
-              </Button>
-            </>
+                    <div className="max-h-72 overflow-y-auto p-3">
+                      <CalendarToggleList
+                        calendars={calendars}
+                        selectedCalendarSet={selectedCalendarSet}
+                        saving={savingPreferences}
+                        variant="panel"
+                        onToggle={toggleCalendar}
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           ) : null}
         </div>
       </div>
@@ -669,6 +756,12 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
                   initialView={calendarView}
                   initialDate={calendarDate}
+                  views={{
+                    timeGridFourDay: {
+                      type: "timeGrid",
+                      duration: { days: 4 }
+                    }
+                  }}
                   headerToolbar={false}
                   direction={direction}
                   locale={locale === "he" ? heLocale : "en"}
@@ -679,8 +772,8 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                   editable={Boolean(defaultWritableCalendar)}
                   eventStartEditable
                   eventDurationEditable
-                  dayHeaders={calendarView !== "timeGridDay"}
-                  allDaySlot={calendarView === "timeGridWeek"}
+                  dayHeaders={calendarScope !== "day" && calendarScope !== "schedule"}
+                  allDaySlot={calendarScope === "week" || calendarScope === "fourDays"}
                   height="100%"
                   contentHeight="auto"
                   slotMinTime="08:00:00"
@@ -1284,13 +1377,34 @@ function invalidateGoogleCalendarCache() {
   invalidateCachedQueries(googleCalendarCachePrefix);
 }
 
-function isCalendarView(value: string): value is CalendarView {
-  return value === "timeGridDay" || value === "timeGridWeek" || value === "dayGridMonth" || value === "listWeek";
+function calendarScopeToView(scope: CalendarScope): CalendarView {
+  if (scope === "day") return "timeGridDay";
+  if (scope === "week") return "timeGridWeek";
+  if (scope === "month") return "dayGridMonth";
+  if (scope === "year") return "dayGridYear";
+  if (scope === "schedule") return "listWeek";
+  return "timeGridFourDay";
+}
+
+function scopeFromCalendarView(value: string): CalendarScope | null {
+  if (value === "timeGridDay") return "day";
+  if (value === "timeGridWeek") return "week";
+  if (value === "dayGridMonth") return "month";
+  if (value === "dayGridYear") return "year";
+  if (value === "listWeek") return "schedule";
+  if (value === "timeGridFourDay") return "fourDays";
+  return null;
 }
 
 function formatCalendarTitle(arg: DatesSetArg, locale: string) {
   const intlLocale = locale === "he" ? "he-IL" : "en-US";
   const viewType = arg.view.type;
+
+  if (viewType === "dayGridYear") {
+    return new Intl.DateTimeFormat(intlLocale, {
+      year: "numeric"
+    }).format(arg.view.currentStart);
+  }
 
   if (viewType === "dayGridMonth") {
     return new Intl.DateTimeFormat(intlLocale, {
@@ -1299,7 +1413,7 @@ function formatCalendarTitle(arg: DatesSetArg, locale: string) {
     }).format(arg.view.currentStart);
   }
 
-  if (viewType === "timeGridWeek" || viewType === "listWeek") {
+  if (viewType === "timeGridWeek" || viewType === "listWeek" || viewType === "timeGridFourDay") {
     const inclusiveEnd = new Date(arg.end.getTime() - oneDayMs);
     const formatter = new Intl.DateTimeFormat(intlLocale, {
       day: "numeric",
