@@ -558,7 +558,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
               </Button>
             </div>
 
-            <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
+            <div className="flex min-w-0 items-center justify-between gap-3 pb-0.5">
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
                   type="button"
@@ -597,130 +597,132 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                 </div>
               </div>
 
-              <div
-                className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-border bg-secondary/70 p-0.5"
-                role="group"
-                aria-label={t("googleCalendar.displayMode")}
-              >
-                <button
-                  type="button"
-                  aria-pressed={calendarPresentation === "agenda"}
-                  className={cn(
-                    "flex w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-                    calendarPresentation === "agenda" && "bg-primary text-primary-foreground shadow-xs hover:bg-primary hover:text-primary-foreground"
-                  )}
-                  onClick={() => changeCalendarPresentation("agenda")}
-                  title={t("googleCalendar.viewAgenda")}
-                  aria-label={t("googleCalendar.viewAgenda")}
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-x-auto">
+                <div
+                  className="flex h-8 shrink-0 overflow-hidden rounded-lg border border-border bg-secondary/70 p-0.5"
+                  role="group"
+                  aria-label={t("googleCalendar.displayMode")}
                 >
-                  <Clock3 className="size-4" aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={calendarPresentation === "calendar"}
-                  className={cn(
-                    "flex w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-                    calendarPresentation === "calendar" && "bg-primary text-primary-foreground shadow-xs hover:bg-primary hover:text-primary-foreground"
-                  )}
-                  onClick={() => changeCalendarPresentation("calendar")}
-                  title={t("googleCalendar.viewCalendar")}
-                  aria-label={t("googleCalendar.viewCalendar")}
-                >
-                  <CalendarDays className="size-4" aria-hidden />
-                </button>
-              </div>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="h-8 w-8 shrink-0 rounded-lg bg-secondary/70"
-                    title={t("common.filter")}
-                    aria-label={t("common.filter")}
+                    aria-pressed={calendarPresentation === "agenda"}
+                    className={cn(
+                      "flex w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                      calendarPresentation === "agenda" && "bg-primary text-primary-foreground shadow-xs hover:bg-primary hover:text-primary-foreground"
+                    )}
+                    onClick={() => changeCalendarPresentation("agenda")}
+                    title={t("googleCalendar.viewAgenda")}
+                    aria-label={t("googleCalendar.viewAgenda")}
                   >
-                    <Filter className="size-4" aria-hidden />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align={direction === "rtl" ? "start" : "end"} className="w-[min(22rem,calc(100vw-2rem))] p-0">
-                  <div className="flex items-start justify-between gap-3 border-b border-border p-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{t("googleCalendar.filterCalendars")}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t("googleCalendar.filterSummary", {
-                          selected: selectedCalendarIds.length,
-                          total: calendars.length
-                        })}
-                      </p>
-                    </div>
-                    {savingPreferences ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : null}
-                  </div>
-                  <div className="max-h-72 overflow-y-auto p-3">
-                    <CalendarToggleList
-                      calendars={calendars}
-                      selectedCalendarSet={selectedCalendarSet}
-                      saving={savingPreferences}
-                      variant="panel"
-                      onToggle={toggleCalendar}
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
+                    <Clock3 className="size-4" aria-hidden />
+                  </button>
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 shrink-0 rounded-lg border-border bg-secondary/70 px-2.5"
+                    aria-pressed={calendarPresentation === "calendar"}
+                    className={cn(
+                      "flex w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                      calendarPresentation === "calendar" && "bg-primary text-primary-foreground shadow-xs hover:bg-primary hover:text-primary-foreground"
+                    )}
+                    onClick={() => changeCalendarPresentation("calendar")}
+                    title={t("googleCalendar.viewCalendar")}
+                    aria-label={t("googleCalendar.viewCalendar")}
                   >
-                    {calendarScopeLabels[calendarScope]}
-                    <ChevronDown className="size-4 opacity-70" aria-hidden />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-48 p-2">
-                  {calendarScopeOptions.map((scope) => (
-                    <DropdownMenuItem
-                      key={scope}
-                      className={cn(
-                        "h-10 justify-between rounded-md font-medium",
-                        calendarScope === scope && "bg-accent text-accent-foreground"
-                      )}
-                      onSelect={() => changeCalendarScope(scope)}
+                    <CalendarDays className="size-4" aria-hidden />
+                  </button>
+                </div>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-8 w-8 shrink-0 rounded-lg bg-secondary/70"
+                      title={t("common.filter")}
+                      aria-label={t("common.filter")}
                     >
-                      <span>{calendarScopeLabels[scope]}</span>
-                      <DropdownMenuShortcut>{calendarScopeShortcuts[scope]}</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      <Filter className="size-4" aria-hidden />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align={direction === "rtl" ? "start" : "end"} className="w-[min(22rem,calc(100vw-2rem))] p-0">
+                    <div className="flex items-start justify-between gap-3 border-b border-border p-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{t("googleCalendar.filterCalendars")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("googleCalendar.filterSummary", {
+                            selected: selectedCalendarIds.length,
+                            total: calendars.length
+                          })}
+                        </p>
+                      </div>
+                      {savingPreferences ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden /> : null}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto p-3">
+                      <CalendarToggleList
+                        calendars={calendars}
+                        selectedCalendarSet={selectedCalendarSet}
+                        saving={savingPreferences}
+                        variant="panel"
+                        onToggle={toggleCalendar}
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => void refreshGoogleCalendar()}
-                disabled={loading || calendarLoading}
-                title={t("googleCalendar.refreshCalendars")}
-                aria-label={t("googleCalendar.refreshCalendars")}
-                className="h-8 w-8 shrink-0 rounded-lg bg-secondary/70 text-muted-foreground hover:text-foreground"
-              >
-                <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => void disconnectGoogleCalendar()}
-                disabled={disconnecting}
-                title={t("googleCalendar.disconnect")}
-                aria-label={t("googleCalendar.disconnect")}
-                className="h-8 w-8 shrink-0 rounded-lg bg-secondary/70 text-muted-foreground hover:text-foreground"
-              >
-                {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
-              </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 rounded-lg border-border bg-secondary/70 px-2.5"
+                    >
+                      {calendarScopeLabels[calendarScope]}
+                      <ChevronDown className="size-4 opacity-70" aria-hidden />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align={direction === "rtl" ? "start" : "end"} className="w-48 p-2">
+                    {calendarScopeOptions.map((scope) => (
+                      <DropdownMenuItem
+                        key={scope}
+                        className={cn(
+                          "h-10 justify-between rounded-md font-medium",
+                          calendarScope === scope && "bg-accent text-accent-foreground"
+                        )}
+                        onSelect={() => changeCalendarScope(scope)}
+                      >
+                        <span>{calendarScopeLabels[scope]}</span>
+                        <DropdownMenuShortcut>{calendarScopeShortcuts[scope]}</DropdownMenuShortcut>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => void refreshGoogleCalendar()}
+                  disabled={loading || calendarLoading}
+                  title={t("googleCalendar.refreshCalendars")}
+                  aria-label={t("googleCalendar.refreshCalendars")}
+                  className="h-8 w-8 shrink-0 rounded-lg bg-secondary/70 text-muted-foreground hover:text-foreground"
+                >
+                  <RefreshCw className={cn("size-[18px]", calendarLoading && "animate-spin")} aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => void disconnectGoogleCalendar()}
+                  disabled={disconnecting}
+                  title={t("googleCalendar.disconnect")}
+                  aria-label={t("googleCalendar.disconnect")}
+                  className="h-8 w-8 shrink-0 rounded-lg bg-secondary/70 text-muted-foreground hover:text-foreground"
+                >
+                  {disconnecting ? <Loader2 className="size-[18px] animate-spin" aria-hidden /> : <Unplug className="size-[18px]" aria-hidden />}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
