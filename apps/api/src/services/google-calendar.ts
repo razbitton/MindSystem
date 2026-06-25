@@ -409,7 +409,7 @@ export function mapGoogleCalendarEvent(
     eventId: event.id ?? "",
     calendarId,
     calendarSummary,
-    title: event.summary || "(No title)",
+    title: event.summary ?? "",
     start: event.start?.dateTime ?? event.start?.date ?? null,
     end: event.end?.dateTime ?? event.end?.date ?? null,
     allDay,

@@ -161,6 +161,8 @@ type EventEditorState = {
 type CalendarScope = "day" | "week" | "month";
 type CalendarPresentation = "calendar" | "agenda";
 type CalendarView = "timeGridDay" | "timeGridWeek" | "dayGridMonth" | "listDay" | "listWeek" | "listMonth";
+type CalendarTranslator = ReturnType<typeof useI18n>["t"];
+type CalendarTranslationKey = Parameters<CalendarTranslator>[0];
 
 const googleCalendarCachePrefix = "GET /api/google-calendar";
 const attendeeSplitPattern = /[\s,;]+/;
@@ -172,6 +174,35 @@ const calendarScopeShortcuts: Record<CalendarScope, string> = {
   week: "W",
   month: "M"
 };
+const googleCalendarErrorTranslationRules: { match: string; key: CalendarTranslationKey }[] = [
+  { match: "Google Calendar is not configured", key: "googleCalendar.notConfigured" },
+  { match: "Missing Google Calendar authorization response", key: "googleCalendar.authMissingResponse" },
+  { match: "Invalid Google Calendar authorization state", key: "googleCalendar.authInvalidState" },
+  { match: "Google did not return a refresh token", key: "googleCalendar.authNoRefreshToken" },
+  { match: "Google Calendar requires a signed-in user session", key: "googleCalendar.signedInRequired" },
+  { match: "Google Calendar is not connected", key: "googleCalendar.notConnectedError" },
+  { match: "Invalid encrypted token", key: "googleCalendar.invalidToken" },
+  { match: "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key", key: "googleCalendar.invalidEncryptionKey" },
+  { match: "start and end must be provided together", key: "googleCalendar.eventRequired" },
+  { match: "All-day Google Calendar events require YYYY-MM-DD start and end values", key: "googleCalendar.eventRequired" },
+  { match: "All-day event end date must be after start date", key: "googleCalendar.endAfterStart" },
+  { match: "Timed Google Calendar events require ISO date-time start and end values", key: "googleCalendar.eventRequired" },
+  { match: "Event end time must be after start time", key: "googleCalendar.endAfterStart" }
+];
+
+function googleCalendarErrorMessage(error: unknown, t: CalendarTranslator, fallbackKey: CalendarTranslationKey = "common.failed") {
+  const message = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+  const normalizedMessage = message.trim();
+  if (!normalizedMessage) return t(fallbackKey);
+
+  if (normalizedMessage.startsWith("Google Calendar authorization failed")) {
+    const detail = normalizedMessage.split(":").slice(1).join(":").trim();
+    return detail ? `${t("googleCalendar.connectError")}: ${detail}` : t("googleCalendar.connectError");
+  }
+
+  const rule = googleCalendarErrorTranslationRules.find((candidate) => normalizedMessage.includes(candidate.match));
+  return rule ? t(rule.key) : normalizedMessage;
+}
 
 export function GoogleCalendarPanel({ className }: { className?: string } = {}) {
   const { t, direction, locale } = useI18n();
@@ -230,7 +261,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
         setSelectedCalendarIds(nextStatus.selectedCalendarIds ?? []);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("googleCalendar.loadError"));
+      setError(googleCalendarErrorMessage(err, t, "googleCalendar.loadError"));
     } finally {
       setLoading(false);
       setCalendarLoading(false);
@@ -245,7 +276,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
     if (result === "connected") {
       toast.success(t("googleCalendar.connected"));
     } else if (result === "error") {
-      toast.error(url.searchParams.get("message") || t("googleCalendar.connectError"));
+      toast.error(googleCalendarErrorMessage(url.searchParams.get("message"), t, "googleCalendar.connectError"));
     }
 
     url.searchParams.delete("googleCalendar");
@@ -288,9 +319,9 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
         timeZone,
         calendarIds: selectedCalendarIdsKey
       });
-      return data.events.map(mapApiEventToFullCalendar);
+      return data.events.map((event) => mapApiEventToFullCalendar(event, t("googleCalendar.noTitle")));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("googleCalendar.loadError"));
+      toast.error(googleCalendarErrorMessage(err, t, "googleCalendar.loadError"));
       return [];
     }
   }, [selectedCalendarIdsKey, status?.connected, t, timeZone]);
@@ -307,7 +338,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       const response = await apiPost<{ authorizationUrl: string }>("/api/google-calendar/connect", {});
       window.location.assign(response.authorizationUrl);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("googleCalendar.connectFailed"));
+      toast.error(googleCalendarErrorMessage(err, t, "googleCalendar.connectFailed"));
       setConnecting(false);
     }
   }
@@ -322,7 +353,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       toast.success(t("googleCalendar.disconnected"));
       await loadGoogleCalendar(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("common.failed"));
+      toast.error(googleCalendarErrorMessage(err, t));
     } finally {
       setDisconnecting(false);
     }
@@ -341,7 +372,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       invalidateGoogleCalendarCache();
     } catch (err) {
       setSelectedCalendarIds(previous);
-      toast.error(err instanceof Error ? err.message : t("googleCalendar.preferencesFailed"));
+      toast.error(googleCalendarErrorMessage(err, t, "googleCalendar.preferencesFailed"));
     } finally {
       setSavingPreferences(false);
     }
@@ -412,7 +443,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       calendarRef.current?.getApi().refetchEvents();
     } catch (err) {
       revert();
-      toast.error(err instanceof Error ? err.message : t("common.failed"));
+      toast.error(googleCalendarErrorMessage(err, t));
     }
   }
 
@@ -447,7 +478,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       toast.success(t("googleCalendar.saved"));
       calendarRef.current?.getApi().refetchEvents();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("common.failed"));
+      toast.error(googleCalendarErrorMessage(err, t));
     } finally {
       setSavingEvent(false);
     }
@@ -468,7 +499,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
       toast.success(t("googleCalendar.deleted"));
       calendarRef.current?.getApi().refetchEvents();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("common.failed"));
+      toast.error(googleCalendarErrorMessage(err, t));
     } finally {
       setDeleting(false);
     }
@@ -778,6 +809,7 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                 className="calendar-frame h-[640px] min-h-[560px] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-background sm:h-[720px]"
               >
                 <FullCalendar
+                  key={locale}
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
                   initialView={calendarView}
@@ -785,6 +817,22 @@ export function GoogleCalendarPanel({ className }: { className?: string } = {}) 
                   headerToolbar={false}
                   direction={direction}
                   locale={locale === "he" ? heLocale : "en"}
+                  buttonText={{
+                    today: t("googleCalendar.todayAction"),
+                    month: t("googleCalendar.viewMonth"),
+                    week: t("googleCalendar.viewWeek"),
+                    day: t("googleCalendar.viewDay"),
+                    list: t("googleCalendar.viewAgenda")
+                  }}
+                  allDayText={t("googleCalendar.allDay")}
+                  weekText={t("googleCalendar.weekLabel")}
+                  weekTextLong={t("googleCalendar.weekLabelLong")}
+                  noEventsText={t("googleCalendar.noEvents")}
+                  moreLinkText={(count) => t("googleCalendar.moreEvents", { count })}
+                  moreLinkHint={(count) => t("googleCalendar.moreEventsHint", { count })}
+                  eventHint={t("googleCalendar.eventHint")}
+                  timeHint={t("googleCalendar.timeHint")}
+                  closeHint={t("common.close")}
                   firstDay={1}
                   nowIndicator
                   selectable={Boolean(defaultWritableCalendar)}
@@ -989,6 +1037,7 @@ function GoogleCalendarEventEditor({
       open={Boolean(editor)}
       title={editor?.mode === "edit" ? t("googleCalendar.editEvent") : t("googleCalendar.newEvent")}
       onClose={onClose}
+      preventOpenAutoFocus
       footer={
         editor ? (
           <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1169,10 +1218,10 @@ function Field({
   );
 }
 
-function mapApiEventToFullCalendar(event: GoogleCalendarApiEvent): EventInput {
+function mapApiEventToFullCalendar(event: GoogleCalendarApiEvent, fallbackTitle: string): EventInput {
   const input: EventInput = {
     id: event.id,
-    title: event.title,
+    title: event.title || fallbackTitle,
     allDay: event.allDay,
     editable: event.editable,
     extendedProps: {
@@ -1293,7 +1342,7 @@ function movedEventPayload(event: EventApi, props: GoogleCalendarEventProps, tim
   };
 }
 
-function editorPayload(editor: EventEditorState, timeZone: string, t: (key: Parameters<ReturnType<typeof useI18n>["t"]>[0]) => string): AnyRecord {
+function editorPayload(editor: EventEditorState, timeZone: string, t: CalendarTranslator): AnyRecord {
   const summary = editor.summary.trim();
   if (!summary || !editor.start || !editor.end) throw new Error(t("googleCalendar.eventRequired"));
 
@@ -1331,7 +1380,7 @@ function editorPayload(editor: EventEditorState, timeZone: string, t: (key: Para
   };
 }
 
-function parseAttendees(text: string, t: (key: Parameters<ReturnType<typeof useI18n>["t"]>[0]) => string) {
+function parseAttendees(text: string, t: CalendarTranslator) {
   const candidates = parseAttendeeCandidates(text);
   if (candidates.some((email) => !emailPattern.test(email))) {
     throw new Error(t("googleCalendar.invalidAttendee"));
