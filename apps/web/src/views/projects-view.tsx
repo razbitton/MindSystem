@@ -177,7 +177,7 @@ export default function ProjectsView() {
           {t("projects.title")}
         </h1>
 
-        <div className="flex min-w-0 items-center gap-3" dir="ltr">
+        <div className="flex min-w-0 items-center gap-3" dir={direction}>
           <Button dir={direction} size="sm" type="button" onClick={openCreate}>
             <Plus data-icon="inline-start" />
             {t("projects.newProject")}
@@ -193,7 +193,7 @@ export default function ProjectsView() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder={`${t("projects.searchPlaceholder")}...`}
               className={cn(
-                "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+                "h-9 rounded-lg border-border bg-secondary/70 ps-10 pe-3 text-sm shadow-none focus-visible:ring-1",
                 direction === "rtl" ? "text-right" : "text-left"
               )}
             />
@@ -243,7 +243,7 @@ export default function ProjectsView() {
                 <article
                   key={project.id}
                   className={cn(
-                    "flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-shadow hover:shadow-md",
+                    "interactive-card group flex min-w-0 max-w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4",
                     projectColorClass(project.color, "card")
                   )}
                   style={projectColorStyle(project.color)}
@@ -251,10 +251,10 @@ export default function ProjectsView() {
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <Link
                       href={`/projects/${project.id}`}
-                      className="min-w-0 flex-1 overflow-hidden hover:underline"
+                      className="min-w-0 flex-1 overflow-hidden transition-colors hover:text-primary"
                       aria-label={`${t("projects.openProject")}: ${project.name}`}
                     >
-                      <p className="truncate text-sm font-semibold text-foreground [overflow-wrap:anywhere]" dir="auto">
+                      <p className="truncate text-sm font-semibold text-current [overflow-wrap:anywhere]" dir="auto">
                         {projectColorValue(project.color) ? (
                           <span
                             className={cn("me-2 inline-block size-2.5 rounded-full align-middle", projectColorClass(project.color, "swatch"))}

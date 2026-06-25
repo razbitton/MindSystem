@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { Direction as RadixDirection } from "radix-ui";
 
 export type Locale = "en" | "he";
 export type Direction = "ltr" | "rtl";
@@ -1092,7 +1093,11 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     };
   }, [direction, locale, theme]);
 
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return (
+    <RadixDirection.Provider dir={direction}>
+      <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
+    </RadixDirection.Provider>
+  );
 }
 
 export function useI18n() {

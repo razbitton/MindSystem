@@ -1026,7 +1026,7 @@ function GoogleCalendarEventEditor({
   onSave: () => void;
   onDelete: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, direction } = useI18n();
   const editable = Boolean(editor?.canEdit);
   const calendarOptions = editor?.mode === "create"
     ? calendars.filter((calendar) => calendar.writable)
@@ -1071,7 +1071,7 @@ function GoogleCalendarEventEditor({
       }
     >
       {editor ? (
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4" dir={direction}>
           {!editable ? (
             <Alert>
               <AlertDescription>{t("googleCalendar.readOnlyEvent")}</AlertDescription>
@@ -1120,7 +1120,7 @@ function GoogleCalendarEventEditor({
             </Select>
           </Field>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" dir={direction}>
             <Switch
               id="google-calendar-all-day"
               checked={editor.allDay}

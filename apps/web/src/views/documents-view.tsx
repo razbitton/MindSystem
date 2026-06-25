@@ -162,7 +162,7 @@ export default function DocumentsView() {
             {t("documents.title")}
           </h1>
 
-          <div className="flex min-w-0 items-center gap-3" dir="ltr">
+          <div className="flex min-w-0 items-center gap-3" dir={direction}>
             <Button dir={direction} size="sm" type="button" onClick={openCreate}>
               <Plus data-icon="inline-start" />
               {t("documents.newDocument")}
@@ -192,7 +192,7 @@ export default function DocumentsView() {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={`${t("documents.searchPlaceholder")}...`}
                 className={cn(
-                  "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+                  "h-9 rounded-lg border-border bg-secondary/70 ps-10 pe-3 text-sm shadow-none focus-visible:ring-1",
                   direction === "rtl" ? "text-right" : "text-left"
                 )}
               />
@@ -296,9 +296,9 @@ export default function DocumentsView() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="flex min-h-[17rem] min-w-0 max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card/40 p-6 text-center text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="interactive-card group flex min-h-[17rem] min-w-0 max-w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card/40 p-6 text-center text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted transition-colors">
+                <span className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted transition-[background-color,transform] group-hover:scale-105 group-hover:bg-primary/10">
                   <Plus className="size-7" aria-hidden />
                 </span>
                 <span className="text-base font-semibold">{t("documents.newDocument")}</span>
@@ -515,13 +515,13 @@ function DocumentCard({
   return (
     <article
       className={cn(
-        "group flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15",
+        "interactive-card group flex h-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border bg-card p-4",
         projectColorClass(linkedProjectRecord?.color, "card")
       )}
       style={projectColorStyle(linkedProjectRecord?.color)}
     >
       <div className="mb-3 flex min-w-0 items-start gap-4">
-        <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden>
+        <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-[background-color,transform] group-hover:scale-105 group-hover:bg-primary/15" aria-hidden>
           <FileText className="size-6" strokeWidth={1.5} />
         </span>
         <div className="min-w-0 flex-1">

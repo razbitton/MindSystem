@@ -281,7 +281,7 @@ export default function NotesView({ initialNotes, initialProjects }: NotesViewPr
                     }
                   }}
                   className={cn(
-                    "flex max-h-56 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 text-start shadow-xs transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "interactive-card flex max-h-56 cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-border bg-card p-4 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     projectColorClass(linkedProjectRecord?.color, "card")
                   )}
                   style={projectColorStyle(linkedProjectRecord?.color)}
@@ -387,7 +387,7 @@ function NotesSearchProjectFilter({
         "flex min-w-0 items-center gap-3",
         className
       )}
-      dir="ltr"
+      dir={direction}
     >
       <Select
         value={projectFilter || ALL_PROJECTS}
@@ -438,7 +438,7 @@ function NotesSearchProjectFilter({
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={`${t("notes.searchPlaceholder")}...`}
           className={cn(
-            "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+            "h-9 rounded-lg border-border bg-secondary/70 ps-10 pe-3 text-sm shadow-none focus-visible:ring-1",
             direction === "rtl" ? "text-right" : "text-left"
           )}
         />
@@ -496,6 +496,7 @@ function NoteEditorPanel({
       className={cn(
         "relative w-full overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-all duration-200",
         expanded ? "shadow-lg shadow-black/10" : "hover:border-primary/40 hover:shadow-md",
+        !expanded && "interactive-card",
         projectColorClass(selectedProject?.color, "card"),
         mode === "edit" && "max-h-[min(42rem,calc(100svh_-_2rem))] md:max-h-[min(72rem,calc(100svh_-_1rem))]"
       )}

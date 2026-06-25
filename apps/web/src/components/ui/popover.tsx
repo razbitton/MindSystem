@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Popover as PopoverPrimitive } from "radix-ui"
+import { Direction, Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
@@ -21,12 +21,16 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  dir,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  const resolvedDir = Direction.useDirection(dir as "ltr" | "rtl" | undefined)
+
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         data-slot="popover-content"
+        dir={resolvedDir}
         align={align}
         sideOffset={sideOffset}
         className={cn(

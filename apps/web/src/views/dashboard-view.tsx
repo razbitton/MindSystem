@@ -314,7 +314,7 @@ function DailyObjectiveRow({
   return (
     <li
       className={cn(
-        "flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/55 p-3 sm:flex-row sm:items-stretch sm:justify-between",
+        "interactive-row flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-background/55 p-3 sm:flex-row sm:items-stretch sm:justify-between",
         projectColorClass(task.projectColor ?? task.project_color, "row")
       )}
       style={projectColorStyle(task.projectColor ?? task.project_color)}
@@ -430,7 +430,7 @@ function ReminderSection({
           <li
             key={reminder.id}
             className={cn(
-              "flex min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-background/55 p-3",
+              "interactive-row flex min-w-0 items-start justify-between gap-3 rounded-lg border border-border bg-background/55 p-3",
               projectColorClass(reminder.projectColor ?? reminder.project_color, "row")
             )}
             style={projectColorStyle(reminder.projectColor ?? reminder.project_color)}
@@ -515,7 +515,7 @@ function ProjectRows({
           <Link
             href={`/projects/${project.id}`}
             className={cn(
-              "flex min-w-0 items-start justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/60",
+              "interactive-row flex min-w-0 items-start justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               projectColorClass(project.color, "row")
             )}
             style={projectColorStyle(project.color)}

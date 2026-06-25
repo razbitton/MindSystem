@@ -84,6 +84,13 @@
   --surface-max-block: min(48rem, calc(100svh - 4rem));
   --surface-max-block-tight: min(34rem, calc(100svh - 6rem));
   --surface-max-block-tall: min(64rem, calc(100svh - 4rem));
+
+  /* Interactive elevation */
+  --interactive-shadow-rest: 0 1px 2px rgb(15 23 42 / 0.06);
+  --interactive-shadow-hover: 0 18px 42px rgb(15 23 42 / 0.12), 0 5px 14px rgb(15 23 42 / 0.06);
+  --interactive-shadow-active: 0 12px 28px rgb(15 23 42 / 0.10);
+  --interactive-glow: color-mix(in oklch, var(--ring) 24%, transparent);
+  --interactive-wash: color-mix(in oklch, var(--ring) 10%, transparent);
 }
 
 [data-theme="dark"] {
@@ -151,6 +158,12 @@
   --chart-3: oklch(0.7 0.12 155);
   --chart-4: oklch(0.76 0.13 75);
   --chart-5: oklch(0.68 0.15 12);
+
+  --interactive-shadow-rest: 0 1px 2px rgb(0 0 0 / 0.22);
+  --interactive-shadow-hover: 0 20px 46px rgb(0 0 0 / 0.34), 0 5px 16px rgb(0 0 0 / 0.22);
+  --interactive-shadow-active: 0 12px 30px rgb(0 0 0 / 0.28);
+  --interactive-glow: color-mix(in oklch, var(--ring) 32%, transparent);
+  --interactive-wash: color-mix(in oklch, var(--ring) 14%, transparent);
 }
 
 @theme inline {
@@ -319,6 +332,182 @@
 }
 
 @layer utilities {
+  .interactive-card,
+  .interactive-row,
+  .interactive-sidebar-tab {
+    position: relative;
+    isolation: isolate;
+    transform: translate3d(0, 0, 0);
+    transition:
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease,
+      filter 180ms ease;
+  }
+
+  .interactive-card {
+    box-shadow: var(--interactive-shadow-rest);
+  }
+
+  .interactive-card::after,
+  .interactive-row::before,
+  .interactive-sidebar-tab::before {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    content: "";
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+
+  .interactive-card > *,
+  .interactive-row > *,
+  .interactive-sidebar-tab > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .interactive-card::after {
+    background:
+      radial-gradient(circle at 14% 12%, var(--interactive-glow), transparent 34%),
+      linear-gradient(135deg, var(--interactive-wash), transparent 48%);
+  }
+
+  .interactive-sidebar-tab {
+    overflow: hidden;
+  }
+
+  .interactive-row::before {
+    inset-block: 22%;
+    inset-inline-start: 0;
+    width: 3px;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--ring) 52%, transparent);
+    transform: scaleY(0.45);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .project-color-row.interactive-row::before {
+    background: color-mix(in srgb, var(--project-color) 72%, transparent);
+  }
+
+  .interactive-sidebar-tab::before {
+    background:
+      linear-gradient(135deg, color-mix(in oklch, var(--sidebar-primary) 18%, transparent), transparent 54%),
+      linear-gradient(90deg, color-mix(in oklch, var(--chart-2) 12%, transparent), transparent);
+  }
+
+  .interactive-sidebar-tab::after {
+    position: absolute;
+    inset-block: 22%;
+    inset-inline-start: 0;
+    width: 3px;
+    border-radius: 999px;
+    background: var(--sidebar-primary);
+    content: "";
+    z-index: 0;
+    opacity: 0;
+    transform: scaleY(0.45);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .interactive-card:focus-visible,
+  .interactive-row:focus-visible,
+  .interactive-sidebar-tab:focus-visible {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 28%, transparent), var(--interactive-shadow-active);
+  }
+
+  .interactive-sidebar-tab[data-active="true"]::before,
+  .interactive-sidebar-tab[data-active="true"]::after,
+  .interactive-sidebar-tab[aria-current="page"]::before,
+  .interactive-sidebar-tab[aria-current="page"]::after {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  .interactive-row:focus-visible::before {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .interactive-card:hover {
+      border-color: color-mix(in oklch, var(--ring) 36%, var(--border));
+      box-shadow: var(--interactive-shadow-hover);
+      transform: translateY(-3px);
+    }
+
+    .interactive-card:hover::after,
+    .interactive-row:hover::before,
+    .interactive-sidebar-tab:hover::before,
+    .interactive-sidebar-tab:hover::after {
+      opacity: 1;
+    }
+
+    .interactive-card:active,
+    .interactive-row:active,
+    .interactive-sidebar-tab:active {
+      box-shadow: var(--interactive-shadow-active);
+      transform: translateY(-1px) scale(0.995);
+      transition-duration: 90ms;
+    }
+
+    .interactive-row:hover {
+      border-color: color-mix(in oklch, var(--ring) 24%, var(--border));
+      background-color: color-mix(in oklch, var(--accent) 34%, transparent);
+      box-shadow: 0 8px 18px color-mix(in oklch, var(--foreground) 7%, transparent);
+      transform: translateY(-1px);
+    }
+
+    .interactive-row:hover::before {
+      transform: scaleY(1);
+    }
+
+    .interactive-sidebar-tab:hover {
+      color: var(--sidebar-foreground);
+      transform: translateY(-1px);
+    }
+
+    .interactive-sidebar-tab:hover::after {
+      transform: scaleY(0.72);
+    }
+
+    .project-color-card.interactive-card:hover {
+      border-color: color-mix(in srgb, var(--project-color) 58%, var(--ring));
+      box-shadow:
+        0 18px 42px color-mix(in srgb, var(--project-color) 16%, transparent),
+        var(--interactive-shadow-hover);
+    }
+
+    .project-color-row.interactive-row:hover {
+      border-color: color-mix(in srgb, var(--project-color) 44%, var(--border));
+      background-color: color-mix(in srgb, var(--project-color) 13%, transparent);
+      box-shadow: 0 8px 18px color-mix(in srgb, var(--project-color) 12%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .interactive-card,
+    .interactive-row,
+    .interactive-sidebar-tab {
+      transition-duration: 1ms;
+    }
+
+    .interactive-card:hover,
+    .interactive-card:active,
+    .interactive-row:hover,
+    .interactive-row:active,
+    .interactive-sidebar-tab:hover,
+    .interactive-sidebar-tab:active {
+      transform: none;
+    }
+  }
+
   .google-calendar-panel .fc {
     --calendar-time-axis-width: 4.75rem;
     --fc-border-color: var(--border);

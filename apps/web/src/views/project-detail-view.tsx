@@ -328,7 +328,7 @@ function TaskRows({
             tabIndex={0}
             aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
             className={cn(
-              "flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between",
+              "interactive-row flex min-w-0 max-w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-lg border border-transparent px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-start sm:justify-between",
               projectColorClass(projectColor, "row")
             )}
             style={projectColorStyle(projectColor)}
@@ -408,7 +408,7 @@ function SimpleRows({
           <li
             key={row.id}
             className={cn(
-              "flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-lg px-3 py-2.5 hover:bg-accent/40",
+              "interactive-row flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2.5",
               projectColorClass(projectColor, "row")
             )}
             style={projectColorStyle(projectColor)}

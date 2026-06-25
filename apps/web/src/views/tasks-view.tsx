@@ -208,7 +208,7 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
           {t("tasks.title")}
         </h1>
 
-        <div className="flex min-w-0 items-center gap-3" dir="ltr">
+        <div className="flex min-w-0 items-center gap-3" dir={direction}>
           <Button dir={direction} size="sm" type="button" onClick={openCreate}>
             <Plus data-icon="inline-start" />
             {t("tasks.newTask")}
@@ -238,7 +238,7 @@ export default function TasksView({ initialTasks, initialProjects }: TasksViewPr
               onChange={(event) => setQuery(event.target.value)}
               placeholder={`${t("tasks.searchPlaceholder")}...`}
               className={cn(
-                "h-9 rounded-lg border-border bg-secondary/70 pl-10 pr-3 text-sm shadow-none focus-visible:ring-1",
+                "h-9 rounded-lg border-border bg-secondary/70 ps-10 pe-3 text-sm shadow-none focus-visible:ring-1",
                 direction === "rtl" ? "text-right" : "text-left"
               )}
             />
@@ -542,7 +542,7 @@ function TaskDesktopList({
             tabIndex={0}
             aria-label={`${t("common.open")}: ${String(task.title ?? t("entity.task"))}`}
             className={cn(
-              "grid min-w-[58rem] cursor-pointer grid-cols-[64px_112px_112px_170px_150px_minmax(220px,1fr)] items-center border-b border-border/80 px-6 py-4 transition-colors last:border-b-0 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "interactive-row grid min-w-[58rem] cursor-pointer grid-cols-[64px_112px_112px_170px_150px_minmax(220px,1fr)] items-center border-b border-border/80 px-6 py-4 last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               projectColorClass(linkedProject?.color, "row"),
               isDone && "opacity-75"
             )}
@@ -716,7 +716,7 @@ function TaskCard({
         }
       }}
       className={cn(
-        "flex min-w-0 max-w-full cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-xs transition-colors hover:border-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "interactive-card group flex min-w-0 max-w-full cursor-pointer flex-col gap-3 overflow-hidden rounded-2xl border border-border bg-card p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         projectColorClass(linkedProject?.color, "card")
       )}
       style={projectColorStyle(linkedProject?.color)}

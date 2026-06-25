@@ -87,17 +87,25 @@ function NavLink({
       onClick={() => onNavigate?.()}
       onFocus={prefetch}
       onMouseEnter={prefetch}
+      data-active={active ? "true" : undefined}
+      aria-current={active ? "page" : undefined}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       className={cn(
-        "flex items-center rounded-lg text-sm font-medium transition-colors",
+        "interactive-sidebar-tab group/nav flex items-center rounded-lg text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/45",
         collapsed ? "size-10 justify-center px-0 py-0" : "gap-2.5 px-3 py-2",
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          ? "bg-sidebar-accent/85 text-sidebar-accent-foreground shadow-sm"
           : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
       )}
     >
-      <Icon className="size-[18px]" aria-hidden />
+      <Icon
+        className={cn(
+          "size-[18px] transition-[color,transform] duration-200 group-hover/nav:scale-110",
+          active ? "text-sidebar-primary" : "text-sidebar-foreground/55 group-hover/nav:text-sidebar-primary"
+        )}
+        aria-hidden
+      />
       <span className={cn(collapsed && "sr-only")}>{label}</span>
     </Link>
   );
