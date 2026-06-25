@@ -141,7 +141,7 @@ export function TaskDetailDialog({
                   size="icon-sm"
                   variant="ghost"
                   aria-pressed={isPinnedToday}
-                  className={cn(isPinnedToday && "text-foreground")}
+                  className="text-muted-foreground hover:text-foreground"
                   disabled={!isPinnedToday && (isDone || task.status === "cancelled")}
                   onClick={() => void onPinToday(task)}
                 >
@@ -152,7 +152,7 @@ export function TaskDetailDialog({
                 <TaskActionIconButton
                   label={t("common.edit")}
                   type="button"
-                  variant="ghost"
+                  variant="edit"
                   size="icon-sm"
                   onClick={() => onEdit(task)}
                 >

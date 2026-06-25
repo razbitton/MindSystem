@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Edit3, FolderKanban, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Edit2, FolderKanban, Plus, Search, Trash2 } from "lucide-react";
 import { apiDelete, apiPatch, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
@@ -267,7 +267,7 @@ export default function ProjectsView() {
                     </Link>
                     <div className="flex shrink-0 items-center gap-1">
                       <IconButton label={t("common.edit")} action="edit" onClick={() => openEdit(project)}>
-                        <Edit3 className="size-4" aria-hidden />
+                        <Edit2 className="size-[18px]" aria-hidden />
                       </IconButton>
                       <IconButton
                         label={t("common.delete")}
