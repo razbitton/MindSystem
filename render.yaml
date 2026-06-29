@@ -19,6 +19,30 @@ envVarGroups:
         value: replace-with-google-oauth-client-secret
       - key: GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY
         value: replace-with-base64-32-byte-token-encryption-key
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_AUTH_MODE
+        value: api_key
+      - key: OPENAI_API_BASE_URL
+        value: https://api.openai.com/v1
+      - key: OPENAI_EXTRACTION_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: OPENAI_CODEX_BASE_URL
+        value: https://chatgpt.com/backend-api/codex
+      - key: OPENAI_CODEX_EXTRACTION_MODEL
+        value: gpt-5.5
+      - key: OPENAI_CODEX_ACCESS_TOKEN
+        sync: false
+      - key: OPENAI_CODEX_REFRESH_TOKEN
+        sync: false
+      - key: OPENAI_CODEX_ACCOUNT_ID
+        sync: false
+      - key: OPENAI_CODEX_TOKEN_EXPIRES_AT
+        sync: false
+      - key: OPENAI_CODEX_TOKEN_ENCRYPTION_KEY
+        sync: false
 
 services:
   - type: keyvalue

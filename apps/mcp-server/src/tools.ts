@@ -36,13 +36,28 @@ const dateTimeSchema = (description = "ISO 8601 datetime.") => ({ type: "string"
 const taskStatusValues = ["inbox", "todo", "in_progress", "waiting", "done", "cancelled"];
 const projectStatusValues = ["active", "paused", "completed", "archived"];
 const priorityValues = ["low", "medium", "high", "urgent"];
-const entityTypeValues = ["project", "task", "note", "document", "decision", "reminder", "person", "goal"];
+const entityTypeValues = ["project", "task", "note", "document", "memory", "decision", "reminder", "person", "goal"];
 const sourceTypeValues = ["web", "whatsapp", "openclaw", "codex", "api", "manual"];
 const reviewStatusValues = ["pending", "approved", "rejected", "all"];
 const dailyObjectiveActionValues = ["pin", "snooze", "clear"];
+const memoryKindValues = [
+  "fact",
+  "decision",
+  "preference",
+  "constraint",
+  "commitment",
+  "open_question",
+  "project_update",
+  "person_profile",
+  "topic_note"
+];
+const memoryImportanceValues = ["low", "medium", "high", "critical"];
 const purgeDataTypeValues = [
   "raw_items",
   "entities",
+  "memory_records",
+  "memory_sources",
+  "entity_aliases",
   "review_queue",
   "audit_events",
   "agent_runs",
@@ -134,6 +149,30 @@ const entityFilterProperties = {
   limit: { type: "number", default: 100 }
 };
 
+const memoryCandidateProperties = {
+  kind: { type: "string", enum: memoryKindValues },
+  title: { type: "string" },
+  body: { type: "string" },
+  summary: { type: "string" },
+  importance: { type: "string", enum: memoryImportanceValues, default: "medium" },
+  confidence: { type: "number", default: 0.8 },
+  projectId: nullableStringSchema("Project table id."),
+  projectTitle: { type: "string" },
+  relatedEntities: {
+    type: "array",
+    items: objectSchema({
+      entityId: { type: "string" },
+      entityType: { type: "string", enum: entityTypeValues },
+      title: { type: "string" },
+      relationType: { type: "string", enum: ["belongs_to", "depends_on", "mentions", "blocks", "derived_from", "related_to"] }
+    })
+  },
+  aliases: { type: "array", items: { type: "string" } },
+  sourceQuote: { type: "string" },
+  occurredAt: nullableStringSchema("ISO 8601 datetime."),
+  customFields: { type: "object" }
+};
+
 const reminderFilterProperties = {
   project_id: { type: "string", description: "Project table id." },
   status: { type: "string" },
@@ -180,6 +219,78 @@ export const mcpRestTools: RestToolDefinition[] = [
     path: "/api/ingest/free-text",
     body: (args) => ({ sourceType: "codex", ...args }),
     inputSchema: objectSchema({ text: { type: "string" }, sourceType: { type: "string", default: "codex" }, projectId: { type: "string" } }, ["text"])
+  },
+  {
+    name: "recall_memory",
+    description: "Recall durable agent memory with hybrid semantic and keyword retrieval. Prefer this over raw search when resolving user intent.",
+    requiredScope: "memory:read",
+    method: "POST",
+    path: "/api/memory/recall",
+    inputSchema: objectSchema({
+      query: { type: "string" },
+      kinds: { type: "array", items: { type: "string", enum: memoryKindValues } },
+      projectId: { type: "string" },
+      entityIds: { type: "array", items: { type: "string" } },
+      includeSuperseded: { type: "boolean", default: false },
+      limit: { type: "number", default: 10 }
+    }, ["query"])
+  },
+  {
+    name: "get_relevant_context",
+    description: "Build a compact context bundle for the current agent turn from stored memory, tasks, decisions, preferences, constraints, and sources.",
+    requiredScope: "memory:read",
+    method: "POST",
+    path: "/api/memory/context",
+    inputSchema: objectSchema({
+      message: { type: "string" },
+      recentMessages: { type: "array", items: { type: "string" } },
+      conversationId: { type: "string" },
+      activeEntityIds: { type: "array", items: { type: "string" } },
+      maxTokens: { type: "number", default: 2500 }
+    }, ["message"])
+  },
+  {
+    name: "store_memory",
+    description: "Store durable agent memory from free text or structured candidates. Use after learning facts, decisions, preferences, constraints, commitments, or open questions.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: "/api/memory/store",
+    inputSchema: objectSchema({
+      text: { type: "string" },
+      candidates: { type: "array", items: objectSchema(memoryCandidateProperties, ["kind", "title", "body"]) },
+      sourceType: { type: "string", enum: sourceTypeValues, default: "codex" },
+      projectId: { type: "string" },
+      rawPayload: { type: "object" }
+    })
+  },
+  {
+    name: "supersede_memory",
+    description: "Replace an older memory with a newer memory while preserving history.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: (args) => `/api/memory/${String(args.id)}/supersede`,
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Memory record id."),
+      replacement: objectSchema(memoryCandidateProperties, ["kind", "title", "body"]),
+      text: { type: "string" },
+      reason: { type: "string" }
+    }, ["id"])
+  },
+  {
+    name: "link_memory",
+    description: "Create an explicit relationship between memory records or generic entities.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: "/api/memory/link",
+    inputSchema: objectSchema({
+      fromMemoryId: { type: "string" },
+      fromEntityId: { type: "string" },
+      toMemoryId: { type: "string" },
+      toEntityId: { type: "string" },
+      relationType: { type: "string", enum: ["belongs_to", "depends_on", "mentions", "blocks", "derived_from", "related_to"] },
+      confidence: { type: "number", default: 1 }
+    })
   },
   {
     name: "list_raw_items",

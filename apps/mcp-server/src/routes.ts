@@ -6,7 +6,7 @@ import type { IncomingHttpHeaders } from "node:http";
 import { authenticateAgent, requireToolScope, type AgentIdentity } from "./auth.js";
 import { executeTool, readResource, type McpExecutionRuntime } from "./execution.js";
 import { isAcceptedClientNotification, type JsonRpcEnvelope } from "./protocol.js";
-import { getResourceDefinition, listedResources } from "./resources.js";
+import { agentBootstrapText, getResourceDefinition, listedResources } from "./resources.js";
 import { getToolDefinition, toolDefinitions } from "./tools.js";
 
 export interface McpRouteOptions {
@@ -54,7 +54,8 @@ async function handleJsonRpc(
     return {
       protocolVersion: "2024-11-05",
       capabilities: { tools: {}, resources: {}, prompts: {} },
-      serverInfo: { name: "personal-context-os", version: "0.1.0" }
+      serverInfo: { name: "personal-context-os", version: "0.1.0" },
+      instructions: agentBootstrapText
     };
   }
 
@@ -72,11 +73,45 @@ async function handleJsonRpc(
     return {
       prompts: [
         {
+          name: "memory_workflow",
+          description: "Use durable memory tools safely and consistently before answering or storing new context."
+        },
+        {
           name: "project_context_brief",
           description: "Summarize the current project context before making changes."
         }
       ]
     };
+  }
+
+  if (method === "prompts/get") {
+    const name = String(params.name ?? "");
+    if (name === "memory_workflow") {
+      return {
+        description: "Use durable memory tools safely and consistently.",
+        messages: [
+          {
+            role: "user",
+            content: { type: "text", text: agentBootstrapText }
+          }
+        ]
+      };
+    }
+    if (name === "project_context_brief") {
+      return {
+        description: "Summarize project context before changing project memory or tasks.",
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: "Read the relevant project context pack, identify open tasks, recent decisions, constraints, and uncertainties, then state what context you used before making changes."
+            }
+          }
+        ]
+      };
+    }
+    throw new Error(`Unknown prompt: ${name}`);
   }
 
   if (!bearerToken) throw new Error("Agent token required");

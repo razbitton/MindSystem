@@ -1,4 +1,5 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { agentMemoryBootstrapInstructions } from "./agent-policy.js";
 import {
   createDocumentSchema,
   createNoteSchema,
@@ -6,10 +7,12 @@ import {
   createReminderSchema,
   createTaskSchema,
   deleteRawItemSchema,
+  getRelevantContextSchema,
   googleCalendarCreateEventSchema,
   googleCalendarPatchEventSchema,
   googleCalendarPreferencesSchema,
   ingestFreeTextSchema,
+  linkMemorySchema,
   loginSchema,
   patchDocumentSchema,
   patchNoteSchema,
@@ -17,8 +20,11 @@ import {
   patchReminderSchema,
   patchTaskSchema,
   purgeWorkspaceDataSchema,
+  recallMemorySchema,
   reviewDecisionSchema,
   setDailyObjectiveSchema,
+  storeMemorySchema,
+  supersedeMemorySchema,
   uploadDocumentSchema
 } from "./schemas.js";
 
@@ -29,7 +35,8 @@ export function buildOpenApiSpec() {
     openapi: "3.1.0",
     info: {
       title: "Personal Context OS API",
-      version: "0.1.0"
+      version: "0.1.0",
+      description: agentMemoryBootstrapInstructions
     },
     servers: [{ url: "/api" }],
     paths: {
@@ -77,6 +84,41 @@ export function buildOpenApiSpec() {
             { name: "limit", in: "query", schema: { type: "integer", default: 25 } }
           ],
           responses: { "200": { description: "Search results" } }
+        }
+      },
+      "/memory/recall": {
+        post: {
+          summary: "Recall agent memory using hybrid semantic and keyword retrieval",
+          requestBody: { required: true, content: { "application/json": { schema: json(recallMemorySchema) } } },
+          responses: { "200": { description: "Ranked memory results and retrieval metadata" } }
+        }
+      },
+      "/memory/context": {
+        post: {
+          summary: "Build a compact relevant context bundle for an agent turn",
+          requestBody: { required: true, content: { "application/json": { schema: json(getRelevantContextSchema) } } },
+          responses: { "200": { description: "Context bundle with memories, sources, and retrieval trace" } }
+        }
+      },
+      "/memory/store": {
+        post: {
+          summary: "Store durable agent memory from free text or structured memory candidates",
+          requestBody: { required: true, content: { "application/json": { schema: json(storeMemorySchema) } } },
+          responses: { "200": { description: "Created, refreshed, and review-queued memory records" } }
+        }
+      },
+      "/memory/{id}/supersede": {
+        post: {
+          summary: "Supersede a memory record while preserving history",
+          requestBody: { required: true, content: { "application/json": { schema: json(supersedeMemorySchema) } } },
+          responses: { "200": { description: "Previous memory and replacement memory" } }
+        }
+      },
+      "/memory/link": {
+        post: {
+          summary: "Link memory records or entities",
+          requestBody: { required: true, content: { "application/json": { schema: json(linkMemorySchema) } } },
+          responses: { "200": { description: "Created entity edge" } }
         }
       },
       "/raw-items": {
@@ -269,6 +311,64 @@ export function buildOpenApiSpec() {
           responses: { "200": { description: "Disconnected" } }
         }
       },
+      "/openai-codex/status": {
+        get: {
+          summary: "Get OpenAI Codex OAuth connection status",
+          responses: { "200": { description: "OpenAI Codex OAuth status" } }
+        }
+      },
+      "/openai-codex/oauth/start": {
+        post: {
+          summary: "Start OpenAI Codex device-code OAuth",
+          responses: {
+            "200": {
+              description: "Device-code login details",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["verificationUrl", "userCode", "deviceAuthId", "intervalMs", "expiresInMs"],
+                    properties: {
+                      verificationUrl: { type: "string" },
+                      userCode: { type: "string" },
+                      deviceAuthId: { type: "string" },
+                      intervalMs: { type: "number" },
+                      expiresInMs: { type: "number" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/openai-codex/oauth/poll": {
+        post: {
+          summary: "Poll and complete OpenAI Codex device-code OAuth",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["deviceAuthId", "userCode"],
+                  properties: {
+                    deviceAuthId: { type: "string" },
+                    userCode: { type: "string" }
+                  }
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Pending or connected result" } }
+        }
+      },
+      "/openai-codex/disconnect": {
+        post: {
+          summary: "Disconnect stored OpenAI Codex OAuth credentials",
+          responses: { "200": { description: "Disconnected" } }
+        }
+      },
       "/google-calendar/calendars": {
         get: {
           summary: "List Google calendars available to the connected account",
@@ -333,6 +433,35 @@ export function buildOpenApiSpec() {
       },
       "/review-queue/clear": {
         post: { summary: "Delete all review items", responses: { "200": { description: "Deleted" } } }
+      },
+      "/agents/bootstrap": {
+        get: {
+          summary: "Get agent bootstrap instructions for using the memory API",
+          description: "Call this once when connecting through the REST API, then follow the returned memory workflow on each user turn.",
+          responses: {
+            "200": {
+              description: "Agent memory bootstrap instructions, workflow, tools, and endpoint hints",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["server", "instructions", "memoryPolicy", "workflow", "primaryTools", "mcp", "api", "scopes"],
+                    properties: {
+                      server: { type: "object" },
+                      instructions: { type: "string" },
+                      memoryPolicy: { type: "string" },
+                      workflow: { type: "array", items: { type: "object" } },
+                      primaryTools: { type: "array", items: { type: "object" } },
+                      mcp: { type: "object" },
+                      api: { type: "object" },
+                      scopes: { type: "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "/agents/runs/{id}": {
         delete: { summary: "Delete an agent run", responses: { "200": { description: "Deleted" } } }

@@ -6,6 +6,11 @@ import { getToolDefinition, toolDefinitions } from "./tools.js";
 const expectedScopes: Record<string, AgentScope> = {
   search_memory: "memory:read",
   ingest_free_text: "memory:write",
+  recall_memory: "memory:read",
+  get_relevant_context: "memory:read",
+  store_memory: "memory:write",
+  supersede_memory: "memory:write",
+  link_memory: "memory:write",
   list_raw_items: "memory:read",
   get_raw_item: "memory:read",
   delete_raw_item: "memory:write",

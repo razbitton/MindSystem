@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink, FileText, Filter, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
+import { API_BASE_URL, apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
   cachedApiGet,
   invalidateWorkspaceQueryCache,
@@ -761,7 +761,8 @@ function formatFileSize(bytes: number) {
 }
 
 function documentFileUrl(document: AnyRecord, disposition: "inline" | "attachment") {
-  return `/api/documents/${encodeURIComponent(String(document.id))}/download?disposition=${disposition}`;
+  const path = `/api/documents/${encodeURIComponent(String(document.id))}/download?disposition=${disposition}`;
+  return API_BASE_URL ? new URL(path, API_BASE_URL).toString() : path;
 }
 
 function documentFileType(mimeType: string, objectKey: string) {

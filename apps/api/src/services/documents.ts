@@ -193,6 +193,9 @@ async function putDocumentObject(
   } catch (error) {
     if (error instanceof S3ServiceException) {
       const code = error.name || "S3Error";
+      if (isStorageCredentialError(error)) {
+        throw new DocumentFileError(storageCredentialErrorMessage("store"), 502);
+      }
       throw new DocumentFileError(`Could not store document file (${code})`, 502);
     }
     throw new DocumentFileError("Could not store document file", 502);
@@ -225,6 +228,9 @@ async function fetchDocumentObject(context: AppContext, objectKey: string) {
       if (statusCode === 404 || code === "NoSuchKey" || code === "NotFound") {
         throw new DocumentFileError("Document file not found", 404);
       }
+      if (isStorageCredentialError(error)) {
+        throw new DocumentFileError(storageCredentialErrorMessage("retrieve"), 502);
+      }
       throw new DocumentFileError(`Could not retrieve document file from storage (${code})`, 502);
     }
     throw new DocumentFileError("Could not retrieve document file from storage", 502);
@@ -236,6 +242,14 @@ async function fetchDocumentObject(context: AppContext, objectKey: string) {
 function isMissingBucketError(error: unknown) {
   if (!(error instanceof S3ServiceException)) return false;
   return error.name === "NoSuchBucket" || error.$metadata.httpStatusCode === 404;
+}
+
+function isStorageCredentialError(error: S3ServiceException) {
+  return ["InvalidAccessKeyId", "SignatureDoesNotMatch", "InvalidToken"].includes(error.name);
+}
+
+function storageCredentialErrorMessage(action: "store" | "retrieve") {
+  return `Could not ${action} document file because the configured S3 credentials were rejected. Check S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET.`;
 }
 
 function createS3Client(context: AppContext) {

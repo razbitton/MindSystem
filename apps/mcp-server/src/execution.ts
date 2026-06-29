@@ -43,6 +43,8 @@ export async function readResource(runtime: McpExecutionRuntime, agent: AgentIde
   if (!resource) throw new Error(`Unsupported resource URI: ${uri}`);
 
   requireToolScope(agent.scopes, resource.requiredScope);
+  if (resource.staticText) return resource.staticText;
+  if (!resource.buildPath) throw new Error(`Resource URI cannot be read through REST: ${uri}`);
   const data = await apiGet(runtime, resource.buildPath(uri), {}, bearerToken);
   return resource.extractText ? resource.extractText(data) : data;
 }

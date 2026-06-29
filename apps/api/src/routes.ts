@@ -33,6 +33,7 @@ import {
   listAgentState,
   revokeAgentToken
 } from "./services/agents.js";
+import { getAgentBootstrap } from "./services/agent-bootstrap.js";
 import { clearAuditEvents, deleteAuditEvent, listAuditEvents } from "./services/audit.js";
 import { getDataInventory, purgeWorkspaceData } from "./services/data-management.js";
 import {
@@ -61,6 +62,13 @@ import {
   updateGoogleCalendarPreferences
 } from "./services/google-calendar.js";
 import { ingestFreeText } from "./services/ingest.js";
+import { getRelevantContext, linkMemory, recallMemory, storeMemory, supersedeMemory } from "./services/memory.js";
+import {
+  disconnectOpenAICodex,
+  getOpenAICodexStatus,
+  pollOpenAICodexOAuth,
+  startOpenAICodexOAuth
+} from "./services/openai-codex.js";
 import {
   createDocument,
   deleteDocument,
@@ -170,6 +178,11 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
 
   if (route === "/api/search" && method === "GET") return "memory:read";
   if (route === "/api/ingest/free-text" && method === "POST") return "memory:write";
+  if (route === "/api/memory/recall" && method === "POST") return "memory:read";
+  if (route === "/api/memory/context" && method === "POST") return "memory:read";
+  if (route === "/api/memory/store" && method === "POST") return "memory:write";
+  if (route === "/api/memory/:id/supersede" && method === "POST") return "memory:write";
+  if (route === "/api/memory/link" && method === "POST") return "memory:write";
   if (route === "/api/dashboard/today" && method === "GET") return "memory:read";
 
   if (route === "/api/raw-items" && method === "GET") return "memory:read";
@@ -220,7 +233,9 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route.startsWith("/api/admin")) return "admin";
   if (route === "/api/agents/runs/:id" && method === "DELETE") return "admin";
   if (route === "/api/agents/runs/clear" && method === "POST") return "admin";
+  if (route === "/api/agents/bootstrap" && method === "GET") return "memory:read";
   if (route === "/api/agents" || route.startsWith("/api/agents/tokens")) return null;
+  if (route.startsWith("/api/openai-codex")) return null;
   if (route.startsWith("/api/audit-events")) return "admin";
   if (route.startsWith("/api/retrieval-logs")) return "admin";
   if (route.startsWith("/api/schema-definitions")) return "admin";
@@ -296,6 +311,19 @@ export async function registerRoutes(app: FastifyInstance) {
     const query = searchQuerySchema.parse(request.query);
     return searchMemory(requestContext(app, request), query);
   });
+
+  app.post("/api/memory/recall", async (request) => recallMemory(requestContext(app, request), request.body ?? {}));
+
+  app.post("/api/memory/context", async (request) => getRelevantContext(requestContext(app, request), request.body ?? {}));
+
+  app.post("/api/memory/store", async (request) => storeMemory(requestContext(app, request), request.body ?? {}, actorFor(request)));
+
+  app.post("/api/memory/:id/supersede", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return supersedeMemory(requestContext(app, request), id, request.body ?? {}, actorFor(request));
+  });
+
+  app.post("/api/memory/link", async (request) => linkMemory(requestContext(app, request), request.body ?? {}, actorFor(request)));
 
   app.get("/api/raw-items", async (request) => listRawItems(requestContext(app, request), request.query));
 
@@ -438,7 +466,7 @@ export async function registerRoutes(app: FastifyInstance) {
       if (!isDocumentFileError(error)) throw error;
       reply.code(error.statusCode).send({
         statusCode: error.statusCode,
-        error: error.statusCode === 404 ? "Not Found" : error.statusCode === 400 ? "Bad Request" : "Bad Gateway",
+        error: error.message,
         message: error.message
       });
       return null;
@@ -509,6 +537,14 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.post("/api/google-calendar/disconnect", async (request) => disconnectGoogleCalendar(requestContext(app, request), actorFor(request)));
 
+  app.get("/api/openai-codex/status", async (request) => getOpenAICodexStatus(requestContext(app, request)));
+
+  app.post("/api/openai-codex/oauth/start", async (request) => startOpenAICodexOAuth(requestContext(app, request)));
+
+  app.post("/api/openai-codex/oauth/poll", async (request) => pollOpenAICodexOAuth(requestContext(app, request), request.body ?? {}, actorFor(request)));
+
+  app.post("/api/openai-codex/disconnect", async (request) => disconnectOpenAICodex(requestContext(app, request), actorFor(request)));
+
   app.get("/api/google-calendar/calendars", async (request) => listGoogleCalendars(requestContext(app, request)));
 
   app.patch("/api/google-calendar/preferences", async (request) => {
@@ -556,6 +592,8 @@ export async function registerRoutes(app: FastifyInstance) {
   app.post("/api/review-queue/clear", async (request) => clearReviewQueue(requestContext(app, request), actorFor(request)));
 
   app.get("/api/agents", async (request) => listAgentState(requestContext(app, request)));
+
+  app.get("/api/agents/bootstrap", async (request) => getAgentBootstrap(requestContext(app, request)));
 
   app.post("/api/agents/tokens", async (request) => {
     const input = createAgentTokenSchema.parse(request.body);

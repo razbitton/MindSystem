@@ -54,6 +54,41 @@ function createRuntime(responsePayload: unknown = { ok: true }) {
 
 const routeCases: RouteCase[] = [
   {
+    name: "recall_memory",
+    args: { query: "launch plan", limit: 5 },
+    method: "POST",
+    path: "/api/memory/recall",
+    body: { query: "launch plan", limit: 5 }
+  },
+  {
+    name: "get_relevant_context",
+    args: { message: "What did we decide about launch?", maxTokens: 1200 },
+    method: "POST",
+    path: "/api/memory/context",
+    body: { message: "What did we decide about launch?", maxTokens: 1200 }
+  },
+  {
+    name: "store_memory",
+    args: { text: "Decision: keep beta small" },
+    method: "POST",
+    path: "/api/memory/store",
+    body: { text: "Decision: keep beta small" }
+  },
+  {
+    name: "supersede_memory",
+    args: { id: "memory-id", text: "Decision: expand beta next week" },
+    method: "POST",
+    path: "/api/memory/memory-id/supersede",
+    body: { text: "Decision: expand beta next week" }
+  },
+  {
+    name: "link_memory",
+    args: { fromMemoryId: "memory-a", toEntityId: "entity-b", relationType: "related_to" },
+    method: "POST",
+    path: "/api/memory/link",
+    body: { fromMemoryId: "memory-a", toEntityId: "entity-b", relationType: "related_to" }
+  },
+  {
     name: "list_raw_items",
     args: { source_type: "manual", limit: 5 },
     method: "GET",
@@ -244,6 +279,14 @@ describe("MCP resources", () => {
     const result = await readResource(runtime, { ...adminAgent, scopes: ["projects:read"] }, "pcos_token", "context-pack://project/project-id");
 
     expect(result).toBe("# Project\n\nContext");
+  });
+
+  it("returns the static memory policy resource without calling REST", async () => {
+    const { runtime, calls } = createRuntime();
+    const result = await readResource(runtime, { ...adminAgent, scopes: ["memory:read"] }, "pcos_token", "memory-policy://agent");
+
+    expect(calls).toHaveLength(0);
+    expect(result).toContain("Agent Memory Policy");
   });
 
   it("enforces admin scope for admin-only resources", async () => {

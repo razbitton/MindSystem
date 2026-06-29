@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@personal-context-os/ai": "workspace:*",
     "@personal-context-os/config": "workspace:*",
     "@personal-context-os/db": "workspace:*",
     "bullmq": "^5.41.2",

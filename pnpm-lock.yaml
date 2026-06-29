@@ -200,6 +200,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@personal-context-os/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@personal-context-os/config':
         specifier: workspace:*
         version: link:../../packages/config

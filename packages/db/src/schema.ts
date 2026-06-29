@@ -10,7 +10,8 @@ import {
   text,
   timestamp,
   uniqueIndex,
-  uuid
+  uuid,
+  customType
 } from "drizzle-orm/pg-core";
 
 export const sourceType = pgEnum("source_type", ["web", "whatsapp", "openclaw", "codex", "api", "manual"]);
@@ -19,6 +20,7 @@ export const entityType = pgEnum("entity_type", [
   "task",
   "note",
   "document",
+  "memory",
   "decision",
   "reminder",
   "person",
@@ -38,6 +40,40 @@ export const relationType = pgEnum("relation_type", [
   "related_to"
 ]);
 export const reviewStatus = pgEnum("review_status", ["pending", "approved", "rejected"]);
+export const memoryKind = pgEnum("memory_kind", [
+  "fact",
+  "decision",
+  "preference",
+  "constraint",
+  "commitment",
+  "open_question",
+  "project_update",
+  "person_profile",
+  "topic_note"
+]);
+export const memoryStatus = pgEnum("memory_status", ["active", "superseded", "archived"]);
+export const memoryImportance = pgEnum("memory_importance", ["low", "medium", "high", "critical"]);
+
+const vector = customType<{
+  data: number[];
+  driverData: string;
+  config: { dimensions: number };
+}>({
+  dataType(config) {
+    return `vector(${config?.dimensions ?? 1536})`;
+  },
+  toDriver(value) {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value) {
+    return value
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .filter(Boolean)
+      .map(Number);
+  }
+});
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -77,6 +113,23 @@ export const googleCalendarConnections = pgTable("google_calendar_connections", 
   ...timestamps
 }, (table) => ({
   workspaceUserIdx: uniqueIndex("google_calendar_connections_workspace_user_idx").on(table.workspaceId, table.userId)
+}));
+
+export const openaiCodexConnections = pgTable("openai_codex_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  accountId: text("account_id").notNull(),
+  email: text("email"),
+  chatgptPlanType: text("chatgpt_plan_type"),
+  accessTokenCiphertext: text("access_token_ciphertext").notNull(),
+  refreshTokenCiphertext: text("refresh_token_ciphertext").notNull(),
+  expiryDate: timestamp("expiry_date", { withTimezone: true }),
+  scope: text("scope").array().notNull().default(sql`ARRAY[]::text[]`),
+  ...timestamps
+}, (table) => ({
+  workspaceIdx: uniqueIndex("openai_codex_connections_workspace_idx").on(table.workspaceId),
+  accountIdx: index("openai_codex_connections_account_idx").on(table.accountId)
 }));
 
 export const apiClients = pgTable("api_clients", {
@@ -216,6 +269,44 @@ export const reminders = pgTable("reminders", {
   ...timestamps
 });
 
+export const memoryRecords = pgTable("memory_records", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  entityId: uuid("entity_id").notNull().unique().references(() => entities.id, { onDelete: "cascade" }),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  sourceRawItemId: uuid("source_raw_item_id").references(() => rawItems.id, { onDelete: "set null" }),
+  kind: memoryKind("kind").notNull(),
+  status: memoryStatus("status").notNull().default("active"),
+  importance: memoryImportance("importance").notNull().default("medium"),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  body: text("body").notNull(),
+  confidenceScore: numeric("confidence_score", { precision: 4, scale: 3 }).notNull().default("1"),
+  supersedesMemoryId: uuid("supersedes_memory_id"),
+  supersededByMemoryId: uuid("superseded_by_memory_id"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  customFields: jsonb("custom_fields").notNull().default({}),
+  ...timestamps
+}, (table) => ({
+  workspaceKindUpdatedIdx: index("memory_records_workspace_kind_updated_idx").on(table.workspaceId, table.kind, table.updatedAt),
+  workspaceStatusIdx: index("memory_records_workspace_status_idx").on(table.workspaceId, table.status),
+  projectIdx: index("memory_records_project_idx").on(table.projectId)
+}));
+
+export const memorySources = pgTable("memory_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  memoryRecordId: uuid("memory_record_id").notNull().references(() => memoryRecords.id, { onDelete: "cascade" }),
+  rawItemId: uuid("raw_item_id").references(() => rawItems.id, { onDelete: "set null" }),
+  sourceQuote: text("source_quote"),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  memoryIdx: index("memory_sources_memory_idx").on(table.memoryRecordId),
+  workspaceIdx: index("memory_sources_workspace_idx").on(table.workspaceId)
+}));
+
 export const dailyObjectiveOverrides = pgTable("daily_objective_overrides", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
@@ -252,13 +343,24 @@ export const entityTags = pgTable("entity_tags", {
   uniqueTagIdx: uniqueIndex("entity_tags_unique_idx").on(table.workspaceId, table.entityId, table.tag)
 }));
 
+export const entityAliases = pgTable("entity_aliases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  entityId: uuid("entity_id").notNull().references(() => entities.id, { onDelete: "cascade" }),
+  alias: text("alias").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  uniqueAliasIdx: uniqueIndex("entity_aliases_unique_idx").on(table.workspaceId, table.entityId, table.alias),
+  lookupIdx: index("entity_aliases_lookup_idx").on(table.workspaceId, table.alias)
+}));
+
 export const chunks = pgTable("chunks", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   entityId: uuid("entity_id").notNull().references(() => entities.id, { onDelete: "cascade" }),
   chunkText: text("chunk_text").notNull(),
   chunkIndex: integer("chunk_index").notNull().default(0),
-  embedding: text("embedding"),
+  embedding: vector("embedding", { dimensions: 1536 }),
   fts: text("fts"),
   metadata: jsonb("metadata").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()

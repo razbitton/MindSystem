@@ -1,4 +1,4 @@
-import type { AgentScope } from "@personal-context-os/shared";
+import { agentMemoryBootstrapInstructions, agentMemoryPolicyText, type AgentScope } from "@personal-context-os/shared";
 
 export interface ResourceDefinition {
   uri: string;
@@ -6,7 +6,8 @@ export interface ResourceDefinition {
   mimeType: string;
   requiredScope: AgentScope;
   matches: (uri: string) => boolean;
-  buildPath: (uri: string) => string;
+  buildPath?: (uri: string) => string;
+  staticText?: string;
   extractText?: (data: unknown) => string;
 }
 
@@ -28,7 +29,21 @@ const idResource = (uri: string, name: string, requiredScope: AgentScope, prefix
   buildPath: (candidate) => `${pathPrefix}/${candidate.slice(prefix.length)}`
 });
 
+const staticResource = (uri: string, name: string, requiredScope: AgentScope, text: string): ResourceDefinition => ({
+  uri,
+  name,
+  mimeType: "text/markdown",
+  requiredScope,
+  matches: (candidate) => candidate === uri,
+  staticText: text
+});
+
+export const memoryPolicyText = agentMemoryPolicyText;
+export const agentBootstrapText = agentMemoryBootstrapInstructions;
+
 export const resourceDefinitions: ResourceDefinition[] = [
+  staticResource("agent-bootstrap://memory", "Agent bootstrap instructions", "memory:read", agentBootstrapText),
+  staticResource("memory-policy://agent", "Agent memory workflow policy", "memory:read", memoryPolicyText),
   exactResource("dashboard://today", "Today's dashboard", "memory:read", "/api/dashboard/today"),
   exactResource("raw-items://recent", "Recent raw captures", "memory:read", "/api/raw-items"),
   exactResource("entities://all", "All entities", "memory:read", "/api/entities"),
@@ -64,7 +79,7 @@ export const resourceDefinitions: ResourceDefinition[] = [
   }
 ];
 
-export const listedResources = resourceDefinitions.map(({ requiredScope, matches, buildPath, extractText, ...resource }) => resource);
+export const listedResources = resourceDefinitions.map(({ requiredScope, matches, buildPath, staticText, extractText, ...resource }) => resource);
 
 export function getResourceDefinition(uri: string) {
   return resourceDefinitions.find((resource) => resource.matches(uri));

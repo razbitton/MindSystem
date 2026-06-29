@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AgentsView from "./agents-view";
 import DataManagementView from "./data-management-view";
 import SchemasView from "./schemas-view";
+import { OpenAICodexPanel } from "../components/openai-codex-panel";
 
 export default function SettingsView({ initialTab = "preferences" }: { initialTab?: string }) {
   const { t, locale, setLocale, theme, setTheme } = useI18n();
@@ -56,7 +57,8 @@ export default function SettingsView({ initialTab = "preferences" }: { initialTa
           </Card>
         </TabsContent>
 
-        <TabsContent value="connections">
+        <TabsContent value="connections" className="flex flex-col gap-6">
+          <OpenAICodexPanel />
           <AgentsView embedded />
         </TabsContent>
 

@@ -10,6 +10,9 @@ const inventoryTables = [
   ["notes", "notes"],
   ["documents", "documents"],
   ["reminders", "reminders"],
+  ["memoryRecords", "memory_records"],
+  ["memorySources", "memory_sources"],
+  ["entityAliases", "entity_aliases"],
   ["reviewQueue", "review_queue"],
   ["auditEvents", "audit_events"],
   ["agentRuns", "agent_runs"],
@@ -20,6 +23,21 @@ const inventoryTables = [
 ] as const;
 
 const purgeStatements: { type: PurgeDataType; resultKey: string; sql: string }[] = [
+  {
+    type: "memory_sources",
+    resultKey: "deletedMemorySources",
+    sql: "delete from memory_sources where workspace_id = $1"
+  },
+  {
+    type: "entity_aliases",
+    resultKey: "deletedEntityAliases",
+    sql: "delete from entity_aliases where workspace_id = $1"
+  },
+  {
+    type: "memory_records",
+    resultKey: "deletedMemoryRecords",
+    sql: "delete from memory_records where workspace_id = $1"
+  },
   {
     type: "daily_objective_overrides",
     resultKey: "deletedDailyObjectiveOverrides",

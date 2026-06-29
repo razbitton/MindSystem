@@ -27,6 +27,7 @@ const workspaceDataPrefixes = [
   "GET /api/retrieval-logs",
   "GET /api/audit-events",
   "GET /api/agents",
+  "GET /api/openai-codex",
   "GET /api/google-calendar"
 ];
 

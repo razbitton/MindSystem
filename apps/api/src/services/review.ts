@@ -1,10 +1,11 @@
 import { reviewQueue } from "@personal-context-os/db";
 import { desc, eq, and } from "drizzle-orm";
-import { createTaskSchema, projectColorSchema, type reviewDecisionSchema } from "@personal-context-os/shared";
+import { createTaskSchema, memoryCandidateSchema, projectColorSchema, type reviewDecisionSchema } from "@personal-context-os/shared";
 import { z } from "zod";
 import { createNote } from "./notes.js";
 import { createProject } from "./projects.js";
 import { createTask } from "./tasks.js";
+import { createMemoryRecordFromCandidate } from "./memory.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
@@ -53,6 +54,13 @@ export async function approveReviewItem(context: AppContext, id: string, input: 
       description: stringOrUndefined(payload.description),
       color: parsedColor.success ? parsedColor.data : null
     }, actor);
+  }
+  if (item.suggestedAction === "create_memory_record" && typeof payload.title === "string") {
+    applied = await createMemoryRecordFromCandidate(context, {
+      candidate: memoryCandidateSchema.parse(payload),
+      rawItemId: item.rawItemId,
+      actor
+    });
   }
 
   const [updated] = await context.db

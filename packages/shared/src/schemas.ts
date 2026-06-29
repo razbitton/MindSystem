@@ -8,6 +8,7 @@ export const entityTypeSchema = z.enum([
   "task",
   "note",
   "document",
+  "memory",
   "decision",
   "reminder",
   "person",
@@ -31,6 +32,104 @@ export const relationTypeSchema = z.enum([
   "derived_from",
   "related_to"
 ]);
+
+export const memoryKindSchema = z.enum([
+  "fact",
+  "decision",
+  "preference",
+  "constraint",
+  "commitment",
+  "open_question",
+  "project_update",
+  "person_profile",
+  "topic_note"
+]);
+export type MemoryKind = z.infer<typeof memoryKindSchema>;
+
+export const memoryStatusSchema = z.enum(["active", "superseded", "archived"]);
+export type MemoryStatus = z.infer<typeof memoryStatusSchema>;
+
+export const memoryImportanceSchema = z.enum(["low", "medium", "high", "critical"]);
+export type MemoryImportance = z.infer<typeof memoryImportanceSchema>;
+
+export const memoryEntityReferenceSchema = z.object({
+  entityId: z.string().uuid().optional(),
+  entityType: entityTypeSchema.optional(),
+  title: z.string().trim().min(1).optional(),
+  relationType: relationTypeSchema.default("related_to")
+}).refine((value) => Boolean(value.entityId || value.title), {
+  message: "Either entityId or title is required for a memory entity reference."
+});
+
+export const memoryCandidateSchema = z.object({
+  kind: memoryKindSchema,
+  title: z.string().trim().min(1),
+  body: z.string().trim().min(1),
+  summary: z.string().trim().optional(),
+  importance: memoryImportanceSchema.default("medium"),
+  confidence: z.number().min(0).max(1).default(0.8),
+  projectId: z.string().uuid().nullable().optional(),
+  projectTitle: z.string().trim().min(1).optional(),
+  relatedEntities: z.array(memoryEntityReferenceSchema).default([]),
+  aliases: z.array(z.string().trim().min(1)).default([]),
+  sourceQuote: z.string().trim().optional(),
+  occurredAt: z.string().datetime().nullable().optional(),
+  customFields: z.record(z.unknown()).default({})
+});
+export type MemoryCandidate = z.infer<typeof memoryCandidateSchema>;
+
+export const recallMemorySchema = z.object({
+  query: z.string().trim().min(1),
+  kinds: z.array(memoryKindSchema).default([]),
+  projectId: z.string().uuid().optional(),
+  entityIds: z.array(z.string().uuid()).default([]),
+  includeSuperseded: z.boolean().default(false),
+  limit: z.coerce.number().int().positive().max(50).default(10)
+});
+export type RecallMemoryInput = z.infer<typeof recallMemorySchema>;
+
+export const getRelevantContextSchema = z.object({
+  message: z.string().trim().min(1),
+  recentMessages: z.array(z.string().trim().min(1)).default([]),
+  conversationId: z.string().trim().min(1).optional(),
+  activeEntityIds: z.array(z.string().uuid()).default([]),
+  maxTokens: z.coerce.number().int().positive().max(12000).default(2500)
+});
+export type GetRelevantContextInput = z.infer<typeof getRelevantContextSchema>;
+
+export const storeMemorySchema = z.object({
+  text: z.string().trim().optional(),
+  candidates: z.array(memoryCandidateSchema).default([]),
+  sourceType: sourceTypeSchema.default("codex"),
+  projectId: z.string().uuid().optional(),
+  rawPayload: z.record(z.unknown()).default({})
+}).refine((value) => Boolean(value.text || value.candidates.length > 0), {
+  message: "Either text or candidates must be provided."
+});
+export type StoreMemoryInput = z.infer<typeof storeMemorySchema>;
+
+export const supersedeMemorySchema = z.object({
+  replacement: memoryCandidateSchema.optional(),
+  text: z.string().trim().optional(),
+  reason: z.string().trim().optional()
+}).refine((value) => Boolean(value.replacement || value.text), {
+  message: "Either replacement or text must be provided."
+});
+export type SupersedeMemoryInput = z.infer<typeof supersedeMemorySchema>;
+
+export const linkMemorySchema = z.object({
+  fromMemoryId: z.string().uuid().optional(),
+  fromEntityId: z.string().uuid().optional(),
+  toMemoryId: z.string().uuid().optional(),
+  toEntityId: z.string().uuid().optional(),
+  relationType: relationTypeSchema.default("related_to"),
+  confidence: z.number().min(0).max(1).default(1)
+}).refine((value) => Boolean(value.fromMemoryId || value.fromEntityId), {
+  message: "A fromMemoryId or fromEntityId is required."
+}).refine((value) => Boolean(value.toMemoryId || value.toEntityId), {
+  message: "A toMemoryId or toEntityId is required."
+});
+export type LinkMemoryInput = z.infer<typeof linkMemorySchema>;
 
 const metadataTagPrefixPattern = /^\s*\[[^\]\r\n]{1,40}\]\s*/;
 const taskTitleSchema = z
@@ -289,6 +388,9 @@ export const clearRawItemsSchema = deleteRawItemSchema;
 export const purgeDataTypeSchema = z.enum([
   "raw_items",
   "entities",
+  "memory_records",
+  "memory_sources",
+  "entity_aliases",
   "review_queue",
   "audit_events",
   "agent_runs",
@@ -302,6 +404,9 @@ export type PurgeDataType = z.infer<typeof purgeDataTypeSchema>;
 export const defaultPurgeDataTypes: PurgeDataType[] = [
   "raw_items",
   "entities",
+  "memory_records",
+  "memory_sources",
+  "entity_aliases",
   "review_queue",
   "audit_events",
   "agent_runs",
