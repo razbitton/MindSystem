@@ -18,7 +18,7 @@ const startResponseSchema = z.object({
   device_auth_id: z.string().min(1),
   user_code: z.string().min(1).optional(),
   usercode: z.string().min(1).optional(),
-  interval: z.number().positive().optional()
+  interval: z.coerce.number().positive().optional()
 });
 
 const pollInputSchema = z.object({
