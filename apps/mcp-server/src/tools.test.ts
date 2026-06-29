@@ -72,7 +72,11 @@ const expectedScopes: Record<string, AgentScope> = {
   delete_project_schema_override: "admin",
   clear_project_schema_overrides: "admin",
   get_data_inventory: "admin",
-  purge_workspace_data: "admin"
+  purge_workspace_data: "admin",
+  list_ai_processing_runs: "admin",
+  start_ai_memory_backfill: "admin",
+  get_ai_processing_schedule: "admin",
+  update_ai_processing_schedule: "admin"
 };
 
 describe("MCP tool definitions", () => {
@@ -116,6 +120,8 @@ describe("MCP tool definitions", () => {
     expect(getToolDefinition("reject_review_item")?.requiredScope).toBe("admin");
     expect(getToolDefinition("list_audit_events")?.requiredScope).toBe("admin");
     expect(getToolDefinition("purge_workspace_data")?.requiredScope).toBe("admin");
+    expect(getToolDefinition("start_ai_memory_backfill")?.requiredScope).toBe("admin");
+    expect(getToolDefinition("update_ai_processing_schedule")?.requiredScope).toBe("admin");
     expect(getToolDefinition("clear_audit_events")?.requiredScope).toBe("admin");
     expect(getToolDefinition("clear_agent_runs")?.requiredScope).toBe("admin");
   });

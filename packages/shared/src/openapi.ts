@@ -1,6 +1,8 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { agentMemoryBootstrapInstructions } from "./agent-policy.js";
 import {
+  aiProcessingBackfillSchema,
+  aiProcessingScheduleSchema,
   createDocumentSchema,
   createNoteSchema,
   createProjectSchema,
@@ -513,6 +515,34 @@ export function buildOpenApiSpec() {
           summary: "Bulk-delete selected workspace data categories",
           requestBody: { required: false, content: { "application/json": { schema: json(purgeWorkspaceDataSchema) } } },
           responses: { "200": { description: "Deleted counts" } }
+        }
+      },
+      "/admin/ai-processing/runs": {
+        get: {
+          summary: "List AI processing runs",
+          parameters: [
+            { name: "status", in: "query", schema: { type: "string" } },
+            { name: "limit", in: "query", schema: { type: "integer", default: 25 } }
+          ],
+          responses: { "200": { description: "AI processing run history" } }
+        }
+      },
+      "/admin/ai-processing/backfill": {
+        post: {
+          summary: "Queue a one-off AI memory backfill over raw captures",
+          requestBody: { required: false, content: { "application/json": { schema: json(aiProcessingBackfillSchema) } } },
+          responses: { "200": { description: "Queued AI processing run" } }
+        }
+      },
+      "/admin/ai-processing/schedule": {
+        get: {
+          summary: "Get the workspace AI processing schedule",
+          responses: { "200": { description: "AI processing schedule" } }
+        },
+        patch: {
+          summary: "Enable, disable, or update routine AI processing",
+          requestBody: { required: true, content: { "application/json": { schema: json(aiProcessingScheduleSchema) } } },
+          responses: { "200": { description: "AI processing schedule" } }
         }
       },
       "/openapi.json": {

@@ -24,6 +24,7 @@ const workspaceDataPrefixes = [
   "GET /api/review-queue",
   "GET /api/search",
   "GET /api/admin/data-inventory",
+  "GET /api/admin/ai-processing",
   "GET /api/retrieval-logs",
   "GET /api/audit-events",
   "GET /api/agents",

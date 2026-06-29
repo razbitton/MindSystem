@@ -1,11 +1,13 @@
 import { loadEnv } from "@personal-context-os/config";
 import { createDb } from "@personal-context-os/db";
 import { OpenAIEmbeddingClient, vectorToSql } from "@personal-context-os/ai";
-import { Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
+import { enqueueDueAiProcessingRuns, runAiProcessingJob } from "./ai-processing.js";
 
 const env = loadEnv();
 const { pool } = createDb(env.DATABASE_URL);
 const connection = { url: env.REDIS_URL };
+const aiProcessingQueue = new Queue("ai-processing", { connection });
 
 const embeddingWorker = new Worker(
   "embeddings",
@@ -73,13 +75,32 @@ const dashboardWorker = new Worker(
   { connection }
 );
 
-for (const worker of [embeddingWorker, dashboardWorker]) {
+const aiProcessingWorker = new Worker(
+  "ai-processing",
+  async (job) => {
+    return runAiProcessingJob(pool, env, String(job.data.runId));
+  },
+  { connection, concurrency: 1 }
+);
+
+const aiProcessingScheduler = setInterval(() => {
+  enqueueDueAiProcessingRuns(pool, aiProcessingQueue).catch((error) => {
+    console.error("Failed to enqueue due AI processing runs", error);
+  });
+}, 60_000);
+
+enqueueDueAiProcessingRuns(pool, aiProcessingQueue).catch((error) => {
+  console.error("Failed to enqueue due AI processing runs", error);
+});
+
+for (const worker of [embeddingWorker, dashboardWorker, aiProcessingWorker]) {
   worker.on("completed", (job) => console.log(`Completed ${job.queueName}:${job.name}:${job.id}`));
   worker.on("failed", (job, error) => console.error(`Failed ${job?.queueName}:${job?.name}:${job?.id}`, error));
 }
 
 process.on("SIGTERM", async () => {
-  await Promise.all([embeddingWorker.close(), dashboardWorker.close()]);
+  clearInterval(aiProcessingScheduler);
+  await Promise.all([embeddingWorker.close(), dashboardWorker.close(), aiProcessingWorker.close(), aiProcessingQueue.close()]);
   await pool.end();
   process.exit(0);
 });

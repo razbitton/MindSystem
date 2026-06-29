@@ -34,6 +34,12 @@ import {
   revokeAgentToken
 } from "./services/agents.js";
 import { getAgentBootstrap } from "./services/agent-bootstrap.js";
+import {
+  getAiProcessingSchedule,
+  listAiProcessingRuns,
+  startAiMemoryBackfill,
+  updateAiProcessingSchedule
+} from "./services/ai-processing.js";
 import { clearAuditEvents, deleteAuditEvent, listAuditEvents } from "./services/audit.js";
 import { getDataInventory, purgeWorkspaceData } from "./services/data-management.js";
 import {
@@ -657,4 +663,12 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/api/admin/data-inventory", async (request) => getDataInventory(requestContext(app, request)));
 
   app.post("/api/admin/purge-data", async (request) => purgeWorkspaceData(requestContext(app, request), request.body ?? {}, actorFor(request)));
+
+  app.get("/api/admin/ai-processing/runs", async (request) => listAiProcessingRuns(requestContext(app, request), request.query));
+
+  app.post("/api/admin/ai-processing/backfill", async (request) => startAiMemoryBackfill(requestContext(app, request), request.body ?? {}, actorFor(request)));
+
+  app.get("/api/admin/ai-processing/schedule", async (request) => getAiProcessingSchedule(requestContext(app, request)));
+
+  app.patch("/api/admin/ai-processing/schedule", async (request) => updateAiProcessingSchedule(requestContext(app, request), request.body ?? {}, actorFor(request)));
 }

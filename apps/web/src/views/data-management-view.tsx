@@ -21,6 +21,8 @@ const fullPurgeTypes = [
   "review_queue",
   "audit_events",
   "agent_runs",
+  "ai_processing_runs",
+  "ai_processing_schedules",
   "retrieval_logs",
   "schema_definitions",
   "project_schema_overrides"
@@ -39,6 +41,8 @@ const countKeys = [
   ["reviewQueue", "Review"],
   ["auditEvents", "Audit events"],
   ["agentRuns", "Agent runs"],
+  ["aiProcessingRuns", "AI runs"],
+  ["aiProcessingSchedules", "AI schedules"],
   ["retrievalLogs", "Search logs"]
 ] as const;
 

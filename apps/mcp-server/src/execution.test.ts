@@ -213,6 +213,22 @@ const routeCases: RouteCase[] = [
     method: "POST",
     path: "/api/admin/purge-data",
     body: { types: ["raw_items", "entities"] }
+  },
+  { name: "list_ai_processing_runs", args: { limit: 5 }, method: "GET", path: "/api/admin/ai-processing/runs", query: { limit: "5" } },
+  {
+    name: "start_ai_memory_backfill",
+    args: { limit: 100, dryRun: true },
+    method: "POST",
+    path: "/api/admin/ai-processing/backfill",
+    body: { limit: 100, dryRun: true }
+  },
+  { name: "get_ai_processing_schedule", args: {}, method: "GET", path: "/api/admin/ai-processing/schedule" },
+  {
+    name: "update_ai_processing_schedule",
+    args: { enabled: true, intervalMinutes: 1440, limit: 100 },
+    method: "PATCH",
+    path: "/api/admin/ai-processing/schedule",
+    body: { enabled: true, intervalMinutes: 1440, limit: 100 }
   }
 ];
 

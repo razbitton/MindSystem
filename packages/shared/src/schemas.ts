@@ -394,6 +394,8 @@ export const purgeDataTypeSchema = z.enum([
   "review_queue",
   "audit_events",
   "agent_runs",
+  "ai_processing_runs",
+  "ai_processing_schedules",
   "retrieval_logs",
   "schema_definitions",
   "project_schema_overrides",
@@ -410,6 +412,8 @@ export const defaultPurgeDataTypes: PurgeDataType[] = [
   "review_queue",
   "audit_events",
   "agent_runs",
+  "ai_processing_runs",
+  "ai_processing_schedules",
   "retrieval_logs",
   "schema_definitions",
   "project_schema_overrides",
@@ -419,6 +423,38 @@ export const defaultPurgeDataTypes: PurgeDataType[] = [
 export const purgeWorkspaceDataSchema = z.object({
   types: z.array(purgeDataTypeSchema).min(1).default(defaultPurgeDataTypes)
 });
+
+export const aiProcessingBackfillSchema = z.object({
+  rawItemIds: z.array(z.string().uuid()).default([]),
+  sourceTypes: z.array(sourceTypeSchema).default([]),
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(10000).default(500),
+  batchSize: z.coerce.number().int().positive().max(100).default(25),
+  onlyUnprocessed: z.boolean().default(true),
+  dryRun: z.boolean().default(false)
+}).refine((value) => !value.since || !value.until || new Date(value.since) <= new Date(value.until), {
+  message: "since must be before until.",
+  path: ["until"]
+});
+export type AiProcessingBackfillInput = z.infer<typeof aiProcessingBackfillSchema>;
+
+export const aiProcessingScheduleSchema = z.object({
+  enabled: z.boolean(),
+  intervalMinutes: z.coerce.number().int().min(15).max(10080).default(1440),
+  sourceTypes: z.array(sourceTypeSchema).default([]),
+  limit: z.coerce.number().int().positive().max(1000).default(100),
+  batchSize: z.coerce.number().int().positive().max(100).default(25),
+  onlyUnprocessed: z.boolean().default(true),
+  dryRun: z.boolean().default(false)
+});
+export type AiProcessingScheduleInput = z.infer<typeof aiProcessingScheduleSchema>;
+
+export const aiProcessingRunsQuerySchema = z.object({
+  status: z.string().trim().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(25)
+});
+export type AiProcessingRunsQuery = z.infer<typeof aiProcessingRunsQuerySchema>;
 
 export const createAgentTokenSchema = z.object({
   name: z.string().min(1),

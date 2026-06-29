@@ -61,6 +61,8 @@ const purgeDataTypeValues = [
   "review_queue",
   "audit_events",
   "agent_runs",
+  "ai_processing_runs",
+  "ai_processing_schedules",
   "retrieval_logs",
   "schema_definitions",
   "project_schema_overrides",
@@ -814,6 +816,58 @@ export const mcpRestTools: RestToolDefinition[] = [
     inputSchema: objectSchema({
       types: { type: "array", items: { type: "string", enum: purgeDataTypeValues } }
     })
+  },
+  {
+    name: "list_ai_processing_runs",
+    description: "List AI processing run history for memory backfills and scheduled processing.",
+    requiredScope: "admin",
+    method: "GET",
+    path: "/api/admin/ai-processing/runs",
+    inputSchema: objectSchema({
+      status: { type: "string" },
+      limit: { type: "number", default: 25 }
+    })
+  },
+  {
+    name: "start_ai_memory_backfill",
+    description: "Queue a safe AI memory backfill over existing raw captures. It dedupes active memories and routes uncertain output to review.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/admin/ai-processing/backfill",
+    inputSchema: objectSchema({
+      rawItemIds: { type: "array", items: { type: "string" } },
+      sourceTypes: { type: "array", items: { type: "string", enum: sourceTypeValues } },
+      since: dateTimeSchema(),
+      until: dateTimeSchema(),
+      limit: { type: "number", default: 500 },
+      batchSize: { type: "number", default: 25 },
+      onlyUnprocessed: { type: "boolean", default: true },
+      dryRun: { type: "boolean", default: false }
+    })
+  },
+  {
+    name: "get_ai_processing_schedule",
+    description: "Get the workspace routine AI processing schedule.",
+    requiredScope: "admin",
+    method: "GET",
+    path: "/api/admin/ai-processing/schedule",
+    inputSchema: objectSchema({})
+  },
+  {
+    name: "update_ai_processing_schedule",
+    description: "Enable, disable, or update routine AI memory processing.",
+    requiredScope: "admin",
+    method: "PATCH",
+    path: "/api/admin/ai-processing/schedule",
+    inputSchema: objectSchema({
+      enabled: { type: "boolean" },
+      intervalMinutes: { type: "number", default: 1440 },
+      sourceTypes: { type: "array", items: { type: "string", enum: sourceTypeValues } },
+      limit: { type: "number", default: 100 },
+      batchSize: { type: "number", default: 25 },
+      onlyUnprocessed: { type: "boolean", default: true },
+      dryRun: { type: "boolean", default: false }
+    }, ["enabled"])
   }
 ];
 

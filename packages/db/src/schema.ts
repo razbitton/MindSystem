@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   index,
+  boolean,
   integer,
   jsonb,
   numeric,
@@ -440,3 +441,50 @@ export const retrievalLogs = pgTable("retrieval_logs", {
   resultCount: integer("result_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
+
+export const aiProcessingRuns = pgTable("ai_processing_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  runType: text("run_type").notNull().default("memory_backfill"),
+  status: text("status").notNull().default("queued"),
+  requestedByUserId: uuid("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  sourceTypes: text("source_types").array().notNull().default(sql`ARRAY[]::text[]`),
+  rawItemIds: uuid("raw_item_ids").array().notNull().default(sql`ARRAY[]::uuid[]`),
+  onlyUnprocessed: boolean("only_unprocessed").notNull().default(true),
+  dryRun: boolean("dry_run").notNull().default(false),
+  limitCount: integer("limit_count").notNull().default(500),
+  batchSize: integer("batch_size").notNull().default(25),
+  since: timestamp("since", { withTimezone: true }),
+  until: timestamp("until", { withTimezone: true }),
+  totalCount: integer("total_count").notNull().default(0),
+  processedCount: integer("processed_count").notNull().default(0),
+  skippedCount: integer("skipped_count").notNull().default(0),
+  createdCount: integer("created_count").notNull().default(0),
+  updatedCount: integer("updated_count").notNull().default(0),
+  reviewCount: integer("review_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  ...timestamps
+}, (table) => ({
+  workspaceStatusIdx: index("ai_processing_runs_workspace_status_idx").on(table.workspaceId, table.status, table.createdAt)
+}));
+
+export const aiProcessingSchedules = pgTable("ai_processing_schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(false),
+  intervalMinutes: integer("interval_minutes").notNull().default(1440),
+  sourceTypes: text("source_types").array().notNull().default(sql`ARRAY[]::text[]`),
+  onlyUnprocessed: boolean("only_unprocessed").notNull().default(true),
+  dryRun: boolean("dry_run").notNull().default(false),
+  limitCount: integer("limit_count").notNull().default(100),
+  batchSize: integer("batch_size").notNull().default(25),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  ...timestamps
+}, (table) => ({
+  workspaceIdx: uniqueIndex("ai_processing_schedules_workspace_idx").on(table.workspaceId),
+  dueIdx: index("ai_processing_schedules_due_idx").on(table.enabled, table.nextRunAt)
+}));

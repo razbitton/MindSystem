@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AgentsView from "./agents-view";
 import DataManagementView from "./data-management-view";
 import SchemasView from "./schemas-view";
+import { AiProcessingPanel } from "../components/ai-processing-panel";
 import { OpenAICodexPanel } from "../components/openai-codex-panel";
 
 export default function SettingsView({ initialTab = "preferences" }: { initialTab?: string }) {
@@ -63,6 +64,7 @@ export default function SettingsView({ initialTab = "preferences" }: { initialTa
         </TabsContent>
 
         <TabsContent value="data" className="flex flex-col gap-6">
+          <AiProcessingPanel />
           <DataManagementView />
           <SchemasView embedded />
         </TabsContent>
