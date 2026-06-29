@@ -254,6 +254,19 @@ export const createDocumentSchema = z.object({
 });
 export type CreateDocumentInput = z.infer<typeof createDocumentSchema>;
 
+export const uploadDocumentSchema = createDocumentSchema.pick({
+  title: true,
+  projectId: true,
+  extractedText: true
+}).extend({
+  file: z.object({
+    name: z.string().trim().min(1),
+    mimeType: z.string().trim().optional(),
+    dataBase64: z.string().min(1)
+  })
+});
+export type UploadDocumentInput = z.infer<typeof uploadDocumentSchema>;
+
 export const patchDocumentSchema = createDocumentSchema.partial();
 
 export const createReminderSchema = z.object({

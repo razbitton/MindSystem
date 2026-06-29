@@ -18,7 +18,8 @@ import {
   patchTaskSchema,
   purgeWorkspaceDataSchema,
   reviewDecisionSchema,
-  setDailyObjectiveSchema
+  setDailyObjectiveSchema,
+  uploadDocumentSchema
 } from "./schemas.js";
 
 export function buildOpenApiSpec() {
@@ -177,6 +178,13 @@ export function buildOpenApiSpec() {
           responses: { "200": { description: "Document" } }
         },
         get: { summary: "List documents", responses: { "200": { description: "Documents" } } }
+      },
+      "/documents/upload": {
+        post: {
+          summary: "Upload a document file and attach it to the workspace",
+          requestBody: { required: true, content: { "application/json": { schema: json(uploadDocumentSchema) } } },
+          responses: { "200": { description: "Document" } }
+        }
       },
       "/documents/{id}": {
         get: { summary: "Get a document", responses: { "200": { description: "Document" } } },

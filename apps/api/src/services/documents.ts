@@ -1,7 +1,8 @@
 import { documents, entities } from "@personal-context-os/db";
-import { patchDocumentSchema, type CreateDocumentInput } from "@personal-context-os/shared";
-import { GetObjectCommand, S3Client, S3ServiceException } from "@aws-sdk/client-s3";
+import { patchDocumentSchema, type CreateDocumentInput, type UploadDocumentInput } from "@personal-context-os/shared";
+import { CreateBucketCommand, GetObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from "@aws-sdk/client-s3";
 import { and, desc, eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { createGenericEntity } from "./entities.js";
 import { writeAuditEvent } from "./audit.js";
@@ -10,6 +11,9 @@ import type { Actor } from "./types.js";
 import type { AppContext } from "./types.js";
 
 type DocumentFileDisposition = "inline" | "attachment";
+
+export const DOCUMENT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const DOCUMENT_UPLOAD_BODY_LIMIT_BYTES = Math.ceil(DOCUMENT_UPLOAD_MAX_BYTES * 1.4) + 100_000;
 
 export class DocumentFileError extends Error {
   constructor(message: string, public readonly statusCode: number) {
@@ -46,6 +50,28 @@ export async function createDocument(context: AppContext, input: CreateDocumentI
 
   await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, metadata: { entityType: "document" } });
   return { document, entity };
+}
+
+export async function uploadDocument(context: AppContext, input: UploadDocumentInput, actor: Actor) {
+  const body = decodeUploadedDocument(input.file.dataBase64);
+  const contentType = normalizedContentType(input.file.mimeType) ?? "application/octet-stream";
+  const objectKey = documentObjectKey(context.workspaceId, input.file.name);
+
+  await putDocumentObject(context, {
+    key: objectKey,
+    body,
+    contentType
+  });
+
+  const documentInput: CreateDocumentInput = {
+    title: input.title,
+    projectId: input.projectId ?? null,
+    objectKey,
+    mimeType: contentType
+  };
+  if (input.extractedText !== undefined) documentInput.extractedText = input.extractedText;
+
+  return createDocument(context, documentInput, actor);
 }
 
 export async function listDocuments(context: AppContext) {
@@ -139,6 +165,42 @@ export async function deleteDocument(context: AppContext, id: string, actor: Act
   return { ok: true };
 }
 
+async function putDocumentObject(
+  context: AppContext,
+  input: {
+    key: string;
+    body: Buffer;
+    contentType: string;
+  }
+) {
+  const client = createS3Client(context);
+  const command = new PutObjectCommand({
+    Bucket: context.env.S3_BUCKET,
+    Key: input.key,
+    Body: input.body,
+    ContentLength: input.body.byteLength,
+    ContentType: input.contentType
+  });
+
+  try {
+    try {
+      await client.send(command);
+    } catch (error) {
+      if (!isMissingBucketError(error)) throw error;
+      await client.send(new CreateBucketCommand({ Bucket: context.env.S3_BUCKET }));
+      await client.send(command);
+    }
+  } catch (error) {
+    if (error instanceof S3ServiceException) {
+      const code = error.name || "S3Error";
+      throw new DocumentFileError(`Could not store document file (${code})`, 502);
+    }
+    throw new DocumentFileError("Could not store document file", 502);
+  } finally {
+    client.destroy();
+  }
+}
+
 async function fetchDocumentObject(context: AppContext, objectKey: string) {
   const key = normalizeObjectKey(context, objectKey);
   const client = createS3Client(context);
@@ -169,6 +231,11 @@ async function fetchDocumentObject(context: AppContext, objectKey: string) {
   } finally {
     client.destroy();
   }
+}
+
+function isMissingBucketError(error: unknown) {
+  if (!(error instanceof S3ServiceException)) return false;
+  return error.name === "NoSuchBucket" || error.$metadata.httpStatusCode === 404;
 }
 
 function createS3Client(context: AppContext) {
@@ -232,6 +299,34 @@ function tryParseHttpUrl(value: string) {
   } catch {
     return null;
   }
+}
+
+function decodeUploadedDocument(value: string) {
+  const base64Payload = value.includes(",") ? value.slice(value.indexOf(",") + 1) : value;
+  const normalized = base64Payload.replace(/\s/g, "");
+  if (!normalized || normalized.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(normalized)) {
+    throw new DocumentFileError("Uploaded document payload is not valid base64", 400);
+  }
+
+  const body = Buffer.from(normalized, "base64");
+  if (!body.byteLength) {
+    throw new DocumentFileError("Uploaded document file is empty", 400);
+  }
+  if (body.byteLength > DOCUMENT_UPLOAD_MAX_BYTES) {
+    throw new DocumentFileError("Uploaded document file is too large", 413);
+  }
+
+  return body;
+}
+
+function documentObjectKey(workspaceId: string, fileName: string) {
+  const safeFileName = sanitizeFilename(fileName.split(/[\\/]/).filter(Boolean).at(-1) ?? fileName).slice(0, 160);
+  return `workspaces/${workspaceId}/documents/${randomUUID()}-${safeFileName || "document"}`;
+}
+
+function normalizedContentType(value: string | undefined) {
+  const contentType = value?.split(";")[0]?.trim().toLowerCase();
+  return contentType || null;
 }
 
 async function streamToBuffer(body: unknown) {

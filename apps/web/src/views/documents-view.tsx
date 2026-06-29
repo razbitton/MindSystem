@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Download, ExternalLink, FileText, Filter, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, ExternalLink, FileText, Filter, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiPost, type AnyRecord } from "../lib/api";
 import {
@@ -17,7 +17,7 @@ import { ConfirmDialog } from "../components/confirm-dialog";
 import { useI18n } from "../i18n";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +33,7 @@ const NO_PROJECT = "__none__";
 const ANY = "__any__";
 const WITH_FILE = "with_file";
 const WITHOUT_FILE = "without_file";
+const DOCUMENT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 
 type DocumentForm = {
   title: string;
@@ -63,8 +64,11 @@ export default function DocumentsView() {
   const [showFilters, setShowFilters] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<DocumentForm>(blankForm());
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnyRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function load(force = false) {
     const [documentData, projectData] = await Promise.all([
@@ -86,17 +90,66 @@ export default function DocumentsView() {
   function closeDrawer() {
     setDrawerOpen(false);
     setForm(blankForm());
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function onFileChange(file: File | null) {
+    if (file && file.size > DOCUMENT_UPLOAD_MAX_BYTES) {
+      toast.error(t("documents.fileTooLarge"));
+      clearSelectedFile();
+      return;
+    }
+
+    setSelectedFile(file);
+    if (!file) return;
+
+    setForm((current) => ({
+      ...current,
+      title: current.title.trim() ? current.title : titleFromFileName(file.name),
+      mimeType: file.type || current.mimeType
+    }));
+  }
+
+  function clearSelectedFile() {
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function create() {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || creating) return;
+    setCreating(true);
     try {
-      await apiPost("/api/documents", { ...form, projectId: form.projectId || null });
+      const payload = {
+        ...form,
+        title: form.title.trim(),
+        projectId: form.projectId || null,
+        objectKey: form.objectKey.trim() || undefined,
+        mimeType: form.mimeType.trim() || undefined,
+        extractedText: form.extractedText.trim() || undefined
+      };
+
+      if (selectedFile) {
+        await apiPost("/api/documents/upload", {
+          title: payload.title,
+          projectId: payload.projectId,
+          extractedText: payload.extractedText,
+          file: {
+            name: selectedFile.name,
+            mimeType: selectedFile.type || payload.mimeType,
+            dataBase64: await fileToBase64(selectedFile)
+          }
+        });
+      } else {
+        await apiPost("/api/documents", payload);
+      }
       closeDrawer();
       invalidateWorkspaceQueryCache();
       await load(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -320,8 +373,8 @@ export default function DocumentsView() {
               <Button variant="outline" type="button" onClick={closeDrawer}>
                 {t("common.cancel")}
               </Button>
-              <Button type="button" onClick={() => void create()} disabled={!form.title.trim()}>
-                {t("common.attach")}
+              <Button type="button" onClick={() => void create()} disabled={!form.title.trim() || creating}>
+                {creating ? t("documents.uploading") : t("common.attach")}
               </Button>
             </>
           }
@@ -365,6 +418,43 @@ export default function DocumentsView() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="document-file">{t("documents.sourceFile")}</Label>
+              <Input
+                ref={fileInputRef}
+                id="document-file"
+                type="file"
+                className="sr-only"
+                onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+              />
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                <label
+                  htmlFor="document-file"
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-fit")}
+                >
+                  <Upload aria-hidden />
+                  {t("documents.chooseFile")}
+                </label>
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+                  <span className="min-w-0 truncate" dir="auto">
+                    {selectedFile ? `${selectedFile.name} - ${formatFileSize(selectedFile.size)}` : t("documents.noFileSelected")}
+                  </span>
+                  {selectedFile ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      type="button"
+                      onClick={clearSelectedFile}
+                      aria-label={t("documents.clearFile")}
+                      title={t("documents.clearFile")}
+                      className="shrink-0"
+                    >
+                      <X aria-hidden />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="document-text">{t("documents.extractedText")}</Label>
@@ -641,6 +731,33 @@ function blankForm(): DocumentForm {
     mimeType: "",
     extractedText: ""
   };
+}
+
+function titleFromFileName(fileName: string) {
+  const cleanName = fileName.split(/[\\/]/).filter(Boolean).at(-1) ?? fileName;
+  const withoutExtension = cleanName.replace(/\.[^.]+$/, "").trim();
+  return withoutExtension || cleanName || "Document";
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    });
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("Could not read file")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) return `${kilobytes.toFixed(kilobytes >= 10 ? 0 : 1)} KB`;
+  const megabytes = kilobytes / 1024;
+  return `${megabytes.toFixed(megabytes >= 10 ? 0 : 1)} MB`;
 }
 
 function documentFileUrl(document: AnyRecord, disposition: "inline" | "attachment") {

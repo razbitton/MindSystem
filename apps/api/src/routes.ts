@@ -20,6 +20,7 @@ import {
   patchTaskSchema,
   reviewDecisionSchema,
   searchQuerySchema,
+  uploadDocumentSchema,
   type AgentScope
 } from "@personal-context-os/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -60,7 +61,17 @@ import {
   updateGoogleCalendarPreferences
 } from "./services/google-calendar.js";
 import { ingestFreeText } from "./services/ingest.js";
-import { createDocument, deleteDocument, getDocument, getDocumentFile, isDocumentFileError, listDocuments, patchDocument } from "./services/documents.js";
+import {
+  createDocument,
+  deleteDocument,
+  DOCUMENT_UPLOAD_BODY_LIMIT_BYTES,
+  getDocument,
+  getDocumentFile,
+  isDocumentFileError,
+  listDocuments,
+  patchDocument,
+  uploadDocument
+} from "./services/documents.js";
 import { deleteEntity, getEntity, listEntities } from "./services/entities.js";
 import {
   createNote,
@@ -194,6 +205,7 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
 
   if (route === "/api/documents" && method === "GET") return "documents:read";
   if (route === "/api/documents" && method === "POST") return "documents:write";
+  if (route === "/api/documents/upload" && method === "POST") return "documents:write";
   if (route === "/api/documents/:id" && method === "GET") return "documents:read";
   if (route === "/api/documents/:id/download" && method === "GET") return "documents:read";
   if (route === "/api/documents/:id" && method === "PATCH") return "documents:write";
@@ -403,6 +415,18 @@ export async function registerRoutes(app: FastifyInstance) {
   app.post("/api/documents", async (request) => {
     const input = createDocumentSchema.parse(request.body);
     return createDocument(requestContext(app, request), input, actorFor(request));
+  });
+
+  app.post("/api/documents/upload", { bodyLimit: DOCUMENT_UPLOAD_BODY_LIMIT_BYTES }, async (request, reply) => {
+    const input = uploadDocumentSchema.parse(request.body);
+    return uploadDocument(requestContext(app, request), input, actorFor(request)).catch((error: unknown) => {
+      if (!isDocumentFileError(error)) throw error;
+      return reply.code(error.statusCode).send({
+        statusCode: error.statusCode,
+        error: error.message,
+        message: error.message
+      });
+    });
   });
 
   app.get("/api/documents", async (request) => listDocuments(requestContext(app, request)));
