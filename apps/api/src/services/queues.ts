@@ -29,7 +29,7 @@ export async function enqueuePostIngestJobs(context: AppContext, entityIds: stri
 export async function enqueueAiProcessingRun(context: AppContext, runId: string) {
   const queues = getQueues(context);
   await queues.aiProcessingQueue.add("run_memory_backfill", { runId, workspaceId: context.workspaceId }, {
-    jobId: `ai-processing-run:${runId}`,
+    jobId: `ai-processing-run-${runId}`,
     attempts: 1
   });
 }

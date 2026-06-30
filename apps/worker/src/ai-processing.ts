@@ -170,7 +170,7 @@ export async function enqueueDueAiProcessingRuns(pool: Pool, queue: Queue) {
 
   for (const run of result.rows) {
     await queue.add("run_memory_backfill", { runId: run.id, workspaceId: run.workspace_id }, {
-      jobId: `ai-processing-run:${run.id}`,
+      jobId: `ai-processing-run-${run.id}`,
       attempts: 1
     });
   }
