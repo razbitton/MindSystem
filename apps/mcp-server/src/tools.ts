@@ -142,7 +142,7 @@ const manageTaskProperties = {
     enum: manageTaskActionValues,
     description: "Task operation to perform."
   },
-  id: nullableStringSchema("Task table id or task entity id. Required except for create."),
+  id: { type: "string", description: "Task table id or task entity id. Required except for create." },
   ...taskProperties,
   date: { type: "string", description: "Local date in YYYY-MM-DD format. Required for pin, snooze, and clear_daily_objective." },
   targetDate: { type: "string", description: "Target local date in YYYY-MM-DD format. Required for snooze." },
