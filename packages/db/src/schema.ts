@@ -54,6 +54,7 @@ export const memoryKind = pgEnum("memory_kind", [
 ]);
 export const memoryStatus = pgEnum("memory_status", ["active", "superseded", "archived"]);
 export const memoryImportance = pgEnum("memory_importance", ["low", "medium", "high", "critical"]);
+export const memoryValidity = pgEnum("memory_validity", ["current", "stale", "disputed", "superseded"]);
 
 const vector = customType<{
   data: number[];
@@ -73,6 +74,15 @@ const vector = customType<{
       .split(",")
       .filter(Boolean)
       .map(Number);
+  }
+});
+
+const tsvector = customType<{
+  data: string;
+  driverData: string;
+}>({
+  dataType() {
+    return "tsvector";
   }
 });
 
@@ -287,11 +297,19 @@ export const memoryRecords = pgTable("memory_records", {
   supersededByMemoryId: uuid("superseded_by_memory_id"),
   occurredAt: timestamp("occurred_at", { withTimezone: true }),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  staleAfter: timestamp("stale_after", { withTimezone: true }),
+  validity: memoryValidity("validity").notNull().default("current"),
+  confidenceReason: text("confidence_reason"),
+  sourceReliability: numeric("source_reliability", { precision: 4, scale: 3 }).notNull().default("0.8"),
   customFields: jsonb("custom_fields").notNull().default({}),
   ...timestamps
 }, (table) => ({
   workspaceKindUpdatedIdx: index("memory_records_workspace_kind_updated_idx").on(table.workspaceId, table.kind, table.updatedAt),
   workspaceStatusIdx: index("memory_records_workspace_status_idx").on(table.workspaceId, table.status),
+  workspaceValidityIdx: index("memory_records_workspace_validity_idx").on(table.workspaceId, table.validity),
+  workspaceStaleAfterIdx: index("memory_records_workspace_stale_after_idx").on(table.workspaceId, table.staleAfter),
   projectIdx: index("memory_records_project_idx").on(table.projectId)
 }));
 
@@ -362,7 +380,7 @@ export const chunks = pgTable("chunks", {
   chunkText: text("chunk_text").notNull(),
   chunkIndex: integer("chunk_index").notNull().default(0),
   embedding: vector("embedding", { dimensions: 1536 }),
-  fts: text("fts"),
+  fts: tsvector("fts"),
   metadata: jsonb("metadata").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({

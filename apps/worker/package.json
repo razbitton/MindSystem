@@ -16,6 +16,7 @@
     "@personal-context-os/ai": "workspace:*",
     "@personal-context-os/config": "workspace:*",
     "@personal-context-os/db": "workspace:*",
+    "@personal-context-os/shared": "workspace:*",
     "bullmq": "^5.41.2",
     "pg": "^8.13.3"
   },

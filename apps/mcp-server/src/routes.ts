@@ -7,7 +7,7 @@ import { authenticateAgent, requireToolScope, type AgentIdentity } from "./auth.
 import { executeTool, readResource, type McpExecutionRuntime } from "./execution.js";
 import { isAcceptedClientNotification, type JsonRpcEnvelope } from "./protocol.js";
 import { agentBootstrapText, getResourceDefinition, listedResources } from "./resources.js";
-import { getToolDefinition, toolDefinitions } from "./tools.js";
+import { getToolDefinition, listToolDefinitionsForTier, type ToolTier } from "./tools.js";
 
 export interface McpRouteOptions {
   db: DbClient;
@@ -60,7 +60,13 @@ async function handleJsonRpc(
   }
 
   if (method === "tools/list") {
-    return { tools: toolDefinitions.map(({ requiredScope, ...tool }) => tool) };
+    const tier = parseToolTier(params.tier);
+    if (tier === "admin") {
+      if (!bearerToken) throw new Error("Agent token required to list admin tools");
+      const agent = await authenticateAgent(db, bearerToken);
+      requireToolScope(agent.scopes, "admin");
+    }
+    return { tools: listToolDefinitionsForTier(tier) };
   }
 
   if (method === "resources/list") {
@@ -120,8 +126,23 @@ async function handleJsonRpc(
   if (method === "tools/call") {
     const name = String(params.name ?? "");
     const args = (params.arguments ?? {}) as Record<string, unknown>;
-    const result = await callTool(db, runtime, agent, bearerToken, name, args);
-    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    try {
+      const result = await callTool(db, runtime, agent, bearerToken, name, args);
+      return {
+        structuredContent: result,
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    } catch (error) {
+      const structuredContent = {
+        error: error instanceof Error ? error.message : "Tool execution failed",
+        toolName: name
+      };
+      return {
+        isError: true,
+        structuredContent,
+        content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }]
+      };
+    }
   }
 
   if (method === "resources/read") {
@@ -194,6 +215,10 @@ function extractToken(headers: IncomingHttpHeaders) {
   if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length).trim();
   const token = headers["x-agent-token"];
   return Array.isArray(token) ? token[0] ?? null : token ?? null;
+}
+
+function parseToolTier(value: unknown): ToolTier {
+  return value === "advanced" || value === "admin" ? value : "default";
 }
 
 function summarizeResult(result: unknown) {

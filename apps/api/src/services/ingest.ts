@@ -1,4 +1,4 @@
-import { HeuristicNormalizer } from "@personal-context-os/ai";
+import { OpenAICodexNormalizer, OpenAINormalizer } from "@personal-context-os/ai";
 import {
   entities,
   entityEdges,
@@ -13,15 +13,13 @@ import type { IngestFreeTextInput, NormalizerOutput } from "@personal-context-os
 import { normalizerOutputSchema } from "@personal-context-os/shared";
 import { and, eq } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { createEntityChunks } from "./chunks.js";
 import { createGenericEntity } from "./entities.js";
 import { AUTO_APPLY_CONFIDENCE, buildIngestPlan } from "./ingest-plan.js";
 import { findEntityByTitle, findProjectByName } from "./entity-resolution.js";
+import { resolveOpenAICodexAccessToken } from "./openai-codex.js";
 import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
-
-const normalizer = new HeuristicNormalizer();
 
 export async function ingestFreeText(context: AppContext, input: IngestFreeTextInput, actor: Actor) {
   const [rawItem] = await context.db
@@ -46,6 +44,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
   });
 
   const projectHint = input.projectId ? await getProjectName(context, input.projectId) : undefined;
+  const normalizer = createNormalizer(context);
   const normalized = normalizerOutputSchema.parse(await normalizer.normalize(projectHint ? { text: input.text, projectHint } : { text: input.text }));
   const plan = buildIngestPlan(normalized);
   const createdEntities: unknown[] = [];
@@ -238,8 +237,25 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
     createdEntities,
     reviewItems,
     applied: createdEntities.length,
-    requiresReview: reviewItems.length
+    requiresReview: reviewItems.length,
+    normalizationDegraded: normalized.uncertainties.some((item) => item.startsWith("AI normalizer degraded:"))
   };
+}
+
+function createNormalizer(context: AppContext) {
+  if (context.env.OPENAI_AUTH_MODE === "codex") {
+    return new OpenAICodexNormalizer({
+      tokenProvider: () => resolveOpenAICodexAccessToken(context),
+      apiBaseUrl: context.env.OPENAI_CODEX_BASE_URL,
+      model: context.env.OPENAI_CODEX_EXTRACTION_MODEL
+    });
+  }
+
+  return new OpenAINormalizer({
+    apiKey: context.env.OPENAI_API_KEY ?? "",
+    apiBaseUrl: context.env.OPENAI_API_BASE_URL,
+    model: context.env.OPENAI_EXTRACTION_MODEL
+  });
 }
 
 async function createSimpleEntities(

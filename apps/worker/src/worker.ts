@@ -3,11 +3,14 @@ import { createDb } from "@personal-context-os/db";
 import { OpenAIEmbeddingClient, vectorToSql } from "@personal-context-os/ai";
 import { Queue, Worker } from "bullmq";
 import { enqueueDueAiProcessingRuns, runAiProcessingJob } from "./ai-processing.js";
+import { runMemoryConsolidationJob } from "./consolidation.js";
 
 const env = loadEnv();
 const { pool } = createDb(env.DATABASE_URL);
 const connection = { url: env.REDIS_URL };
+const embeddingQueue = new Queue("embeddings", { connection });
 const aiProcessingQueue = new Queue("ai-processing", { connection });
+const memoryConsolidationQueue = new Queue("memory-consolidation", { connection });
 
 const embeddingWorker = new Worker(
   "embeddings",
@@ -78,7 +81,19 @@ const dashboardWorker = new Worker(
 const aiProcessingWorker = new Worker(
   "ai-processing",
   async (job) => {
-    return runAiProcessingJob(pool, env, String(job.data.runId));
+    return runAiProcessingJob(pool, env, String(job.data.runId), { embeddingQueue });
+  },
+  { connection, concurrency: 1 }
+);
+
+const memoryConsolidationWorker = new Worker(
+  "memory-consolidation",
+  async (job) => {
+    return runMemoryConsolidationJob(pool, {
+      workspaceId: String(job.data.workspaceId),
+      dryRun: Boolean(job.data.dryRun),
+      limit: Number(job.data.limit ?? 200)
+    });
   },
   { connection, concurrency: 1 }
 );
@@ -93,14 +108,22 @@ enqueueDueAiProcessingRuns(pool, aiProcessingQueue).catch((error) => {
   console.error("Failed to enqueue due AI processing runs", error);
 });
 
-for (const worker of [embeddingWorker, dashboardWorker, aiProcessingWorker]) {
+for (const worker of [embeddingWorker, dashboardWorker, aiProcessingWorker, memoryConsolidationWorker]) {
   worker.on("completed", (job) => console.log(`Completed ${job.queueName}:${job.name}:${job.id}`));
   worker.on("failed", (job, error) => console.error(`Failed ${job?.queueName}:${job?.name}:${job?.id}`, error));
 }
 
 process.on("SIGTERM", async () => {
   clearInterval(aiProcessingScheduler);
-  await Promise.all([embeddingWorker.close(), dashboardWorker.close(), aiProcessingWorker.close(), aiProcessingQueue.close()]);
+  await Promise.all([
+    embeddingWorker.close(),
+    dashboardWorker.close(),
+    aiProcessingWorker.close(),
+    memoryConsolidationWorker.close(),
+    embeddingQueue.close(),
+    aiProcessingQueue.close(),
+    memoryConsolidationQueue.close()
+  ]);
   await pool.end();
   process.exit(0);
 });

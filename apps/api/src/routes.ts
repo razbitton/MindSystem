@@ -41,6 +41,7 @@ import {
   updateAiProcessingSchedule
 } from "./services/ai-processing.js";
 import { clearAuditEvents, deleteAuditEvent, listAuditEvents } from "./services/audit.js";
+import { startMemoryConsolidation } from "./services/consolidation.js";
 import { getDataInventory, purgeWorkspaceData } from "./services/data-management.js";
 import {
   authenticateAgentBearer,
@@ -68,7 +69,8 @@ import {
   updateGoogleCalendarPreferences
 } from "./services/google-calendar.js";
 import { ingestFreeText } from "./services/ingest.js";
-import { getRelevantContext, linkMemory, recallMemory, storeMemory, supersedeMemory } from "./services/memory.js";
+import { getRelevantContext, prepareTurnContext } from "./services/context-broker.js";
+import { getMemoryDetails, linkMemory, recallMemory, storeMemory, supersedeMemory } from "./services/memory.js";
 import {
   disconnectOpenAICodex,
   getOpenAICodexStatus,
@@ -110,7 +112,11 @@ import {
   clearReviewQueue,
   deleteReviewItem,
   listReviewQueue,
-  rejectReviewItem
+  markReviewMemoryStale,
+  mergeReviewItem,
+  pinReviewPreference,
+  rejectReviewItem,
+  supersedeReviewItem
 } from "./services/review.js";
 import {
   clearProjectSchemaOverrides,
@@ -127,6 +133,7 @@ import {
   deleteTask,
   getTask,
   listTasks,
+  manageTask,
   patchTask,
   setDailyObjective
 } from "./services/tasks.js";
@@ -185,7 +192,9 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/search" && method === "GET") return "memory:read";
   if (route === "/api/ingest/free-text" && method === "POST") return "memory:write";
   if (route === "/api/memory/recall" && method === "POST") return "memory:read";
+  if (route === "/api/memory/:id" && method === "GET") return "memory:read";
   if (route === "/api/memory/context" && method === "POST") return "memory:read";
+  if (route === "/api/context/turn" && method === "POST") return "memory:read";
   if (route === "/api/memory/store" && method === "POST") return "memory:write";
   if (route === "/api/memory/:id/supersede" && method === "POST") return "memory:write";
   if (route === "/api/memory/link" && method === "POST") return "memory:write";
@@ -210,6 +219,7 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
 
   if (route === "/api/tasks" && method === "GET") return "tasks:read";
   if (route === "/api/tasks" && method === "POST") return "tasks:write";
+  if (route === "/api/tasks/manage" && method === "POST") return "tasks:write";
   if (route === "/api/tasks/:id" && method === "GET") return "tasks:read";
   if (route === "/api/tasks/:id" && method === "PATCH") return "tasks:write";
   if (route === "/api/tasks/:id" && method === "DELETE") return "tasks:write";
@@ -320,7 +330,14 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.post("/api/memory/recall", async (request) => recallMemory(requestContext(app, request), request.body ?? {}));
 
+  app.get("/api/memory/:id", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return getMemoryDetails(requestContext(app, request), id);
+  });
+
   app.post("/api/memory/context", async (request) => getRelevantContext(requestContext(app, request), request.body ?? {}));
+
+  app.post("/api/context/turn", async (request) => prepareTurnContext(requestContext(app, request), request.body ?? {}));
 
   app.post("/api/memory/store", async (request) => storeMemory(requestContext(app, request), request.body ?? {}, actorFor(request)));
 
@@ -394,6 +411,8 @@ export async function registerRoutes(app: FastifyInstance) {
     const input = createTaskSchema.parse(request.body);
     return createTask(requestContext(app, request), input, actorFor(request));
   });
+
+  app.post("/api/tasks/manage", async (request) => manageTask(requestContext(app, request), request.body ?? {}, actorFor(request)));
 
   app.get("/api/tasks", async (request) => listTasks(requestContext(app, request), request.query));
 
@@ -585,6 +604,26 @@ export async function registerRoutes(app: FastifyInstance) {
     return approveReviewItem(requestContext(app, request), id, input, actorFor(request));
   });
 
+  app.post("/api/review-queue/:id/merge", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return mergeReviewItem(requestContext(app, request), id, request.body ?? {}, actorFor(request));
+  });
+
+  app.post("/api/review-queue/:id/supersede", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return supersedeReviewItem(requestContext(app, request), id, request.body ?? {}, actorFor(request));
+  });
+
+  app.post("/api/review-queue/:id/mark-stale", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return markReviewMemoryStale(requestContext(app, request), id, actorFor(request));
+  });
+
+  app.post("/api/review-queue/:id/pin-preference", async (request) => {
+    const { id } = idParam.parse(request.params);
+    return pinReviewPreference(requestContext(app, request), id, actorFor(request));
+  });
+
   app.post("/api/review-queue/:id/reject", async (request) => {
     const { id } = idParam.parse(request.params);
     return rejectReviewItem(requestContext(app, request), id, actorFor(request));
@@ -667,6 +706,8 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/api/admin/ai-processing/runs", async (request) => listAiProcessingRuns(requestContext(app, request), request.query));
 
   app.post("/api/admin/ai-processing/backfill", async (request) => startAiMemoryBackfill(requestContext(app, request), request.body ?? {}, actorFor(request)));
+
+  app.post("/api/admin/memory-consolidation", async (request) => startMemoryConsolidation(requestContext(app, request), request.body ?? {}, actorFor(request)));
 
   app.get("/api/admin/ai-processing/schedule", async (request) => getAiProcessingSchedule(requestContext(app, request)));
 

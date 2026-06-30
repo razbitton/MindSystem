@@ -2,6 +2,7 @@ import { entities, entityEdges, projects, tasks } from "@personal-context-os/db"
 import {
   createTaskSchema,
   localDateSchema,
+  manageTaskSchema,
   patchTaskSchema,
   prioritySchema,
   setDailyObjectiveSchema,
@@ -10,7 +11,9 @@ import {
 } from "@personal-context-os/shared";
 import { and, desc, eq, lte, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import { composeEntityChunkText, replaceEntityChunks } from "./chunks.js";
 import { createGenericEntity } from "./entities.js";
+import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
@@ -38,7 +41,8 @@ export async function createTask(context: AppContext, input: z.input<typeof crea
     body: parsed.description ?? null,
     status: parsed.status,
     canonical: parsed,
-    customFields: {}
+    customFields: {},
+    chunkText: taskChunkText(parsed)
   });
 
   const [task] = await context.db
@@ -74,6 +78,7 @@ export async function createTask(context: AppContext, input: z.input<typeof crea
   }
 
   await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, metadata: { entityType: "task" } });
+  await enqueuePostIngestJobs(context, [entity.id]);
   return { task, entity };
 }
 
@@ -182,6 +187,12 @@ export async function patchTask(context: AppContext, id: string, input: ParsedPa
     })
     .where(eq(entities.id, task.entityId));
 
+  await replaceEntityChunks(context, {
+    entityId: task.entityId,
+    text: taskChunkText(task),
+    metadata: { entityType: "task" }
+  });
+  await enqueuePostIngestJobs(context, [task.entityId]);
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: task.entityId, metadata: { entityType: "task" } });
   return { task };
 }
@@ -207,6 +218,12 @@ export async function completeTask(context: AppContext, id: string, actor: Actor
     .update(entities)
     .set({ status: "done", canonical: taskCanonical(task), updatedAt: new Date() })
     .where(eq(entities.id, task.entityId));
+  await replaceEntityChunks(context, {
+    entityId: task.entityId,
+    text: taskChunkText(task),
+    metadata: { entityType: "task" }
+  });
+  await enqueuePostIngestJobs(context, [task.entityId]);
   await writeAuditEvent(context, { ...actor, action: "task complete", entityId: task.entityId, metadata: { taskId: task.id } });
   return { task };
 }
@@ -239,6 +256,48 @@ export async function setDailyObjective(context: AppContext, id: string, input: 
   return { ok: true, task, date: parsed.date, action: parsed.action, targetDate: parsed.targetDate ?? null };
 }
 
+export async function manageTask(context: AppContext, input: unknown, actor: Actor) {
+  const parsed = manageTaskSchema.parse(input);
+
+  if (parsed.action === "create") {
+    return {
+      action: parsed.action,
+      result: await createTask(context, createTaskSchema.parse(parsed), actor)
+    };
+  }
+
+  const id = requireManagedTaskId(parsed.id);
+  if (parsed.action === "update") {
+    return {
+      action: parsed.action,
+      result: await patchTask(context, id, patchTaskSchema.parse(parsed), actor)
+    };
+  }
+  if (parsed.action === "complete") {
+    return {
+      action: parsed.action,
+      result: await completeTask(context, id, actor)
+    };
+  }
+  if (parsed.action === "cancel") {
+    return {
+      action: parsed.action,
+      result: await patchTask(context, id, { status: "cancelled" }, actor)
+    };
+  }
+
+  const date = requireManagedTaskDate(parsed.date);
+  const dailyAction = parsed.action === "clear_daily_objective" ? "clear" : parsed.action;
+  const dailyInput = dailyAction === "snooze"
+    ? { date, action: dailyAction, targetDate: parsed.targetDate }
+    : { date, action: dailyAction };
+
+  return {
+    action: parsed.action,
+    result: await setDailyObjective(context, id, dailyInput, actor)
+  };
+}
+
 export async function deleteTask(context: AppContext, id: string, actor: Actor) {
   const { task } = await getTask(context, id);
 
@@ -258,6 +317,16 @@ export async function deleteTask(context: AppContext, id: string, actor: Actor) 
 
 function taskIdentityWhere(id: string): SQL {
   return or(eq(tasks.id, id), eq(tasks.entityId, id)) ?? eq(tasks.id, id);
+}
+
+function requireManagedTaskId(id: string | undefined) {
+  if (!id) throw new Error("Task id is required for this manage_task action.");
+  return id;
+}
+
+function requireManagedTaskDate(date: string | undefined) {
+  if (!date) throw new Error("date is required for this manage_task action.");
+  return date;
 }
 
 async function getEffectiveDailyObjectiveStates(context: AppContext, taskIds: string[], localDate: string) {
@@ -314,6 +383,40 @@ function taskCanonical(task: typeof tasks.$inferSelect) {
     dependsOnTaskId: task.dependsOnTaskId ?? undefined,
     completedAt: task.completedAt?.toISOString()
   };
+}
+
+function taskChunkText(task: {
+  title: string;
+  description?: string | null | undefined;
+  projectId?: string | null | undefined;
+  kind?: string | null | undefined;
+  status?: string | null | undefined;
+  priority?: string | null | undefined;
+  dueAt?: string | Date | null | undefined;
+  scheduledFor?: string | Date | null | undefined;
+  estimateMinutes?: number | null | undefined;
+  assignee?: string | null | undefined;
+  dependsOnTaskId?: string | null | undefined;
+  completedAt?: string | Date | null | undefined;
+}) {
+  return composeEntityChunkText([
+    `Task: ${task.title}`,
+    task.description ? `Description: ${task.description}` : null,
+    task.projectId ? `Project ID: ${task.projectId}` : null,
+    task.kind ? `Kind: ${task.kind}` : null,
+    task.status ? `Status: ${task.status}` : null,
+    task.priority ? `Priority: ${task.priority}` : null,
+    task.dueAt ? `Due: ${formatDateLike(task.dueAt)}` : null,
+    task.scheduledFor ? `Scheduled: ${formatDateLike(task.scheduledFor)}` : null,
+    task.estimateMinutes ? `Estimate minutes: ${task.estimateMinutes}` : null,
+    task.assignee ? `Assignee: ${task.assignee}` : null,
+    task.dependsOnTaskId ? `Depends on task ID: ${task.dependsOnTaskId}` : null,
+    task.completedAt ? `Completed: ${formatDateLike(task.completedAt)}` : null
+  ]);
+}
+
+function formatDateLike(value: string | Date) {
+  return value instanceof Date ? value.toISOString() : value;
 }
 
 function sanitizeCreateTask(task: ParsedCreateTask): ParsedCreateTask {

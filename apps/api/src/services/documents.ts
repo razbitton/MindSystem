@@ -4,7 +4,9 @@ import { CreateBucketCommand, GetObjectCommand, PutObjectCommand, S3Client, S3Se
 import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
+import { composeEntityChunkText, replaceEntityChunks } from "./chunks.js";
 import { createGenericEntity } from "./entities.js";
+import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { z } from "zod";
 import type { Actor } from "./types.js";
@@ -32,7 +34,8 @@ export async function createDocument(context: AppContext, input: CreateDocumentI
     summary: input.extractedText?.slice(0, 180) ?? input.objectKey ?? null,
     body: input.extractedText ?? null,
     canonical: input,
-    customFields: {}
+    customFields: {},
+    chunkText: documentChunkText(input)
   });
 
   const [document] = await context.db
@@ -49,6 +52,7 @@ export async function createDocument(context: AppContext, input: CreateDocumentI
     .returning();
 
   await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, metadata: { entityType: "document" } });
+  await enqueuePostIngestJobs(context, [entity.id]);
   return { document, entity };
 }
 
@@ -144,6 +148,12 @@ export async function patchDocument(context: AppContext, id: string, input: z.in
     })
     .where(eq(entities.id, document.entityId));
 
+  await replaceEntityChunks(context, {
+    entityId: document.entityId,
+    text: documentChunkText(document),
+    metadata: { entityType: "document" }
+  });
+  await enqueuePostIngestJobs(context, [document.entityId]);
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: document.entityId, metadata: { entityType: "document" } });
   return { document };
 }
@@ -341,6 +351,22 @@ function documentObjectKey(workspaceId: string, fileName: string) {
 function normalizedContentType(value: string | undefined) {
   const contentType = value?.split(";")[0]?.trim().toLowerCase();
   return contentType || null;
+}
+
+function documentChunkText(document: {
+  title: string;
+  projectId?: string | null | undefined;
+  objectKey?: string | null | undefined;
+  mimeType?: string | null | undefined;
+  extractedText?: string | null | undefined;
+}) {
+  return composeEntityChunkText([
+    `Document: ${document.title}`,
+    document.projectId ? `Project ID: ${document.projectId}` : null,
+    document.mimeType ? `MIME type: ${document.mimeType}` : null,
+    document.objectKey ? `Object key: ${document.objectKey}` : null,
+    document.extractedText ?? null
+  ]);
 }
 
 async function streamToBuffer(body: unknown) {

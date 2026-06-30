@@ -4,13 +4,15 @@ import type { AppContext } from "./types.js";
 let embeddingQueue: Queue | null = null;
 let dashboardQueue: Queue | null = null;
 let aiProcessingQueue: Queue | null = null;
+let memoryConsolidationQueue: Queue | null = null;
 
 function getQueues(context: AppContext) {
   const connection = { url: context.env.REDIS_URL };
   embeddingQueue ??= new Queue("embeddings", { connection });
   dashboardQueue ??= new Queue("dashboard", { connection });
   aiProcessingQueue ??= new Queue("ai-processing", { connection });
-  return { embeddingQueue, dashboardQueue, aiProcessingQueue };
+  memoryConsolidationQueue ??= new Queue("memory-consolidation", { connection });
+  return { embeddingQueue, dashboardQueue, aiProcessingQueue, memoryConsolidationQueue };
 }
 
 export async function enqueuePostIngestJobs(context: AppContext, entityIds: string[]) {
@@ -30,6 +32,18 @@ export async function enqueueAiProcessingRun(context: AppContext, runId: string)
   const queues = getQueues(context);
   await queues.aiProcessingQueue.add("run_memory_backfill", { runId, workspaceId: context.workspaceId }, {
     jobId: `ai-processing-run-${runId}`,
+    attempts: 1
+  });
+}
+
+export async function enqueueMemoryConsolidation(context: AppContext, input: { dryRun: boolean; limit: number }) {
+  const queues = getQueues(context);
+  await queues.memoryConsolidationQueue.add("consolidate_memory", {
+    workspaceId: context.workspaceId,
+    dryRun: input.dryRun,
+    limit: input.limit
+  }, {
+    jobId: `memory-consolidation-${context.workspaceId}`,
     attempts: 1
   });
 }
