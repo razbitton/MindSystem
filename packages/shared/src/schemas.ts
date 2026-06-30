@@ -517,7 +517,7 @@ export type AiProcessingScheduleInput = z.infer<typeof aiProcessingScheduleSchem
 
 export const aiAutonomyModeSchema = z.enum(["conservative", "balanced", "autopilot"]);
 export const aiOperationPolicyPatchSchema = z.object({
-  mode: aiAutonomyModeSchema,
+  mode: aiAutonomyModeSchema.optional(),
   autoApplyMinConfidence: z.number().min(0).max(1).optional(),
   reviewBelowConfidence: z.number().min(0).max(1).optional(),
   requireReviewForDestructive: z.boolean().optional(),
@@ -525,6 +525,8 @@ export const aiOperationPolicyPatchSchema = z.object({
   requireReviewForConflicts: z.boolean().optional(),
   requireReviewForBulkChanges: z.boolean().optional(),
   maxAutoApplyBatchSize: z.coerce.number().int().positive().max(1000).optional()
+}).refine((value) => Object.values(value).some((entry) => entry !== undefined), {
+  message: "At least one policy setting is required."
 }).refine((value) => value.reviewBelowConfidence === undefined || value.autoApplyMinConfidence === undefined || value.reviewBelowConfidence <= value.autoApplyMinConfidence, {
   message: "reviewBelowConfidence must be less than or equal to autoApplyMinConfidence.",
   path: ["reviewBelowConfidence"]

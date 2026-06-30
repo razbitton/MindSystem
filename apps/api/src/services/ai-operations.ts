@@ -5,6 +5,7 @@ import {
   getDefaultAiOperationPolicy,
   type AiAutonomyMode,
   type AiOperationDecision,
+  type AiOperationPolicyPatchInput,
   type AiOperationPolicy,
   type AiOperationSignal,
   type AiOperationType
@@ -59,22 +60,8 @@ export async function getAiOperationPolicySettings(context: AppContext) {
 }
 
 export async function updateAiOperationPolicy(context: AppContext, input: unknown, actor: Actor) {
-  const parsed = aiOperationPolicyPatchSchema.parse(input ?? {});
-  const defaults = getDefaultAiOperationPolicy(parsed.mode);
-  const nextPolicy: AiOperationPolicy = {
-    mode: parsed.mode,
-    autoApplyMinConfidence: parsed.autoApplyMinConfidence ?? defaults.autoApplyMinConfidence,
-    reviewBelowConfidence: parsed.reviewBelowConfidence ?? defaults.reviewBelowConfidence,
-    requireReviewForDestructive: parsed.requireReviewForDestructive ?? defaults.requireReviewForDestructive,
-    requireReviewForSensitive: parsed.requireReviewForSensitive ?? defaults.requireReviewForSensitive,
-    requireReviewForConflicts: parsed.requireReviewForConflicts ?? defaults.requireReviewForConflicts,
-    requireReviewForBulkChanges: parsed.requireReviewForBulkChanges ?? defaults.requireReviewForBulkChanges,
-    maxAutoApplyBatchSize: parsed.maxAutoApplyBatchSize ?? defaults.maxAutoApplyBatchSize
-  };
-
-  if (nextPolicy.reviewBelowConfidence > nextPolicy.autoApplyMinConfidence) {
-    throw new Error("reviewBelowConfidence must be less than or equal to autoApplyMinConfidence.");
-  }
+  const currentPolicy = await getAiOperationPolicy(context);
+  const nextPolicy = mergeAiOperationPolicyPatch(currentPolicy, input);
   const now = new Date();
   const values = {
     workspaceId: context.workspaceId,
@@ -110,6 +97,44 @@ export async function updateAiOperationPolicy(context: AppContext, input: unknow
   });
 
   return { policy };
+}
+
+export function mergeAiOperationPolicyPatch(existing: AiOperationPolicy, input: unknown): AiOperationPolicy {
+  const parsed = aiOperationPolicyPatchSchema.parse(input ?? {});
+  const base = basePolicyForPatch(existing, parsed);
+  const nextPolicy: AiOperationPolicy = {
+    mode: parsed.mode ?? base.mode,
+    autoApplyMinConfidence: parsed.autoApplyMinConfidence ?? base.autoApplyMinConfidence,
+    reviewBelowConfidence: parsed.reviewBelowConfidence ?? base.reviewBelowConfidence,
+    requireReviewForDestructive: parsed.requireReviewForDestructive ?? base.requireReviewForDestructive,
+    requireReviewForSensitive: parsed.requireReviewForSensitive ?? base.requireReviewForSensitive,
+    requireReviewForConflicts: parsed.requireReviewForConflicts ?? base.requireReviewForConflicts,
+    requireReviewForBulkChanges: parsed.requireReviewForBulkChanges ?? base.requireReviewForBulkChanges,
+    maxAutoApplyBatchSize: parsed.maxAutoApplyBatchSize ?? base.maxAutoApplyBatchSize
+  };
+
+  if (nextPolicy.reviewBelowConfidence > nextPolicy.autoApplyMinConfidence) {
+    throw new Error("reviewBelowConfidence must be less than or equal to autoApplyMinConfidence.");
+  }
+
+  return nextPolicy;
+}
+
+function basePolicyForPatch(existing: AiOperationPolicy, parsed: AiOperationPolicyPatchInput) {
+  if (!parsed.mode || parsed.mode === existing.mode || patchHasPolicyTuning(parsed)) return existing;
+  return getDefaultAiOperationPolicy(parsed.mode);
+}
+
+function patchHasPolicyTuning(parsed: AiOperationPolicyPatchInput) {
+  return (
+    parsed.autoApplyMinConfidence !== undefined ||
+    parsed.reviewBelowConfidence !== undefined ||
+    parsed.requireReviewForDestructive !== undefined ||
+    parsed.requireReviewForSensitive !== undefined ||
+    parsed.requireReviewForConflicts !== undefined ||
+    parsed.requireReviewForBulkChanges !== undefined ||
+    parsed.maxAutoApplyBatchSize !== undefined
+  );
 }
 
 export async function writeAiActivity(context: AppContext, input: ActivityPayload) {
