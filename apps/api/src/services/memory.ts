@@ -502,6 +502,13 @@ export function buildMemoryRecallSql(
   const searchTerms = options.searchTerms?.length ? options.searchTerms : [query.query];
   params.push(searchTerms);
   const termIndex = params.length;
+  const termMatch = `exists (
+        select 1 from unnest($${termIndex}::text[]) as search_term(term)
+        where e.title ilike '%' || search_term.term || '%'
+          or mr.title ilike '%' || search_term.term || '%'
+          or mr.body ilike '%' || search_term.term || '%'
+          or coalesce(mr.summary, '') ilike '%' || search_term.term || '%'
+      )`;
 
   let vectorIndex: number | null = null;
   if (embedding) {
@@ -510,13 +517,7 @@ export function buildMemoryRecallSql(
   } else {
     where.push(`(
       c.fts @@ plainto_tsquery('english', $${qIndex})
-      or exists (
-        select 1 from unnest($${termIndex}::text[]) as search_term(term)
-        where e.title ilike '%' || search_term.term || '%'
-          or mr.title ilike '%' || search_term.term || '%'
-          or mr.body ilike '%' || search_term.term || '%'
-          or coalesce(mr.summary, '') ilike '%' || search_term.term || '%'
-      )
+      or ${termMatch}
     )`);
   }
 
@@ -527,13 +528,7 @@ export function buildMemoryRecallSql(
     : "0";
   const keywordRank = `greatest(
     coalesce(max(ts_rank(c.fts, plainto_tsquery('english', $${qIndex}))), 0),
-    case when exists (
-      select 1 from unnest($${termIndex}::text[]) as search_term(term)
-      where e.title ilike '%' || search_term.term || '%'
-        or mr.title ilike '%' || search_term.term || '%'
-        or mr.body ilike '%' || search_term.term || '%'
-        or coalesce(mr.summary, '') ilike '%' || search_term.term || '%'
-    ) then 0.2 else 0 end
+    case when bool_or(${termMatch}) then 0.2 else 0 end
   )`;
   const relevanceGate = vectorIndex
     ? `where keyword_rank > 0 or vector_rank >= ${MEMORY_VECTOR_RELEVANCE_THRESHOLD}`

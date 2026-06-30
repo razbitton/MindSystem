@@ -13,6 +13,7 @@ describe("buildMemoryRecallSql", () => {
 
     expect(built.sql).toContain("<=>");
     expect(built.sql).toContain("vector_rank >= 0.58");
+    expect(built.sql).toContain("bool_or");
     expect(built.sql).toContain("unnest");
     expect(built.sql).toContain("memory_records");
     expect(built.params).toContain("[0.1,0.2,0.3]");
