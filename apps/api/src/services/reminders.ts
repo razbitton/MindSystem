@@ -2,7 +2,9 @@ import { entities, entityEdges, projects, reminders } from "@personal-context-os
 import { createReminderSchema, patchReminderSchema } from "@personal-context-os/shared";
 import { and, desc, eq, lte, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import { composeEntityChunkText, replaceEntityChunks } from "./chunks.js";
 import { createGenericEntity } from "./entities.js";
+import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
@@ -20,7 +22,8 @@ export async function createReminder(context: AppContext, input: z.input<typeof 
     title: parsed.title,
     status: parsed.status,
     canonical: parsed,
-    customFields: {}
+    customFields: {},
+    chunkText: reminderChunkText(parsed)
   });
 
   const [reminder] = await context.db
@@ -50,6 +53,7 @@ export async function createReminder(context: AppContext, input: z.input<typeof 
   }
 
   await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, metadata: { entityType: "reminder" } });
+  await enqueuePostIngestJobs(context, [entity.id]);
   return { reminder, entity };
 }
 
@@ -107,6 +111,12 @@ export async function patchReminder(context: AppContext, id: string, input: z.in
     })
     .where(eq(entities.id, reminder.entityId));
 
+  await replaceEntityChunks(context, {
+    entityId: reminder.entityId,
+    text: reminderChunkText(reminder),
+    metadata: { entityType: "reminder" }
+  });
+  await enqueuePostIngestJobs(context, [reminder.entityId]);
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: reminder.entityId, metadata: { entityType: "reminder" } });
   return { reminder };
 }
@@ -136,4 +146,24 @@ function reminderCanonical(reminder: typeof reminders.$inferSelect) {
     recurrenceRule: reminder.recurrenceRule ?? undefined,
     status: reminder.status
   };
+}
+
+function reminderChunkText(reminder: {
+  title: string;
+  projectId?: string | null | undefined;
+  remindAt?: string | Date | null | undefined;
+  recurrenceRule?: string | null | undefined;
+  status?: string | null | undefined;
+}) {
+  return composeEntityChunkText([
+    `Reminder: ${reminder.title}`,
+    reminder.projectId ? `Project ID: ${reminder.projectId}` : null,
+    reminder.remindAt ? `Remind at: ${formatDateLike(reminder.remindAt)}` : null,
+    reminder.recurrenceRule ? `Recurrence: ${reminder.recurrenceRule}` : null,
+    reminder.status ? `Status: ${reminder.status}` : null
+  ]);
+}
+
+function formatDateLike(value: string | Date) {
+  return value instanceof Date ? value.toISOString() : value;
 }

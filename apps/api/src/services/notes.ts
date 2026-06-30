@@ -2,7 +2,9 @@ import { entities, notes } from "@personal-context-os/db";
 import { createNoteSchema, patchNoteSchema, type CreateNoteInput } from "@personal-context-os/shared";
 import { and, desc, eq, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import { composeEntityChunkText, replaceEntityChunks } from "./chunks.js";
 import { createGenericEntity } from "./entities.js";
+import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
@@ -17,7 +19,8 @@ export async function createNote(context: AppContext, input: CreateNoteInput, ac
     summary: input.body.slice(0, 180),
     body: input.body,
     canonical: input,
-    customFields: {}
+    customFields: {},
+    chunkText: noteChunkText(input)
   });
 
   const [note] = await context.db
@@ -32,6 +35,7 @@ export async function createNote(context: AppContext, input: CreateNoteInput, ac
     .returning();
 
   await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, metadata: { entityType: "note" } });
+  await enqueuePostIngestJobs(context, [entity.id]);
   return { note, entity };
 }
 
@@ -85,6 +89,12 @@ export async function patchNote(context: AppContext, id: string, input: z.infer<
     })
     .where(eq(entities.id, note.entityId));
 
+  await replaceEntityChunks(context, {
+    entityId: note.entityId,
+    text: noteChunkText(note),
+    metadata: { entityType: "note" }
+  });
+  await enqueuePostIngestJobs(context, [note.entityId]);
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: note.entityId, metadata: { entityType: "note" } });
   return { note };
 }
@@ -104,4 +114,12 @@ export async function deleteNote(context: AppContext, id: string, actor: Actor) 
     .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, note.entityId)));
 
   return { ok: true };
+}
+
+function noteChunkText(note: { title: string; body: string; projectId?: string | null | undefined }) {
+  return composeEntityChunkText([
+    `Note: ${note.title}`,
+    note.projectId ? `Project ID: ${note.projectId}` : null,
+    note.body
+  ]);
 }

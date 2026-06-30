@@ -31,6 +31,7 @@ import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
 type MemoryRow = Record<string, unknown>;
+const MEMORY_VECTOR_RELEVANCE_THRESHOLD = 0.58;
 
 export async function storeMemory(context: AppContext, input: unknown, actor: Actor) {
   const parsed = storeMemorySchema.parse(input);
@@ -145,7 +146,8 @@ export async function recallMemory(context: AppContext, input: unknown) {
       projectId: parsed.projectId,
       entityIds: parsed.entityIds,
       includeSuperseded: parsed.includeSuperseded,
-      mode: embedding ? "hybrid-vector" : "keyword-fallback"
+      mode: embedding ? "hybrid-vector" : "keyword-fallback",
+      ...(embedding ? { minVectorRank: MEMORY_VECTOR_RELEVANCE_THRESHOLD } : {})
     },
     resultCount: result.rowCount ?? 0
   });
@@ -156,7 +158,8 @@ export async function recallMemory(context: AppContext, input: unknown) {
       mode: embedding ? "hybrid-vector" : "keyword-fallback",
       degraded,
       error,
-      count: result.rowCount ?? 0
+      count: result.rowCount ?? 0,
+      ...(embedding ? { minVectorRank: MEMORY_VECTOR_RELEVANCE_THRESHOLD } : {})
     }
   };
 }
@@ -233,6 +236,7 @@ export async function supersedeMemory(context: AppContext, id: string, input: un
     .update(memoryRecords)
     .set({
       status: "superseded",
+      validity: "superseded",
       supersededByMemoryId: replacement.memory.id,
       updatedAt: new Date()
     })
@@ -277,6 +281,21 @@ export async function linkMemory(context: AppContext, input: unknown, actor: Act
   return { edge };
 }
 
+export async function getMemoryDetails(context: AppContext, id: string) {
+  const memory = await getMemoryRecord(context, id);
+  const sources = await context.db
+    .select()
+    .from(memorySources)
+    .where(and(eq(memorySources.workspaceId, context.workspaceId), eq(memorySources.memoryRecordId, id)));
+  const [entity] = await context.db
+    .select()
+    .from(entities)
+    .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, memory.entityId)))
+    .limit(1);
+
+  return { memory, entity: entity ?? null, sources };
+}
+
 export async function createMemoryRecordFromCandidate(
   context: AppContext,
   input: {
@@ -319,6 +338,10 @@ export async function createMemoryRecordFromCandidate(
       confidenceScore: String(input.candidate.confidence),
       supersedesMemoryId: input.supersedesMemoryId ?? null,
       occurredAt: input.candidate.occurredAt ? new Date(input.candidate.occurredAt) : null,
+      lastVerifiedAt: new Date(),
+      validity: "current",
+      confidenceReason: stringField(input.candidate.customFields, "confidenceReason"),
+      sourceReliability: String(numberField(input.candidate.customFields, "sourceReliability") ?? 0.8),
       customFields: input.candidate.customFields
     })
     .returning();
@@ -396,7 +419,18 @@ export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInp
   const vectorRank = vectorIndex
     ? `coalesce(1 / (1 + min(c.embedding <=> $${vectorIndex}::vector)), 0)`
     : "0";
-  const keywordRank = `coalesce(max(ts_rank(c.fts, plainto_tsquery('english', $${qIndex}))), 0)`;
+  const keywordRank = `greatest(
+    coalesce(max(ts_rank(c.fts, plainto_tsquery('english', $${qIndex}))), 0),
+    case when bool_or(
+      e.title ilike '%' || $${qIndex} || '%'
+      or mr.title ilike '%' || $${qIndex} || '%'
+      or mr.body ilike '%' || $${qIndex} || '%'
+      or coalesce(mr.summary, '') ilike '%' || $${qIndex} || '%'
+    ) then 0.2 else 0 end
+  )`;
+  const relevanceGate = vectorIndex
+    ? `where keyword_rank > 0 or vector_rank >= ${MEMORY_VECTOR_RELEVANCE_THRESHOLD}`
+    : "";
 
   return {
     params,
@@ -412,9 +446,17 @@ export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInp
                mr.updated_at, mr.updated_at as "updatedAt",
                mr.occurred_at, mr.occurred_at as "occurredAt",
                mr.last_seen_at, mr.last_seen_at as "lastSeenAt",
+               mr.last_verified_at, mr.last_verified_at as "lastVerifiedAt",
+               mr.expires_at, mr.expires_at as "expiresAt",
+               mr.stale_after, mr.stale_after as "staleAfter",
+               mr.validity::text as validity,
+               mr.confidence_reason, mr.confidence_reason as "confidenceReason",
+               mr.source_reliability, mr.source_reliability as "sourceReliability",
                mr.custom_fields, mr.custom_fields as "customFields",
                coalesce(array_remove(array_agg(distinct ms.raw_item_id), null), array[]::uuid[]) as source_raw_item_ids,
                coalesce(array_remove(array_agg(distinct ms.raw_item_id), null), array[]::uuid[]) as "sourceRawItemIds",
+               coalesce(array_remove(array_agg(distinct ms.source_quote), null), array[]::text[]) as source_quotes,
+               coalesce(array_remove(array_agg(distinct ms.source_quote), null), array[]::text[]) as "sourceQuotes",
                coalesce(array_remove(array_agg(distinct ee.to_entity_id), null), array[]::uuid[]) as related_entity_ids,
                coalesce(array_remove(array_agg(distinct ee.to_entity_id), null), array[]::uuid[]) as "relatedEntityIds",
                ${keywordRank} as keyword_rank,
@@ -440,6 +482,7 @@ export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInp
       select *,
              (keyword_rank * 0.3 + vector_rank * 0.55 + importance_rank * 0.1 + recency_rank * 0.05) as score
       from ranked
+      ${relevanceGate}
       order by score desc, "updatedAt" desc
       limit $${limitIndex}
     `
@@ -452,6 +495,8 @@ async function refreshExistingMemory(context: AppContext, existing: typeof memor
     .set({
       lastSeenAt: new Date(),
       confidenceScore: String(Math.max(Number(existing.confidenceScore), candidate.confidence)),
+      lastVerifiedAt: new Date(),
+      validity: "current",
       updatedAt: new Date()
     })
     .where(eq(memoryRecords.id, existing.id))
@@ -473,7 +518,22 @@ async function findDuplicateMemory(context: AppContext, candidate: MemoryCandida
       )
     )
     .limit(1);
-  return existing ?? null;
+  if (existing) return existing;
+
+  const nearby = await context.db
+    .select()
+    .from(memoryRecords)
+    .where(
+      and(
+        eq(memoryRecords.workspaceId, context.workspaceId),
+        eq(memoryRecords.kind, candidate.kind),
+        eq(memoryRecords.status, "active"),
+        eq(memoryRecords.validity, "current")
+      )
+    )
+    .limit(50);
+
+  return nearby.find((memory) => memorySimilarity(memory, candidate) >= 0.72) ?? null;
 }
 
 async function getMemoryRecord(context: AppContext, id: string) {
@@ -619,7 +679,7 @@ function mapRecallRow(row: MemoryRow) {
     score: numberValue(row.score),
     keywordRank,
     vectorRank,
-    reason: vectorRank > keywordRank ? "semantic match" : "text or metadata match"
+    reason: vectorRank >= MEMORY_VECTOR_RELEVANCE_THRESHOLD && vectorRank > keywordRank ? "semantic match" : "text or metadata match"
   };
 }
 
@@ -671,4 +731,34 @@ function numberValue(value: unknown) {
   if (typeof value === "number") return value;
   if (typeof value === "string") return Number(value) || 0;
   return 0;
+}
+
+function stringField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function memorySimilarity(memory: typeof memoryRecords.$inferSelect, candidate: MemoryCandidate) {
+  const left = tokenSet([memory.title, memory.summary, memory.body].filter(Boolean).join(" "));
+  const right = tokenSet([candidate.title, candidate.summary, candidate.body].filter(Boolean).join(" "));
+  if (left.size === 0 || right.size === 0) return 0;
+  let intersection = 0;
+  for (const token of left) {
+    if (right.has(token)) intersection += 1;
+  }
+  return intersection / Math.max(left.size, right.size);
+}
+
+function tokenSet(value: string) {
+  return new Set(value.toLowerCase().split(/[^a-z0-9\u0590-\u05ff]+/i).filter((token) => token.length > 2));
 }

@@ -80,15 +80,18 @@ export async function searchMemory(context: AppContext, query: SearchQuery) {
   await context.db.insert(retrievalLogs).values({
     workspaceId: context.workspaceId,
     query: query.q ?? "",
-    filters: query,
+    filters: {
+      ...query,
+      mode: query.q?.trim() ? "keyword" : "filtered-list"
+    },
     resultCount: result.rowCount ?? 0
   });
 
   return {
     results: result.rows,
     retrieval: {
-      mode: "hybrid-placeholder",
-      vectorReady: true,
+      mode: query.q?.trim() ? "keyword" : "filtered-list",
+      vectorReady: false,
       count: result.rowCount ?? 0
     }
   };

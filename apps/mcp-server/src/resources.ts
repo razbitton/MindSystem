@@ -59,6 +59,7 @@ export const resourceDefinitions: ResourceDefinition[] = [
   exactResource("project-schema-overrides://all", "Project schema overrides", "admin", "/api/project-schema-overrides"),
   exactResource("data-inventory://workspace", "Workspace data inventory", "admin", "/api/admin/data-inventory"),
   idResource("raw-item://{rawItemId}", "Raw capture by id", "memory:read", "raw-item://", "/api/raw-items"),
+  idResource("memory://{memoryId}", "Memory record by id", "memory:read", "memory://", "/api/memory"),
   idResource("entity://{entityId}", "Entity by id", "memory:read", "entity://", "/api/entities"),
   idResource("project://{projectId}", "Project by id", "projects:read", "project://", "/api/projects"),
   idResource("task://{taskId}", "Task by id", "tasks:read", "task://", "/api/tasks"),

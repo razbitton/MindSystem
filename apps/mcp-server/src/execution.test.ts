@@ -54,6 +54,13 @@ function createRuntime(responsePayload: unknown = { ok: true }) {
 
 const routeCases: RouteCase[] = [
   {
+    name: "prepare_turn_context",
+    args: { message: "What did we decide about launch?", client: "mcp", maxTokens: 1200 },
+    method: "POST",
+    path: "/api/context/turn",
+    body: { message: "What did we decide about launch?", client: "mcp", maxTokens: 1200 }
+  },
+  {
     name: "recall_memory",
     args: { query: "launch plan", limit: 5 },
     method: "POST",
@@ -75,7 +82,21 @@ const routeCases: RouteCase[] = [
     body: { text: "Decision: keep beta small" }
   },
   {
+    name: "remember",
+    args: { text: "Decision: keep beta small" },
+    method: "POST",
+    path: "/api/memory/store",
+    body: { text: "Decision: keep beta small" }
+  },
+  {
     name: "supersede_memory",
+    args: { id: "memory-id", text: "Decision: expand beta next week" },
+    method: "POST",
+    path: "/api/memory/memory-id/supersede",
+    body: { text: "Decision: expand beta next week" }
+  },
+  {
+    name: "update_memory",
     args: { id: "memory-id", text: "Decision: expand beta next week" },
     method: "POST",
     path: "/api/memory/memory-id/supersede",
@@ -167,7 +188,9 @@ const routeCases: RouteCase[] = [
   { name: "update_reminder", args: { id: "reminder-id", status: "done" }, method: "PATCH", path: "/api/reminders/reminder-id", body: { status: "done" } },
   { name: "delete_reminder", args: { id: "reminder-id" }, method: "DELETE", path: "/api/reminders/reminder-id" },
   { name: "get_project_context", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
+  { name: "project_brief", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
   { name: "create_context_pack", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
+  { name: "manage_task", args: { id: "task-id", status: "waiting" }, method: "PATCH", path: "/api/tasks/task-id", body: { status: "waiting" } },
   {
     name: "get_daily_dashboard",
     args: { date: "2026-06-24", start: "2026-06-23T21:00:00.000Z", end: "2026-06-24T20:59:59.999Z" },
@@ -184,6 +207,22 @@ const routeCases: RouteCase[] = [
     path: "/api/review-queue/review-id/approve",
     body: { editedPayload: { title: "Edited" } }
   },
+  {
+    name: "merge_review_item",
+    args: { id: "review-id", targetMemoryId: "memory-id", editedPayload: { title: "Edited" } },
+    method: "POST",
+    path: "/api/review-queue/review-id/merge",
+    body: { targetMemoryId: "memory-id", editedPayload: { title: "Edited" } }
+  },
+  {
+    name: "supersede_review_item",
+    args: { id: "review-id", targetMemoryId: "memory-id", reason: "newer fact" },
+    method: "POST",
+    path: "/api/review-queue/review-id/supersede",
+    body: { targetMemoryId: "memory-id", reason: "newer fact" }
+  },
+  { name: "mark_review_memory_stale", args: { id: "review-id" }, method: "POST", path: "/api/review-queue/review-id/mark-stale", body: {} },
+  { name: "pin_review_preference", args: { id: "review-id" }, method: "POST", path: "/api/review-queue/review-id/pin-preference", body: {} },
   { name: "reject_review_item", args: { id: "review-id" }, method: "POST", path: "/api/review-queue/review-id/reject", body: {} },
   { name: "delete_review_item", args: { id: "review-id" }, method: "DELETE", path: "/api/review-queue/review-id" },
   { name: "clear_review_queue", args: {}, method: "POST", path: "/api/review-queue/clear", body: {} },
@@ -222,6 +261,13 @@ const routeCases: RouteCase[] = [
     path: "/api/admin/ai-processing/backfill",
     body: { limit: 100, dryRun: true }
   },
+  {
+    name: "start_memory_consolidation",
+    args: { limit: 200, dryRun: true },
+    method: "POST",
+    path: "/api/admin/memory-consolidation",
+    body: { limit: 200, dryRun: true }
+  },
   { name: "get_ai_processing_schedule", args: {}, method: "GET", path: "/api/admin/ai-processing/schedule" },
   {
     name: "update_ai_processing_schedule",
@@ -257,6 +303,7 @@ describe("MCP REST execution", () => {
 const resourceCases = [
   { uri: "raw-items://recent", path: "/api/raw-items", scope: "memory:read" },
   { uri: "raw-item://raw-id", path: "/api/raw-items/raw-id", scope: "memory:read" },
+  { uri: "memory://memory-id", path: "/api/memory/memory-id", scope: "memory:read" },
   { uri: "entities://all", path: "/api/entities", scope: "memory:read" },
   { uri: "entity://entity-id", path: "/api/entities/entity-id", scope: "memory:read" },
   { uri: "projects://all", path: "/api/projects", scope: "projects:read" },

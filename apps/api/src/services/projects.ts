@@ -2,7 +2,9 @@ import { documents, entities, notes, projects, tasks } from "@personal-context-o
 import { createProjectSchema, patchProjectSchema } from "@personal-context-os/shared";
 import type { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
+import { composeEntityChunkText, replaceEntityChunks } from "./chunks.js";
 import { createGenericEntity } from "./entities.js";
+import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
@@ -15,7 +17,8 @@ export async function createProject(context: AppContext, input: z.input<typeof c
     body: parsed.description ?? null,
     status: parsed.status,
     canonical: parsed,
-    customFields: {}
+    customFields: {},
+    chunkText: projectChunkText(parsed)
   });
 
   const [project] = await context.db
@@ -35,6 +38,7 @@ export async function createProject(context: AppContext, input: z.input<typeof c
     .returning();
 
   await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, metadata: { entityType: "project" } });
+  await enqueuePostIngestJobs(context, [entity.id]);
   return { project, entity };
 }
 
@@ -130,6 +134,12 @@ export async function patchProject(context: AppContext, id: string, input: z.inf
     })
     .where(eq(entities.id, project.entityId));
 
+  await replaceEntityChunks(context, {
+    entityId: project.entityId,
+    text: projectChunkText(project),
+    metadata: { entityType: "project" }
+  });
+  await enqueuePostIngestJobs(context, [project.entityId]);
   await writeAuditEvent(context, { ...actor, action: "update entity", entityId: project.entityId, metadata: { entityType: "project" } });
   return { project };
 }
@@ -149,4 +159,22 @@ export async function deleteProject(context: AppContext, id: string, actor: Acto
     .where(and(eq(entities.workspaceId, context.workspaceId), eq(entities.id, project.entityId)));
 
   return { ok: true };
+}
+
+function projectChunkText(project: {
+  name: string;
+  description?: string | null | undefined;
+  goal?: string | null | undefined;
+  status?: string | null | undefined;
+  priority?: string | null | undefined;
+  dueAt?: string | Date | null | undefined;
+}) {
+  return composeEntityChunkText([
+    `Project: ${project.name}`,
+    project.description ? `Description: ${project.description}` : null,
+    project.goal ? `Goal: ${project.goal}` : null,
+    project.status ? `Status: ${project.status}` : null,
+    project.priority ? `Priority: ${project.priority}` : null,
+    project.dueAt ? `Due: ${project.dueAt instanceof Date ? project.dueAt.toISOString() : project.dueAt}` : null
+  ]);
 }

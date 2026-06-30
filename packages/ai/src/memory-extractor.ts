@@ -83,13 +83,7 @@ export class OpenAIMemoryExtractor implements MemoryExtractor {
           messages: [
             {
               role: "system",
-              content: [
-                "Extract durable memory records for an external AI agent.",
-                "Return only information worth remembering beyond the current turn.",
-                "Prefer small, atomic records with clear titles and source quotes.",
-                "Do not store secrets, passwords, payment data, or private tokens unless the user explicitly asks to remember them.",
-                "Use the user's language for titles and bodies when practical."
-              ].join(" ")
+              content: memoryExtractionInstructions()
             },
             {
               role: "user",
@@ -243,7 +237,7 @@ export class HeuristicMemoryExtractor implements MemoryExtractor {
       }));
     }
 
-    if (candidates.length === 0) {
+    if (candidates.length === 0 && isLikelyDurableTopic(input.text, input.projectHint)) {
       const title = cleanTitle(lines[0] ?? input.text).slice(0, 90) || "Memory note";
       candidates.push(memoryCandidateSchema.parse({
         kind: "topic_note",
@@ -260,6 +254,11 @@ export class HeuristicMemoryExtractor implements MemoryExtractor {
 
     return candidates;
   }
+}
+
+function isLikelyDurableTopic(text: string, projectHint: string | undefined) {
+  if (projectHint) return text.trim().length >= 20;
+  return text.trim().length >= 80 && /\b(decision|remember|preference|constraint|commit|project|deadline|important|policy|plan|goal)\b/i.test(text);
 }
 
 function parseCandidates(values: unknown[]) {
@@ -308,10 +307,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function memoryExtractionInstructions() {
   return [
     "Extract durable memory records for an external AI agent.",
-    "Return only information worth remembering beyond the current turn.",
-    "Prefer small, atomic records with clear titles and source quotes.",
-    "Do not store secrets, passwords, payment data, or private tokens unless the user explicitly asks to remember them.",
+    "Return only information worth remembering beyond the current turn. Do not store greetings, transient chat, scratch text, or generic summaries.",
+    "Prefer small, atomic records with clear titles and exact source quotes.",
+    "Classify decisions as decision, durable user preferences as preference, hard limits as constraint, promised follow-ups as commitment, unresolved questions as open_question, project status/progress as project_update, durable facts as fact, and person details as person_profile.",
+    "Use topic_note only when no better kind fits. Do not create broad topic_note records for vague or chatty turns.",
+    "Use high confidence for explicit durable statements, medium confidence for likely but inferred records, and low confidence for ambiguous records that should be reviewed.",
+    "Set customFields.confidenceReason when confidence is not obvious. Set customFields.sourceReliability when the source quality is clear.",
+    "For Hebrew/English mixed text, keep the user's language in titles, bodies, and source quotes.",
+    "Do not store secrets, passwords, tokens, payment data, or highly sensitive personal data unless the user explicitly asks to remember it.",
     "Use the user's language for titles and bodies when practical.",
+    "Examples:",
+    "Input: 'Decision: keep Atlas beta invite-only until we finish onboarding' -> one decision memory.",
+    "Input: 'I prefer concise engineering answers' -> one preference memory.",
+    "Input: 'maybe later' -> no candidates.",
     "Return only JSON that matches the requested schema."
   ].join(" ");
 }
@@ -392,7 +400,20 @@ function memoryExtractionJsonSchema() {
             aliases: { type: "array", items: { type: "string" } },
             sourceQuote: { type: ["string", "null"] },
             occurredAt: { type: ["string", "null"] },
-            customFields: { type: "object", additionalProperties: false, properties: {}, required: [] }
+            customFields: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                confidenceReason: { type: ["string", "null"] },
+                sourceReliability: { type: ["number", "null"], minimum: 0, maximum: 1 },
+                locale: { type: ["string", "null"] },
+                labels: { type: "array", items: { type: "string" } },
+                extractionNotes: { type: ["string", "null"] },
+                staleAfter: { type: ["string", "null"] },
+                expiresAt: { type: ["string", "null"] }
+              },
+              required: []
+            }
           }
         }
       }

@@ -4,9 +4,13 @@ export type ToolHttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export interface ToolDefinition {
   name: string;
+  title?: string;
   description: string;
   requiredScope: AgentScope;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
+  tier?: "default" | "advanced" | "admin";
 }
 
 export interface RestToolDefinition extends ToolDefinition {
@@ -52,6 +56,7 @@ const memoryKindValues = [
   "topic_note"
 ];
 const memoryImportanceValues = ["low", "medium", "high", "critical"];
+const clientValues = ["codex", "claude", "chatgpt", "api", "web", "mcp", "other"];
 const purgeDataTypeValues = [
   "raw_items",
   "entities",
@@ -175,6 +180,23 @@ const memoryCandidateProperties = {
   customFields: { type: "object" }
 };
 
+const contextOutputSchema = objectSchema({
+  contextMarkdown: { type: "string" },
+  activeProjects: { type: "array", items: { type: "object" } },
+  userPreferences: { type: "array", items: { type: "object" } },
+  relevantMemories: { type: "array", items: { type: "object" } },
+  decisions: { type: "array", items: { type: "object" } },
+  constraints: { type: "array", items: { type: "object" } },
+  openQuestions: { type: "array", items: { type: "object" } },
+  openTasks: { type: "array", items: { type: "object" } },
+  reminders: { type: "array", items: { type: "object" } },
+  sourceQuotes: { type: "array", items: { type: "object" } },
+  conflicts: { type: "array", items: { type: "object" } },
+  staleItems: { type: "array", items: { type: "object" } },
+  recommendedToolUse: { type: "array", items: { type: "string" } },
+  retrievalTrace: { type: "object" }
+});
+
 const reminderFilterProperties = {
   project_id: { type: "string", description: "Project table id." },
   status: { type: "string" },
@@ -199,6 +221,26 @@ const emptyBody = () => ({});
 // apps/api/src/routes.ts and packages/shared/src/openapi.ts so tool parity is visible.
 export const mcpRestTools: RestToolDefinition[] = [
   {
+    name: "prepare_turn_context",
+    title: "Prepare turn context",
+    description: "Prepare a deterministic model-ready context brief for the current turn. Call this before answering project, user-memory, preference, decision, task, or ambiguous context questions.",
+    requiredScope: "memory:read",
+    method: "POST",
+    path: "/api/context/turn",
+    inputSchema: objectSchema({
+      message: { type: "string" },
+      conversationId: { type: "string" },
+      recentMessages: { type: "array", items: { type: "string" } },
+      activeProjectId: { type: "string" },
+      activeEntityIds: { type: "array", items: { type: "string" } },
+      client: { type: "string", enum: clientValues, default: "mcp" },
+      maxTokens: { type: "number", default: 4000 }
+    }, ["message"]),
+    outputSchema: contextOutputSchema,
+    annotations: { readOnlyHint: true },
+    tier: "default"
+  },
+  {
     name: "search_memory",
     description: "Search projects, tasks, notes, documents, reminders, and other entities. Results include entityId plus typedId/taskId/projectId fields when available.",
     requiredScope: "memory:read",
@@ -211,7 +253,9 @@ export const mcpRestTools: RestToolDefinition[] = [
       status: { type: "string" },
       due_before: dateTimeSchema("Return items due on or before this ISO 8601 datetime."),
       limit: { type: "number", default: 10 }
-    })
+    }),
+    annotations: { readOnlyHint: true },
+    tier: "advanced"
   },
   {
     name: "ingest_free_text",
@@ -220,7 +264,9 @@ export const mcpRestTools: RestToolDefinition[] = [
     method: "POST",
     path: "/api/ingest/free-text",
     body: (args) => ({ sourceType: "codex", ...args }),
-    inputSchema: objectSchema({ text: { type: "string" }, sourceType: { type: "string", default: "codex" }, projectId: { type: "string" } }, ["text"])
+    inputSchema: objectSchema({ text: { type: "string" }, sourceType: { type: "string", default: "codex" }, projectId: { type: "string" } }, ["text"]),
+    annotations: { destructiveHint: false },
+    tier: "advanced"
   },
   {
     name: "recall_memory",
@@ -235,7 +281,9 @@ export const mcpRestTools: RestToolDefinition[] = [
       entityIds: { type: "array", items: { type: "string" } },
       includeSuperseded: { type: "boolean", default: false },
       limit: { type: "number", default: 10 }
-    }, ["query"])
+    }, ["query"]),
+    annotations: { readOnlyHint: true },
+    tier: "default"
   },
   {
     name: "get_relevant_context",
@@ -249,10 +297,14 @@ export const mcpRestTools: RestToolDefinition[] = [
       conversationId: { type: "string" },
       activeEntityIds: { type: "array", items: { type: "string" } },
       maxTokens: { type: "number", default: 2500 }
-    }, ["message"])
+    }, ["message"]),
+    outputSchema: contextOutputSchema,
+    annotations: { readOnlyHint: true },
+    tier: "default"
   },
   {
     name: "store_memory",
+    title: "Remember",
     description: "Store durable agent memory from free text or structured candidates. Use after learning facts, decisions, preferences, constraints, commitments, or open questions.",
     requiredScope: "memory:write",
     method: "POST",
@@ -263,10 +315,30 @@ export const mcpRestTools: RestToolDefinition[] = [
       sourceType: { type: "string", enum: sourceTypeValues, default: "codex" },
       projectId: { type: "string" },
       rawPayload: { type: "object" }
-    })
+    }),
+    annotations: { destructiveHint: false },
+    tier: "default"
+  },
+  {
+    name: "remember",
+    title: "Remember",
+    description: "Store durable memory from free text or structured candidates. Alias of store_memory with agent-oriented naming.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: "/api/memory/store",
+    inputSchema: objectSchema({
+      text: { type: "string" },
+      candidates: { type: "array", items: objectSchema(memoryCandidateProperties, ["kind", "title", "body"]) },
+      sourceType: { type: "string", enum: sourceTypeValues, default: "codex" },
+      projectId: { type: "string" },
+      rawPayload: { type: "object" }
+    }),
+    annotations: { destructiveHint: false },
+    tier: "default"
   },
   {
     name: "supersede_memory",
+    title: "Update memory",
     description: "Replace an older memory with a newer memory while preserving history.",
     requiredScope: "memory:write",
     method: "POST",
@@ -277,7 +349,26 @@ export const mcpRestTools: RestToolDefinition[] = [
       replacement: objectSchema(memoryCandidateProperties, ["kind", "title", "body"]),
       text: { type: "string" },
       reason: { type: "string" }
-    }, ["id"])
+    }, ["id"]),
+    annotations: { destructiveHint: false },
+    tier: "default"
+  },
+  {
+    name: "update_memory",
+    title: "Update memory",
+    description: "Replace an older memory while preserving history. Alias of supersede_memory with agent-oriented naming.",
+    requiredScope: "memory:write",
+    method: "POST",
+    path: (args) => `/api/memory/${String(args.id)}/supersede`,
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Memory record id."),
+      replacement: objectSchema(memoryCandidateProperties, ["kind", "title", "body"]),
+      text: { type: "string" },
+      reason: { type: "string" }
+    }, ["id"]),
+    annotations: { destructiveHint: false },
+    tier: "default"
   },
   {
     name: "link_memory",
@@ -292,7 +383,9 @@ export const mcpRestTools: RestToolDefinition[] = [
       toEntityId: { type: "string" },
       relationType: { type: "string", enum: ["belongs_to", "depends_on", "mentions", "blocks", "derived_from", "related_to"] },
       confidence: { type: "number", default: 1 }
-    })
+    }),
+    annotations: { destructiveHint: false },
+    tier: "default"
   },
   {
     name: "list_raw_items",
@@ -609,7 +702,20 @@ export const mcpRestTools: RestToolDefinition[] = [
     requiredScope: "projects:read",
     method: "GET",
     path: projectContextPath,
-    inputSchema: objectSchema({ projectId: { type: "string" } }, ["projectId"])
+    inputSchema: objectSchema({ projectId: { type: "string" } }, ["projectId"]),
+    annotations: { readOnlyHint: true },
+    tier: "default"
+  },
+  {
+    name: "project_brief",
+    title: "Project brief",
+    description: "Get the project context pack with project details, tasks, notes, documents, and model-ready markdown.",
+    requiredScope: "projects:read",
+    method: "GET",
+    path: projectContextPath,
+    inputSchema: objectSchema({ projectId: { type: "string" } }, ["projectId"]),
+    annotations: { readOnlyHint: true },
+    tier: "default"
   },
   {
     name: "create_context_pack",
@@ -617,7 +723,24 @@ export const mcpRestTools: RestToolDefinition[] = [
     requiredScope: "projects:read",
     method: "GET",
     path: projectContextPath,
-    inputSchema: objectSchema({ projectId: { type: "string" } }, ["projectId"])
+    inputSchema: objectSchema({ projectId: { type: "string" } }, ["projectId"]),
+    annotations: { readOnlyHint: true },
+    tier: "advanced"
+  },
+  {
+    name: "manage_task",
+    title: "Manage task",
+    description: "Update a task's status, priority, due date, assignment, or description. Use complete_task for completion.",
+    requiredScope: "tasks:write",
+    method: "PATCH",
+    path: idPath("/api/tasks"),
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Task table id. entityId is accepted for compatibility; prefer taskId from search_memory."),
+      ...taskProperties
+    }, ["id"]),
+    annotations: { destructiveHint: false },
+    tier: "default"
   },
   {
     name: "get_daily_dashboard",
@@ -655,6 +778,59 @@ export const mcpRestTools: RestToolDefinition[] = [
       id: idSchema("Review queue item id."),
       editedPayload: { type: "object", description: "Optional edited payload to apply instead of the suggested payload." }
     }, ["id"])
+  },
+  {
+    name: "merge_review_item",
+    description: "Merge a reviewed memory candidate into an existing target memory.",
+    requiredScope: "admin",
+    method: "POST",
+    path: (args) => `/api/review-queue/${String(args.id)}/merge`,
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Review queue item id."),
+      targetMemoryId: idSchema("Target memory record id."),
+      editedPayload: { type: "object", description: "Optional edited memory candidate payload." }
+    }, ["id", "targetMemoryId"]),
+    annotations: { destructiveHint: false },
+    tier: "admin"
+  },
+  {
+    name: "supersede_review_item",
+    description: "Use a review item to supersede an existing target memory.",
+    requiredScope: "admin",
+    method: "POST",
+    path: (args) => `/api/review-queue/${String(args.id)}/supersede`,
+    body: omitIdBody,
+    inputSchema: objectSchema({
+      id: idSchema("Review queue item id."),
+      targetMemoryId: idSchema("Target memory record id."),
+      reason: { type: "string" },
+      editedPayload: { type: "object", description: "Optional edited replacement candidate payload." }
+    }, ["id", "targetMemoryId"]),
+    annotations: { destructiveHint: false },
+    tier: "admin"
+  },
+  {
+    name: "mark_review_memory_stale",
+    description: "Mark the memory referenced by a review item as stale.",
+    requiredScope: "admin",
+    method: "POST",
+    path: (args) => `/api/review-queue/${String(args.id)}/mark-stale`,
+    body: emptyBody,
+    inputSchema: objectSchema({ id: idSchema("Review queue item id.") }, ["id"]),
+    annotations: { destructiveHint: false },
+    tier: "admin"
+  },
+  {
+    name: "pin_review_preference",
+    description: "Pin the preference memory referenced by a review item.",
+    requiredScope: "admin",
+    method: "POST",
+    path: (args) => `/api/review-queue/${String(args.id)}/pin-preference`,
+    body: emptyBody,
+    inputSchema: objectSchema({ id: idSchema("Review queue item id.") }, ["id"]),
+    annotations: { destructiveHint: false },
+    tier: "admin"
   },
   {
     name: "reject_review_item",
@@ -868,24 +1044,57 @@ export const mcpRestTools: RestToolDefinition[] = [
       onlyUnprocessed: { type: "boolean", default: true },
       dryRun: { type: "boolean", default: false }
     }, ["enabled"])
+  },
+  {
+    name: "start_memory_consolidation",
+    description: "Queue memory lifecycle consolidation review. Creates review items for duplicate, stale, or repeated preference candidates.",
+    requiredScope: "admin",
+    method: "POST",
+    path: "/api/admin/memory-consolidation",
+    inputSchema: objectSchema({
+      dryRun: { type: "boolean", default: false },
+      limit: { type: "number", default: 200 }
+    }),
+    annotations: { destructiveHint: false },
+    tier: "admin"
   }
 ];
 
 export const directToolDefinitions: ToolDefinition[] = [
   {
     name: "link_entities",
+    title: "Link entities",
     description: "Create a non-destructive relationship between two entities.",
     requiredScope: "memory:write",
-    inputSchema: objectSchema({ fromEntityId: { type: "string" }, toEntityId: { type: "string" }, relationType: { type: "string" } }, ["fromEntityId", "toEntityId", "relationType"])
+    inputSchema: objectSchema({ fromEntityId: { type: "string" }, toEntityId: { type: "string" }, relationType: { type: "string" } }, ["fromEntityId", "toEntityId", "relationType"]),
+    annotations: { destructiveHint: false },
+    tier: "advanced"
   }
 ];
 
-export const toolDefinitions: ToolDefinition[] = [...mcpRestTools, ...directToolDefinitions].map(({ name, description, requiredScope, inputSchema }) => ({
-  name,
-  description,
-  requiredScope,
-  inputSchema
-}));
+export const toolDefinitions: ToolDefinition[] = [...mcpRestTools, ...directToolDefinitions].map((tool) => {
+  const definition: ToolDefinition = {
+    name: tool.name,
+    description: tool.description,
+    requiredScope: tool.requiredScope,
+    inputSchema: tool.inputSchema
+  };
+
+  if (tool.title) {
+    definition.title = tool.title;
+  }
+  if (tool.outputSchema) {
+    definition.outputSchema = tool.outputSchema;
+  }
+  if (tool.annotations) {
+    definition.annotations = tool.annotations;
+  }
+  if (tool.tier) {
+    definition.tier = tool.tier;
+  }
+
+  return definition;
+});
 
 export function getToolDefinition(name: string) {
   return toolDefinitions.find((tool) => tool.name === name);

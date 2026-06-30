@@ -4,12 +4,15 @@ import { requireToolScope } from "./auth.js";
 import { getToolDefinition, toolDefinitions } from "./tools.js";
 
 const expectedScopes: Record<string, AgentScope> = {
+  prepare_turn_context: "memory:read",
   search_memory: "memory:read",
   ingest_free_text: "memory:write",
   recall_memory: "memory:read",
   get_relevant_context: "memory:read",
   store_memory: "memory:write",
+  remember: "memory:write",
   supersede_memory: "memory:write",
+  update_memory: "memory:write",
   link_memory: "memory:write",
   list_raw_items: "memory:read",
   get_raw_item: "memory:read",
@@ -48,12 +51,18 @@ const expectedScopes: Record<string, AgentScope> = {
   update_reminder: "memory:write",
   delete_reminder: "memory:write",
   get_project_context: "projects:read",
+  project_brief: "projects:read",
   get_daily_dashboard: "memory:read",
   get_urgent_tasks: "tasks:read",
+  manage_task: "tasks:write",
   link_entities: "memory:write",
   create_context_pack: "projects:read",
   list_review_queue: "admin",
   approve_review_item: "admin",
+  merge_review_item: "admin",
+  supersede_review_item: "admin",
+  mark_review_memory_stale: "admin",
+  pin_review_preference: "admin",
   reject_review_item: "admin",
   delete_review_item: "admin",
   clear_review_queue: "admin",
@@ -75,6 +84,7 @@ const expectedScopes: Record<string, AgentScope> = {
   purge_workspace_data: "admin",
   list_ai_processing_runs: "admin",
   start_ai_memory_backfill: "admin",
+  start_memory_consolidation: "admin",
   get_ai_processing_schedule: "admin",
   update_ai_processing_schedule: "admin"
 };

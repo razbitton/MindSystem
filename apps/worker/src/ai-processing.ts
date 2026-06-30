@@ -59,6 +59,10 @@ type ProcessingCounts = {
   failed: number;
 };
 
+type AiProcessingOptions = {
+  embeddingQueue?: Queue;
+};
+
 type SelectionSummary = {
   matchingRawItems: number;
   eligibleUnprocessedRawItems: number;
@@ -77,7 +81,7 @@ type SelectionSummary = {
   reason: string | null;
 };
 
-export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string) {
+export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string, options: AiProcessingOptions = {}) {
   const run = await loadRun(pool, runId);
   if (!run) throw new Error(`AI processing run not found: ${runId}`);
   if (!["queued", "running"].includes(run.status)) return { runId, skipped: true, reason: `Run status is ${run.status}.` };
@@ -105,7 +109,7 @@ export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string)
     for (const rawItem of rawItems) {
       try {
         const extraction = await extractor.extract({ text: rawItem.raw_text });
-        const itemCounts = await applyMemoryExtraction(pool, run, rawItem, extraction);
+        const itemCounts = await applyMemoryExtraction(pool, run, rawItem, extraction, options);
         addCounts(counts, itemCounts);
         counts.processed += 1;
       } catch (error) {
@@ -494,7 +498,8 @@ async function applyMemoryExtraction(
   pool: Pool,
   run: AiProcessingRunRow,
   rawItem: RawItemRow,
-  extraction: MemoryExtractionResult
+  extraction: MemoryExtractionResult,
+  options: AiProcessingOptions
 ): Promise<ProcessingCounts> {
   const counts: ProcessingCounts = { processed: 0, skipped: 0, created: 0, updated: 0, review: 0, failed: 0 };
 
@@ -529,7 +534,7 @@ async function applyMemoryExtraction(
       await refreshExistingMemory(pool, run.workspace_id, existing, rawItem.id, candidate);
       counts.updated += 1;
     } else {
-      await createMemoryRecordFromCandidate(pool, run, rawItem.id, candidate);
+      await createMemoryRecordFromCandidate(pool, run, rawItem.id, candidate, options.embeddingQueue);
       counts.created += 1;
     }
   }
@@ -563,6 +568,8 @@ async function refreshExistingMemory(
     `update memory_records
      set last_seen_at = now(),
          confidence_score = $2,
+         last_verified_at = now(),
+         validity = 'current',
          updated_at = now()
      where id = $1`,
     [existing.id, String(nextConfidence)]
@@ -570,8 +577,16 @@ async function refreshExistingMemory(
   await createMemorySource(pool, workspaceId, existing.id, rawItemId, candidate);
 }
 
-async function createMemoryRecordFromCandidate(pool: Pool, run: AiProcessingRunRow, rawItemId: string, candidate: MemoryCandidate) {
+async function createMemoryRecordFromCandidate(
+  pool: Pool,
+  run: AiProcessingRunRow,
+  rawItemId: string,
+  candidate: MemoryCandidate,
+  embeddingQueue?: Queue
+) {
   const client = await pool.connect();
+  let committed = false;
+  let entityId: string | null = null;
   try {
     await client.query("begin");
     const projectId = await resolveProjectId(client, run.workspace_id, candidate);
@@ -601,7 +616,7 @@ async function createMemoryRecordFromCandidate(pool: Pool, run: AiProcessingRunR
         String(candidate.confidence)
       ]
     );
-    const entityId = entityResult.rows[0]?.id;
+    entityId = entityResult.rows[0]?.id ?? null;
     if (!entityId) throw new Error("Failed to create memory entity.");
 
     await createChunks(client, run.workspace_id, entityId, [candidate.title, candidate.summary, candidate.body].filter(Boolean).join("\n\n"));
@@ -619,10 +634,14 @@ async function createMemoryRecordFromCandidate(pool: Pool, run: AiProcessingRunR
          summary,
          body,
          confidence_score,
+         last_verified_at,
+         validity,
+         confidence_reason,
+         source_reliability,
          occurred_at,
          custom_fields
        )
-       values ($1, $2, $3, $4, $5::memory_kind, 'active', $6::memory_importance, $7, $8, $9, $10, $11, $12::jsonb)
+       values ($1, $2, $3, $4, $5::memory_kind, 'active', $6::memory_importance, $7, $8, $9, $10, now(), 'current'::memory_validity, $11, $12, $13, $14::jsonb)
        returning id`,
       [
         run.workspace_id,
@@ -635,6 +654,8 @@ async function createMemoryRecordFromCandidate(pool: Pool, run: AiProcessingRunR
         candidate.summary ?? null,
         candidate.body,
         String(candidate.confidence),
+        stringField(candidate.customFields, "confidenceReason"),
+        String(numberField(candidate.customFields, "sourceReliability") ?? 0.8),
         candidate.occurredAt ? new Date(candidate.occurredAt) : null,
         JSON.stringify(candidate.customFields)
       ]
@@ -653,11 +674,16 @@ async function createMemoryRecordFromCandidate(pool: Pool, run: AiProcessingRunR
     );
 
     await client.query("commit");
+    committed = true;
   } catch (error) {
-    await client.query("rollback");
+    if (!committed) await client.query("rollback");
     throw error;
   } finally {
     client.release();
+  }
+
+  if (entityId && embeddingQueue) {
+    await enqueueEmbeddingJob(embeddingQueue, run.workspace_id, entityId);
   }
 }
 
@@ -816,12 +842,39 @@ async function insertReviewItem(
   );
 }
 
+async function enqueueEmbeddingJob(queue: Queue, workspaceId: string, entityId: string) {
+  try {
+    await queue.add("embed_entity", { entityId, workspaceId });
+  } catch (error) {
+    console.warn("Embedding enqueue failed for AI backfill-created memory", {
+      workspaceId,
+      entityId,
+      error: error instanceof Error ? error.message : "Embedding enqueue failed."
+    });
+  }
+}
+
 function addCounts(target: ProcessingCounts, next: ProcessingCounts) {
   target.skipped += next.skipped;
   target.created += next.created;
   target.updated += next.updated;
   target.review += next.review;
   target.failed += next.failed;
+}
+
+function stringField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 async function updateRunCounts(pool: Pool, runId: string, counts: ProcessingCounts) {

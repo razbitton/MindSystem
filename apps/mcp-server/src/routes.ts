@@ -120,8 +120,23 @@ async function handleJsonRpc(
   if (method === "tools/call") {
     const name = String(params.name ?? "");
     const args = (params.arguments ?? {}) as Record<string, unknown>;
-    const result = await callTool(db, runtime, agent, bearerToken, name, args);
-    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    try {
+      const result = await callTool(db, runtime, agent, bearerToken, name, args);
+      return {
+        structuredContent: result,
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+      };
+    } catch (error) {
+      const structuredContent = {
+        error: error instanceof Error ? error.message : "Tool execution failed",
+        toolName: name
+      };
+      return {
+        isError: true,
+        structuredContent,
+        content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }]
+      };
+    }
   }
 
   if (method === "resources/read") {

@@ -52,6 +52,9 @@ export type MemoryStatus = z.infer<typeof memoryStatusSchema>;
 export const memoryImportanceSchema = z.enum(["low", "medium", "high", "critical"]);
 export type MemoryImportance = z.infer<typeof memoryImportanceSchema>;
 
+export const memoryValiditySchema = z.enum(["current", "stale", "disputed", "superseded"]);
+export type MemoryValidity = z.infer<typeof memoryValiditySchema>;
+
 export const memoryEntityReferenceSchema = z.object({
   entityId: z.string().uuid().optional(),
   entityType: entityTypeSchema.optional(),
@@ -96,6 +99,17 @@ export const getRelevantContextSchema = z.object({
   maxTokens: z.coerce.number().int().positive().max(12000).default(2500)
 });
 export type GetRelevantContextInput = z.infer<typeof getRelevantContextSchema>;
+
+export const prepareTurnContextSchema = z.object({
+  message: z.string().trim().min(1),
+  conversationId: z.string().trim().min(1).optional(),
+  recentMessages: z.array(z.string().trim().min(1)).default([]),
+  activeProjectId: z.string().uuid().optional(),
+  activeEntityIds: z.array(z.string().uuid()).default([]),
+  client: z.enum(["codex", "claude", "chatgpt", "api", "web", "mcp", "other"]).default("api"),
+  maxTokens: z.coerce.number().int().positive().max(12000).default(4000)
+});
+export type PrepareTurnContextInput = z.infer<typeof prepareTurnContextSchema>;
 
 export const storeMemorySchema = z.object({
   text: z.string().trim().optional(),
@@ -477,6 +491,25 @@ export type SearchQuery = z.infer<typeof searchQuerySchema>;
 export const reviewDecisionSchema = z.object({
   editedPayload: z.record(z.unknown()).optional()
 });
+
+export const reviewMergeSchema = z.object({
+  targetMemoryId: z.string().uuid(),
+  editedPayload: z.record(z.unknown()).optional()
+});
+export type ReviewMergeInput = z.infer<typeof reviewMergeSchema>;
+
+export const reviewSupersedeSchema = z.object({
+  targetMemoryId: z.string().uuid(),
+  reason: z.string().trim().optional(),
+  editedPayload: z.record(z.unknown()).optional()
+});
+export type ReviewSupersedeInput = z.infer<typeof reviewSupersedeSchema>;
+
+export const memoryConsolidationSchema = z.object({
+  dryRun: z.boolean().default(false),
+  limit: z.coerce.number().int().positive().max(1000).default(200)
+});
+export type MemoryConsolidationInput = z.infer<typeof memoryConsolidationSchema>;
 
 export const loginSchema = z.object({
   email: z.string().email(),

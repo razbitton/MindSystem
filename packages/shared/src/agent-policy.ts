@@ -1,7 +1,7 @@
 export const agentMemoryPolicyText = [
   "# Agent Memory Policy",
   "",
-  "- Call `get_relevant_context` before answering when the user refers to prior work, people, projects, decisions, preferences, constraints, or ambiguous pronouns.",
+  "- Call `prepare_turn_context` before answering when the user refers to prior work, people, projects, decisions, preferences, constraints, tasks, or ambiguous pronouns. `get_relevant_context` is a compatibility alias.",
   "- Prefer `recall_memory` over `search_memory` for intent resolution and semantic recall.",
   "- Use `store_memory` only for durable information that should affect future turns: facts, decisions, preferences, constraints, commitments, open questions, project updates, people, and topic notes.",
   "- Keep stored memories atomic. Split unrelated facts into separate candidates.",
@@ -19,11 +19,13 @@ export const agentMemoryBootstrapInstructions = [
   "",
   "Core workflow:",
   "",
-  "1. At the start of a user turn, call `get_relevant_context` when the request may depend on prior context, active projects, people, decisions, preferences, constraints, open tasks, open questions, or ambiguous references.",
+  "1. At the start of a user turn, call `prepare_turn_context` when the request may depend on prior context, active projects, people, decisions, preferences, constraints, open tasks, open questions, or ambiguous references.",
   "2. Use `recall_memory` for targeted semantic lookup when you need more detail than the context bundle provides.",
   "3. Use `store_memory` after the user states durable facts, decisions, preferences, constraints, commitments, project updates, people information, topic notes, or open questions that should affect future turns.",
   "4. Use `supersede_memory` when new information replaces older memory, preserving history instead of deleting the older record.",
   "5. Use `link_memory` when a memory should be explicitly connected to a project, person, task, document, decision, or another memory.",
+  "",
+  "Compatibility: `get_relevant_context` is still available and calls the same broker path for older clients.",
   "",
   "Operational rules:",
   "",
@@ -38,7 +40,7 @@ export const agentMemoryWorkflow = [
   {
     step: "retrieve_context",
     when: "The user request may depend on prior context or has ambiguous references.",
-    action: "Call get_relevant_context with the current message and recentMessages when available."
+    action: "Call prepare_turn_context with the current message, recentMessages, and activeProjectId when available."
   },
   {
     step: "targeted_recall",
@@ -64,7 +66,7 @@ export const agentMemoryWorkflow = [
 
 export const agentMemoryPrimaryTools = [
   {
-    name: "get_relevant_context",
+    name: "prepare_turn_context",
     scope: "memory:read",
     purpose: "Build a compact context pack for the current agent turn."
   },

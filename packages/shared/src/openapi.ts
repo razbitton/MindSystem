@@ -16,14 +16,18 @@ import {
   ingestFreeTextSchema,
   linkMemorySchema,
   loginSchema,
+  memoryConsolidationSchema,
   patchDocumentSchema,
   patchNoteSchema,
   patchProjectSchema,
   patchReminderSchema,
   patchTaskSchema,
+  prepareTurnContextSchema,
   purgeWorkspaceDataSchema,
   recallMemorySchema,
   reviewDecisionSchema,
+  reviewMergeSchema,
+  reviewSupersedeSchema,
   setDailyObjectiveSchema,
   storeMemorySchema,
   supersedeMemorySchema,
@@ -76,7 +80,7 @@ export function buildOpenApiSpec() {
       },
       "/search": {
         get: {
-          summary: "Hybrid search placeholder using structured filters and full-text search",
+          summary: "Keyword/full-text search using structured filters",
           parameters: [
             { name: "q", in: "query", schema: { type: "string" } },
             { name: "entity_type", in: "query", schema: { type: "string" } },
@@ -93,6 +97,19 @@ export function buildOpenApiSpec() {
           summary: "Recall agent memory using hybrid semantic and keyword retrieval",
           requestBody: { required: true, content: { "application/json": { schema: json(recallMemorySchema) } } },
           responses: { "200": { description: "Ranked memory results and retrieval metadata" } }
+        }
+      },
+      "/context/turn": {
+        post: {
+          summary: "Prepare deterministic model-ready context for an agent turn",
+          requestBody: { required: true, content: { "application/json": { schema: json(prepareTurnContextSchema) } } },
+          responses: { "200": { description: "Context markdown, structured context fields, source quotes, conflicts, stale items, and retrieval trace" } }
+        }
+      },
+      "/memory/{id}": {
+        get: {
+          summary: "Get a memory record with entity and sources",
+          responses: { "200": { description: "Memory details" } }
         }
       },
       "/memory/context": {
@@ -427,6 +444,26 @@ export function buildOpenApiSpec() {
           responses: { "200": { description: "Review item" } }
         }
       },
+      "/review-queue/{id}/merge": {
+        post: {
+          summary: "Merge a review memory candidate into an existing memory",
+          requestBody: { required: true, content: { "application/json": { schema: json(reviewMergeSchema) } } },
+          responses: { "200": { description: "Review item and merged memory" } }
+        }
+      },
+      "/review-queue/{id}/supersede": {
+        post: {
+          summary: "Supersede an existing memory from a review item",
+          requestBody: { required: true, content: { "application/json": { schema: json(reviewSupersedeSchema) } } },
+          responses: { "200": { description: "Review item and replacement memory" } }
+        }
+      },
+      "/review-queue/{id}/mark-stale": {
+        post: { summary: "Mark a reviewed memory as stale", responses: { "200": { description: "Review item and memory" } } }
+      },
+      "/review-queue/{id}/pin-preference": {
+        post: { summary: "Pin a repeated preference memory", responses: { "200": { description: "Review item and memory" } } }
+      },
       "/review-queue/{id}/reject": {
         post: { summary: "Reject a review item", responses: { "200": { description: "Review item" } } }
       },
@@ -532,6 +569,13 @@ export function buildOpenApiSpec() {
           summary: "Queue a one-off AI memory backfill over raw captures",
           requestBody: { required: false, content: { "application/json": { schema: json(aiProcessingBackfillSchema) } } },
           responses: { "200": { description: "Queued AI processing run" } }
+        }
+      },
+      "/admin/memory-consolidation": {
+        post: {
+          summary: "Queue memory lifecycle consolidation review",
+          requestBody: { required: false, content: { "application/json": { schema: json(memoryConsolidationSchema) } } },
+          responses: { "200": { description: "Queued consolidation job" } }
         }
       },
       "/admin/ai-processing/schedule": {
