@@ -16,12 +16,18 @@ export async function runMemoryConsolidationJob(pool: Pool, input: Consolidation
     duplicateGroups: duplicateGroups.length,
     staleMemories: staleMemories.length,
     repeatedPreferences: repeatedPreferences.length,
-    reviewItems: 0
+    reviewItems: 0,
+    autoApplied: 0
   };
 
   if (input.dryRun) return { ...counts, dryRun: true };
 
   for (const group of duplicateGroups) {
+    if (group.match_type === "exact") {
+      counts.autoApplied += await autoMergeExactDuplicateGroup(pool, input.workspaceId, group);
+      continue;
+    }
+
     const payload = {
       kind: group.kind,
       title: group.title,
@@ -32,9 +38,9 @@ export async function runMemoryConsolidationJob(pool: Pool, input: Consolidation
       memoryId: group.target_memory_id,
       targetMemoryId: group.target_memory_id,
       duplicateMemoryIds: group.duplicate_memory_ids,
-      customFields: { consolidationReason: "duplicate_title_or_semantic_similarity" }
+      customFields: { consolidationReason: "semantic_duplicate_similarity" }
     };
-    counts.reviewItems += await insertReviewItem(pool, input.workspaceId, "duplicate_memory_candidate", "merge_memory_records", payload, group.target_memory_id);
+    counts.reviewItems += await insertReviewItem(pool, input.workspaceId, "semantic_duplicate_memory_candidate", "merge_memory_records", payload, group.target_memory_id);
   }
 
   for (const memory of staleMemories) {
@@ -47,11 +53,7 @@ export async function runMemoryConsolidationJob(pool: Pool, input: Consolidation
   }
 
   for (const preference of repeatedPreferences) {
-    counts.reviewItems += await insertReviewItem(pool, input.workspaceId, "stable_preference_candidate", "pin_preference", {
-      memoryId: preference.id,
-      title: preference.title,
-      sourceCount: preference.source_count
-    }, preference.id);
+    counts.autoApplied += await autoPinRepeatedPreference(pool, input.workspaceId, preference);
   }
 
   return { ...counts, dryRun: false };
@@ -93,14 +95,16 @@ async function findDuplicateGroups(pool: Pool, input: ConsolidationJobInput) {
     confidence_score: string;
     target_memory_id: string;
     duplicate_memory_ids: string[];
+    match_type: "exact" | "semantic";
   }> = [];
 
   for (const row of rows) {
     if (used.has(row.id)) continue;
-    const duplicateIds = rows
+    const matchingRows = rows
       .filter((candidate) => candidate.id !== row.id && !used.has(candidate.id) && candidate.kind === row.kind)
-      .filter((candidate) => findSimilarMemory([row], candidate))
-      .map((candidate) => candidate.id);
+      .filter((candidate) => findSimilarMemory([row], candidate));
+    const exactRows = matchingRows.filter((candidate) => isExactDuplicate(row, candidate));
+    const duplicateIds = matchingRows.map((candidate) => candidate.id);
 
     if (!duplicateIds.length) continue;
     groups.push({
@@ -111,7 +115,8 @@ async function findDuplicateGroups(pool: Pool, input: ConsolidationJobInput) {
       importance: row.importance,
       confidence_score: row.confidence_score,
       target_memory_id: row.id,
-      duplicate_memory_ids: duplicateIds
+      duplicate_memory_ids: duplicateIds,
+      match_type: exactRows.length === matchingRows.length ? "exact" : "semantic"
     });
     used.add(row.id);
     for (const id of duplicateIds) used.add(id);
@@ -150,12 +155,132 @@ async function findRepeatedPreferences(pool: Pool, input: ConsolidationJobInput)
        and mr.kind = 'preference'
        and coalesce((mr.custom_fields ->> 'pinned')::boolean, false) = false
      group by mr.id
-     having count(ms.id) >= 2
+     having count(ms.id) >= 3
      order by count(ms.id) desc, mr.updated_at desc
      limit $2`,
     [input.workspaceId, input.limit]
   );
   return result.rows;
+}
+
+async function autoMergeExactDuplicateGroup(
+  pool: Pool,
+  workspaceId: string,
+  group: {
+    target_memory_id: string;
+    duplicate_memory_ids: string[];
+    title: string;
+    confidence_score: string;
+  }
+) {
+  const result = await pool.query(
+    `with moved_sources as (
+       update memory_sources
+       set memory_record_id = $2
+       where workspace_id = $1
+         and memory_record_id = any($3::uuid[])
+       returning id
+     ),
+     superseded as (
+       update memory_records
+       set status = 'superseded',
+           validity = 'superseded',
+           superseded_by_memory_id = $2,
+           confidence_reason = 'Auto-merged exact duplicate during consolidation.',
+           updated_at = now()
+       where workspace_id = $1
+         and id = any($3::uuid[])
+       returning id
+     )
+     insert into ai_activity_log (
+       workspace_id,
+       actor_type,
+       operation_type,
+       decision,
+       reason,
+       affected_records,
+       previous_values,
+       new_values,
+       confidence,
+       source_reliability,
+       input,
+       undo_status
+     )
+     select $1,
+            'system',
+            'consolidate_memory',
+            'auto_apply_with_audit'::ai_operation_decision,
+            'auto_merged_exact_duplicate_memory',
+            jsonb_build_array(jsonb_build_object('type', 'memory_record', 'id', $2)),
+            jsonb_build_object('duplicateMemoryIds', $3),
+            jsonb_build_object('targetMemoryId', $2, 'movedSourceCount', (select count(*) from moved_sources), 'supersededCount', (select count(*) from superseded)),
+            $4,
+            0.95,
+            jsonb_build_object('title', $5, 'duplicateMemoryIds', $3),
+            'not_available'
+     where exists (select 1 from superseded)`,
+    [workspaceId, group.target_memory_id, group.duplicate_memory_ids, group.confidence_score, group.title]
+  );
+  return result.rowCount ?? 0;
+}
+
+async function autoPinRepeatedPreference(pool: Pool, workspaceId: string, preference: { id: string; title: string; source_count: number }) {
+  const result = await pool.query(
+    `with pinned as (
+       update memory_records
+       set importance = 'high',
+           custom_fields = custom_fields || $3::jsonb,
+           last_verified_at = now(),
+           validity = 'current',
+           updated_at = now()
+       where workspace_id = $1
+         and id = $2
+         and kind = 'preference'
+         and coalesce((custom_fields ->> 'pinned')::boolean, false) = false
+       returning id
+     )
+     insert into ai_activity_log (
+       workspace_id,
+       actor_type,
+       operation_type,
+       decision,
+       reason,
+       affected_records,
+       new_values,
+       confidence,
+       source_reliability,
+       input,
+       undo_status
+     )
+     select $1,
+            'system',
+            'consolidate_memory',
+            'auto_apply_with_audit'::ai_operation_decision,
+            'auto_pinned_repeated_preference',
+            jsonb_build_array(jsonb_build_object('type', 'memory_record', 'id', $2)),
+            jsonb_build_object('pinned', true, 'sourceCount', $4),
+            0.9,
+            0.9,
+            jsonb_build_object('title', $5, 'sourceCount', $4),
+            'not_available'
+     where exists (select 1 from pinned)`,
+    [
+      workspaceId,
+      preference.id,
+      JSON.stringify({ pinned: true, pinnedReason: "Repeated preference with at least three independent sources." }),
+      preference.source_count,
+      preference.title
+    ]
+  );
+  return result.rowCount ?? 0;
+}
+
+function isExactDuplicate(left: { title: string; body: string }, right: { title: string; body: string }) {
+  return normalize(left.title) === normalize(right.title) && normalize(left.body) === normalize(right.body);
+}
+
+function normalize(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 async function insertReviewItem(

@@ -10,16 +10,28 @@ import {
   tasks
 } from "@personal-context-os/db";
 import type { IngestFreeTextInput, NormalizerOutput } from "@personal-context-os/shared";
-import { normalizerOutputSchema } from "@personal-context-os/shared";
+import { normalizerOutputSchema, sourceReliabilityDefaults, type AiOperationDecision, type AiOperationType } from "@personal-context-os/shared";
 import { and, eq } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import { decideWorkspaceAiOperation, writeAiActivity } from "./ai-operations.js";
 import { createGenericEntity } from "./entities.js";
-import { AUTO_APPLY_CONFIDENCE, buildIngestPlan } from "./ingest-plan.js";
+import { buildIngestPlan } from "./ingest-plan.js";
 import { findEntityByTitle, findProjectByName } from "./entity-resolution.js";
 import { resolveOpenAICodexAccessToken } from "./openai-codex.js";
 import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
+
+type NormalizedEntityItem = {
+  title: string;
+  confidence: number;
+  customFields: Record<string, unknown>;
+  body?: string | undefined;
+  importance?: string | undefined;
+  priority?: string | undefined;
+  dueAt?: string | null | undefined;
+  projectTitle?: string | undefined;
+};
 
 export async function ingestFreeText(context: AppContext, input: IngestFreeTextInput, actor: Actor) {
   const [rawItem] = await context.db
@@ -49,11 +61,18 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
   const plan = buildIngestPlan(normalized);
   const createdEntities: unknown[] = [];
   const reviewItems: unknown[] = [];
+  const activityEntries: unknown[] = [];
   const projectTitleToId = new Map<string, string>();
   const entityTitleToId = new Map<string, string>();
+  const bulkCount = normalizedItemCount(normalized);
 
   for (const project of normalized.projects) {
-    if (project.confidence < AUTO_APPLY_CONFIDENCE) {
+    const decision = await decideIngestItem(context, input, "create_memory", project, bulkCount);
+    if (decision === "reject_or_ignore") {
+      activityEntries.push(await logIgnoredIngestItem(context, actor, rawItem.id, "project", project, decision, input));
+      continue;
+    }
+    if (decision === "needs_review") {
       reviewItems.push(await createReviewItem(context, rawItem.id, "low_confidence_project", "create_project", project));
       continue;
     }
@@ -95,11 +114,17 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`project:${project.title.toLowerCase()}`, entity.id);
       createdEntities.push({ entity, project: typed });
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "project", project, decision, input.sourceType));
     }
   }
 
   for (const task of normalized.tasks) {
-    if (task.confidence < AUTO_APPLY_CONFIDENCE) {
+    const decision = await decideIngestItem(context, input, "create_task", task, bulkCount);
+    if (decision === "reject_or_ignore") {
+      activityEntries.push(await logIgnoredIngestItem(context, actor, rawItem.id, "task", task, decision, input));
+      continue;
+    }
+    if (decision === "needs_review") {
       reviewItems.push(await createReviewItem(context, rawItem.id, "low_confidence_task", "create_task", task));
       continue;
     }
@@ -147,11 +172,17 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`task:${task.title.toLowerCase()}`, entity.id);
       await linkToProject(context, entity.id, projectId, task.confidence);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_task", "task", task, decision, input.sourceType));
     }
   }
 
   for (const note of normalized.notes) {
-    if (note.confidence < AUTO_APPLY_CONFIDENCE) {
+    const decision = await decideIngestItem(context, input, "create_memory", note, bulkCount);
+    if (decision === "reject_or_ignore") {
+      activityEntries.push(await logIgnoredIngestItem(context, actor, rawItem.id, "note", note, decision, input));
+      continue;
+    }
+    if (decision === "needs_review") {
       reviewItems.push(await createReviewItem(context, rawItem.id, "low_confidence_note", "create_note", note));
       continue;
     }
@@ -182,11 +213,17 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`note:${note.title.toLowerCase()}`, entity.id);
       await linkToProject(context, entity.id, projectId, note.confidence);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "note", note, decision, input.sourceType));
     }
   }
 
   for (const reminder of normalized.reminders) {
-    if (reminder.confidence < AUTO_APPLY_CONFIDENCE) {
+    const decision = await decideIngestItem(context, input, "create_memory", reminder, bulkCount);
+    if (decision === "reject_or_ignore") {
+      activityEntries.push(await logIgnoredIngestItem(context, actor, rawItem.id, "reminder", reminder, decision, input));
+      continue;
+    }
+    if (decision === "needs_review") {
       reviewItems.push(await createReviewItem(context, rawItem.id, "low_confidence_reminder", "create_reminder", reminder));
       continue;
     }
@@ -216,14 +253,24 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`reminder:${reminder.title.toLowerCase()}`, entity.id);
       await linkToProject(context, entity.id, projectId, reminder.confidence);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "reminder", reminder, decision, input.sourceType));
     }
   }
 
-  await createSimpleEntities(context, normalized, rawItem.id, actor, createdEntities, reviewItems, entityTitleToId);
+  await createSimpleEntities(context, input, normalized, rawItem.id, actor, createdEntities, reviewItems, activityEntries, entityTitleToId, bulkCount);
   await createRelationships(context, normalized, entityTitleToId);
 
   for (const reason of plan.reviewReasons) {
-    reviewItems.push(await createReviewItem(context, rawItem.id, reason, "inspect_normalization", normalized));
+    activityEntries.push(await writeAiActivity(context, {
+      ...actor,
+      operationType: "inspect_raw_item",
+      decision: "reject_or_ignore",
+      reason: reason.startsWith("AI normalizer degraded:") ? "normalization_degraded_logged" : "normalization_uncertainty_logged",
+      rawItemId: rawItem.id,
+      confidence: normalized.confidence,
+      sourceReliability: sourceReliabilityForSourceType(input.sourceType),
+      input: { reason, normalized }
+    }));
   }
 
   const createdEntityIds = createdEntities
@@ -236,6 +283,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
     normalized,
     createdEntities,
     reviewItems,
+    activityEntries,
     applied: createdEntities.length,
     requiresReview: reviewItems.length,
     normalizationDegraded: normalized.uncertainties.some((item) => item.startsWith("AI normalizer degraded:"))
@@ -260,12 +308,15 @@ function createNormalizer(context: AppContext) {
 
 async function createSimpleEntities(
   context: AppContext,
+  input: IngestFreeTextInput,
   normalized: NormalizerOutput,
   rawItemId: string,
   actor: Actor,
   createdEntities: unknown[],
   reviewItems: unknown[],
-  entityTitleToId: Map<string, string>
+  activityEntries: unknown[],
+  entityTitleToId: Map<string, string>,
+  bulkCount: number
 ) {
   const groups = [
     ["person", normalized.people],
@@ -275,7 +326,12 @@ async function createSimpleEntities(
 
   for (const [type, items] of groups) {
     for (const item of items) {
-      if (item.confidence < AUTO_APPLY_CONFIDENCE) {
+      const decision = await decideIngestItem(context, input, "create_memory", item, bulkCount);
+      if (decision === "reject_or_ignore") {
+        activityEntries.push(await logIgnoredIngestItem(context, actor, rawItemId, type, item, decision, input));
+        continue;
+      }
+      if (decision === "needs_review") {
         reviewItems.push(await createReviewItem(context, rawItemId, `low_confidence_${type}`, `create_${type}`, item));
         continue;
       }
@@ -293,6 +349,7 @@ async function createSimpleEntities(
       createdEntities.push({ entity });
       entityTitleToId.set(`${type}:${item.title.toLowerCase()}`, entity.id);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId });
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItemId, entity.id, "create_memory", type, item, decision, input.sourceType));
     }
   }
 }
@@ -374,4 +431,120 @@ async function createReviewItem(
     })
     .returning();
   return reviewItem;
+}
+
+async function decideIngestItem(
+  context: AppContext,
+  input: IngestFreeTextInput,
+  operationType: AiOperationType,
+  item: NormalizedEntityItem,
+  bulkCount: number
+) {
+  return decideWorkspaceAiOperation(context, {
+    operationType,
+    confidence: item.confidence,
+    sourceReliability: sourceReliabilityForSourceType(input.sourceType),
+    hasSourceQuote: hasSourceEvidence(item),
+    userExplicitlyRequested: isExplicitIngest(input),
+    destructive: false,
+    reversible: true,
+    bulkCount,
+    conflicts: [],
+    ambiguousTargets: [],
+    sensitiveFlags: sensitiveFlags(item),
+    projectResolved: true,
+    possiblyImportant: possiblyImportant(item)
+  });
+}
+
+async function logIgnoredIngestItem(
+  context: AppContext,
+  actor: Actor,
+  rawItemId: string,
+  entityType: string,
+  item: NormalizedEntityItem,
+  decision: AiOperationDecision,
+  input: IngestFreeTextInput
+) {
+  return writeAiActivity(context, {
+    ...actor,
+    operationType: entityType === "task" ? "create_task" : "create_memory",
+    decision,
+    reason: `ignored_low_confidence_${entityType}`,
+    rawItemId,
+    confidence: item.confidence,
+    sourceReliability: sourceReliabilityForSourceType(input.sourceType),
+    input: { entityType, item }
+  });
+}
+
+async function logAppliedIngestItem(
+  context: AppContext,
+  actor: Actor,
+  rawItemId: string,
+  entityId: string,
+  operationType: AiOperationType,
+  entityType: string,
+  item: NormalizedEntityItem,
+  decision: AiOperationDecision,
+  sourceType: string
+) {
+  return writeAiActivity(context, {
+    ...actor,
+    operationType,
+    decision,
+    reason: `auto_applied_${entityType}`,
+    rawItemId,
+    entityId,
+    affectedRecords: [{ type: "entity", id: entityId }],
+    newValues: { entityType, item },
+    confidence: item.confidence,
+    sourceReliability: sourceReliabilityForSourceType(sourceType),
+    input: { entityType, item },
+    undoStatus: "not_available"
+  });
+}
+
+function sourceReliabilityForSourceType(sourceType: string) {
+  if (sourceType === "manual") return sourceReliabilityDefaults.manual_note;
+  if (sourceType === "codex" || sourceType === "api") return sourceReliabilityDefaults.direct_user_command;
+  if (sourceType === "web" || sourceType === "openclaw") return sourceReliabilityDefaults.unclear_imported_text;
+  return sourceReliabilityDefaults.backfilled_raw_capture;
+}
+
+function isExplicitIngest(input: IngestFreeTextInput) {
+  return Boolean(input.rawPayload.userExplicitlyRequested) || input.sourceType === "manual" || input.sourceType === "codex" || input.sourceType === "api";
+}
+
+function hasSourceEvidence(item: NormalizedEntityItem) {
+  return typeof item.customFields.sourceQuote === "string" && item.customFields.sourceQuote.trim().length > 0;
+}
+
+function sensitiveFlags(item: NormalizedEntityItem) {
+  const flags = item.customFields.sensitiveFlags;
+  if (Array.isArray(flags)) return flags.filter((flag): flag is string => typeof flag === "string");
+  return [];
+}
+
+function possiblyImportant(item: NormalizedEntityItem) {
+  return (
+    item.importance === "high" ||
+    item.importance === "critical" ||
+    item.priority === "high" ||
+    item.priority === "urgent" ||
+    Boolean(item.dueAt) ||
+    item.confidence >= 0.5
+  );
+}
+
+function normalizedItemCount(normalized: NormalizerOutput) {
+  return [
+    normalized.projects,
+    normalized.tasks,
+    normalized.notes,
+    normalized.reminders,
+    normalized.people,
+    normalized.decisions,
+    normalized.goals
+  ].reduce((count, items) => count + items.length, 0);
 }

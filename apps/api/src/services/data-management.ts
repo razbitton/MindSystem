@@ -15,6 +15,8 @@ const inventoryTables = [
   ["entityAliases", "entity_aliases"],
   ["reviewQueue", "review_queue"],
   ["auditEvents", "audit_events"],
+  ["aiActivityLog", "ai_activity_log"],
+  ["aiOperationPolicies", "ai_operation_policies"],
   ["agentRuns", "agent_runs"],
   ["aiProcessingRuns", "ai_processing_runs"],
   ["aiProcessingSchedules", "ai_processing_schedules"],
@@ -64,6 +66,16 @@ const purgeStatements: { type: PurgeDataType; resultKey: string; sql: string }[]
     type: "agent_runs",
     resultKey: "deletedAgentRuns",
     sql: "delete from agent_runs where workspace_id = $1"
+  },
+  {
+    type: "ai_activity_log",
+    resultKey: "deletedAiActivityLog",
+    sql: "delete from ai_activity_log where workspace_id = $1"
+  },
+  {
+    type: "ai_operation_policies",
+    resultKey: "deletedAiOperationPolicies",
+    sql: "delete from ai_operation_policies where workspace_id = $1"
   },
   {
     type: "ai_processing_runs",

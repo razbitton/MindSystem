@@ -763,6 +763,16 @@ export const mcpRestTools: RestToolDefinition[] = [
     inputSchema: objectSchema(dashboardQueryProperties)
   },
   {
+    name: "list_ai_activity",
+    description: "List recent automatic AI activity and ignored operations.",
+    requiredScope: "memory:read",
+    method: "GET",
+    path: "/api/ai-activity",
+    inputSchema: objectSchema({}),
+    annotations: { readOnlyHint: true },
+    tier: "advanced"
+  },
+  {
     name: "get_urgent_tasks",
     description: "List urgent open tasks.",
     requiredScope: "tasks:read",
@@ -773,7 +783,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "list_review_queue",
-    description: "List review queue items.",
+    description: "List memory exception items that need human attention.",
     requiredScope: "admin",
     method: "GET",
     path: "/api/review-queue",
@@ -781,7 +791,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "approve_review_item",
-    description: "Approve a review queue item.",
+    description: "Apply a memory exception item.",
     requiredScope: "admin",
     method: "POST",
     path: (args) => `/api/review-queue/${String(args.id)}/approve`,
@@ -846,7 +856,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "reject_review_item",
-    description: "Reject a review queue item.",
+    description: "Dismiss a memory exception item.",
     requiredScope: "admin",
     method: "POST",
     path: (args) => `/api/review-queue/${String(args.id)}/reject`,
@@ -855,7 +865,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "delete_review_item",
-    description: "Hard-delete a review queue item.",
+    description: "Hard-delete a memory exception item.",
     requiredScope: "admin",
     method: "DELETE",
     path: idPath("/api/review-queue"),
@@ -863,7 +873,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "clear_review_queue",
-    description: "Hard-delete all review queue items.",
+    description: "Hard-delete all memory exception items.",
     requiredScope: "admin",
     method: "POST",
     path: "/api/review-queue/clear",
@@ -1018,7 +1028,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "start_ai_memory_backfill",
-    description: "Queue a safe AI memory backfill over existing raw captures. It dedupes active memories and routes uncertain output to review.",
+    description: "Queue an AI memory backfill over existing raw captures. Safe output auto-applies with activity logging; risky output becomes an exception.",
     requiredScope: "admin",
     method: "POST",
     path: "/api/admin/ai-processing/backfill",
@@ -1059,7 +1069,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "start_memory_consolidation",
-    description: "Queue memory lifecycle consolidation review. Creates review items for duplicate, stale, or repeated preference candidates.",
+    description: "Queue memory lifecycle consolidation. Exact duplicates and stable preferences can auto-apply with activity logging; risky candidates become exceptions.",
     requiredScope: "admin",
     method: "POST",
     path: "/api/admin/memory-consolidation",

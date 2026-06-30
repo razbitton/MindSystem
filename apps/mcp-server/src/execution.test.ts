@@ -204,6 +204,7 @@ const routeCases: RouteCase[] = [
     path: "/api/dashboard/today",
     query: { date: "2026-06-24", start: "2026-06-23T21:00:00.000Z", end: "2026-06-24T20:59:59.999Z" }
   },
+  { name: "list_ai_activity", args: {}, method: "GET", path: "/api/ai-activity" },
   { name: "get_urgent_tasks", args: { limit: 10 }, method: "GET", path: "/api/tasks", query: { priority: "urgent", limit: "10" } },
   { name: "list_review_queue", args: { status: "all" }, method: "GET", path: "/api/review-queue", query: { status: "all" } },
   {

@@ -23,7 +23,9 @@ type Decision = { id: string; action: ReviewAction } | null;
 export default function ReviewView() {
   const { t, formatDate, translateValue } = useI18n();
   const cachedReview = peekCachedQuery<{ items: AnyRecord[] }>("/api/review-queue");
+  const cachedActivity = peekCachedQuery<{ entries: AnyRecord[] }>("/api/ai-activity");
   const [items, setItems] = useState<AnyRecord[]>(() => cachedReview?.items ?? []);
+  const [activity, setActivity] = useState<AnyRecord[]>(() => cachedActivity?.entries ?? []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!cachedReview);
   const [pending, setPending] = useState<Decision>(null);
@@ -37,6 +39,12 @@ export default function ReviewView() {
     try {
       const data = await cachedApiGet<{ items: AnyRecord[] }>("/api/review-queue", undefined, { force });
       setItems(data.items);
+      try {
+        const activityData = await cachedApiGet<{ entries: AnyRecord[] }>("/api/ai-activity", undefined, { force });
+        setActivity(activityData.entries);
+      } catch {
+        setActivity([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("review.loadError"));
     } finally {
@@ -85,6 +93,31 @@ export default function ReviewView() {
   return (
     <>
       <PageHeader title={t("review.title")} subtitle={t("review.subtitle")} />
+
+      {activity.length ? (
+        <Panel>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">{t("review.activityTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("review.activitySubtitle")}</p>
+            </div>
+            <Badge variant="muted">{activity.length}</Badge>
+          </div>
+          <div className="mt-4 divide-y divide-border">
+            {activity.slice(0, 6).map((entry) => (
+              <div key={String(entry.id)} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{translateValue("reviewReason", String(entry.reason ?? ""))}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {humanize(String(entry.operationType ?? entry.operation_type ?? ""))}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">{formatDate(entry.createdAt ?? entry.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
 
       {error ? (
         <Panel>
@@ -218,6 +251,7 @@ function buildReviewCard(item: AnyRecord, t: Translate, translateValue: Translat
   const confidence = numberValue(payload, "confidence");
   const badges: string[] = [];
   if (confidence !== null) badges.push(`${t("review.confidence")} ${Math.round(confidence * 100)}%`);
+  badges.push(...exceptionBadges(String(item.reason ?? ""), t));
 
   if (item.suggestedAction === "create_memory_record") {
     const kind = stringValue(payload, "kind");
@@ -358,6 +392,18 @@ function numberValue(value: AnyRecord, key: string) {
 function arrayValue(value: AnyRecord, key: string) {
   const next = value[key];
   return Array.isArray(next) ? next : [];
+}
+
+function exceptionBadges(reason: string, t: Translate) {
+  const badges: string[] = [];
+  if (reason.includes("conflict")) badges.push(t("review.reasonConflict"));
+  if (reason.includes("ambiguous")) badges.push(t("review.reasonAmbiguity"));
+  if (reason.includes("sensitive")) badges.push(t("review.reasonSensitive"));
+  if (reason.includes("destructive") || reason.includes("delete")) badges.push(t("review.reasonDestructive"));
+  if (reason.includes("low_confidence") || reason.includes("medium_confidence")) badges.push(t("review.reasonLowConfidence"));
+  if (reason.includes("bulk")) badges.push(t("review.reasonBulk"));
+  if (reason.includes("missing_source_quote")) badges.push(t("review.reasonSource"));
+  return [...new Set(badges)];
 }
 
 function buildReviewActionBody(item: AnyRecord | null | undefined) {
