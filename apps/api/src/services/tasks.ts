@@ -2,6 +2,7 @@ import { entities, entityEdges, projects, tasks } from "@personal-context-os/db"
 import {
   createTaskSchema,
   localDateSchema,
+  manageTaskSchema,
   patchTaskSchema,
   prioritySchema,
   setDailyObjectiveSchema,
@@ -255,6 +256,48 @@ export async function setDailyObjective(context: AppContext, id: string, input: 
   return { ok: true, task, date: parsed.date, action: parsed.action, targetDate: parsed.targetDate ?? null };
 }
 
+export async function manageTask(context: AppContext, input: unknown, actor: Actor) {
+  const parsed = manageTaskSchema.parse(input);
+
+  if (parsed.action === "create") {
+    return {
+      action: parsed.action,
+      result: await createTask(context, createTaskSchema.parse(parsed), actor)
+    };
+  }
+
+  const id = requireManagedTaskId(parsed.id);
+  if (parsed.action === "update") {
+    return {
+      action: parsed.action,
+      result: await patchTask(context, id, patchTaskSchema.parse(parsed), actor)
+    };
+  }
+  if (parsed.action === "complete") {
+    return {
+      action: parsed.action,
+      result: await completeTask(context, id, actor)
+    };
+  }
+  if (parsed.action === "cancel") {
+    return {
+      action: parsed.action,
+      result: await patchTask(context, id, { status: "cancelled" }, actor)
+    };
+  }
+
+  const date = requireManagedTaskDate(parsed.date);
+  const dailyAction = parsed.action === "clear_daily_objective" ? "clear" : parsed.action;
+  const dailyInput = dailyAction === "snooze"
+    ? { date, action: dailyAction, targetDate: parsed.targetDate }
+    : { date, action: dailyAction };
+
+  return {
+    action: parsed.action,
+    result: await setDailyObjective(context, id, dailyInput, actor)
+  };
+}
+
 export async function deleteTask(context: AppContext, id: string, actor: Actor) {
   const { task } = await getTask(context, id);
 
@@ -274,6 +317,16 @@ export async function deleteTask(context: AppContext, id: string, actor: Actor) 
 
 function taskIdentityWhere(id: string): SQL {
   return or(eq(tasks.id, id), eq(tasks.entityId, id)) ?? eq(tasks.id, id);
+}
+
+function requireManagedTaskId(id: string | undefined) {
+  if (!id) throw new Error("Task id is required for this manage_task action.");
+  return id;
+}
+
+function requireManagedTaskDate(date: string | undefined) {
+  if (!date) throw new Error("date is required for this manage_task action.");
+  return date;
 }
 
 async function getEffectiveDailyObjectiveStates(context: AppContext, taskIds: string[], localDate: string) {

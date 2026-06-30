@@ -45,6 +45,7 @@ const entityTypeValues = ["project", "task", "note", "document", "memory", "deci
 const sourceTypeValues = ["web", "whatsapp", "openclaw", "codex", "api", "manual"];
 const reviewStatusValues = ["pending", "approved", "rejected", "all"];
 const dailyObjectiveActionValues = ["pin", "snooze", "clear"];
+const manageTaskActionValues = ["create", "update", "complete", "cancel", "pin", "snooze", "clear_daily_objective"];
 const memoryKindValues = [
   "fact",
   "decision",
@@ -133,6 +134,19 @@ const dailyObjectiveProperties = {
   date: { type: "string", description: "Local date in YYYY-MM-DD format." },
   action: { type: "string", enum: dailyObjectiveActionValues },
   targetDate: { type: "string", description: "Target local date in YYYY-MM-DD format. Required for snooze." }
+};
+
+const manageTaskProperties = {
+  action: {
+    type: "string",
+    enum: manageTaskActionValues,
+    description: "Task operation to perform."
+  },
+  id: nullableStringSchema("Task table id or task entity id. Required except for create."),
+  ...taskProperties,
+  date: { type: "string", description: "Local date in YYYY-MM-DD format. Required for pin, snooze, and clear_daily_objective." },
+  targetDate: { type: "string", description: "Target local date in YYYY-MM-DD format. Required for snooze." },
+  completedAt: nullableStringSchema("ISO 8601 datetime.")
 };
 
 const dashboardQueryProperties = {
@@ -732,15 +746,11 @@ export const mcpRestTools: RestToolDefinition[] = [
   {
     name: "manage_task",
     title: "Manage task",
-    description: "Update a task's status, priority, due date, assignment, or description. Use complete_task for completion.",
+    description: "High-level task manager. Create, update, complete, cancel, pin, snooze, or clear a task's daily objective using one compact tool.",
     requiredScope: "tasks:write",
-    method: "PATCH",
-    path: idPath("/api/tasks"),
-    body: omitIdBody,
-    inputSchema: objectSchema({
-      id: idSchema("Task table id. entityId is accepted for compatibility; prefer taskId from search_memory."),
-      ...taskProperties
-    }, ["id"]),
+    method: "POST",
+    path: "/api/tasks/manage",
+    inputSchema: objectSchema(manageTaskProperties, ["action"]),
     annotations: { destructiveHint: false },
     tier: "default"
   },

@@ -278,6 +278,53 @@ export const patchTaskSchema = createTaskSchema.partial().extend({
   completedAt: z.string().datetime().nullable().optional()
 });
 
+export const manageTaskActionSchema = z.enum([
+  "create",
+  "update",
+  "complete",
+  "cancel",
+  "pin",
+  "snooze",
+  "clear_daily_objective"
+]);
+
+export const manageTaskSchema = patchTaskSchema.extend({
+  action: manageTaskActionSchema,
+  id: z.string().uuid().optional(),
+  date: localDateSchema.optional(),
+  targetDate: localDateSchema.optional()
+}).superRefine((value, context) => {
+  if (value.action === "create" && !value.title) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "title is required when creating a task.",
+      path: ["title"]
+    });
+  }
+  if (value.action !== "create" && !value.id) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "id is required for this task action.",
+      path: ["id"]
+    });
+  }
+  if (["pin", "snooze", "clear_daily_objective"].includes(value.action) && !value.date) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "date is required for daily objective task actions.",
+      path: ["date"]
+    });
+  }
+  if (value.action === "snooze" && !value.targetDate) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "targetDate is required when snoozing a task.",
+      path: ["targetDate"]
+    });
+  }
+});
+export type ManageTaskInput = z.infer<typeof manageTaskSchema>;
+
 export const dashboardTodayQuerySchema = z.object({
   date: localDateSchema.optional(),
   start: z.string().datetime().optional(),

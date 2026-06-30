@@ -190,7 +190,13 @@ const routeCases: RouteCase[] = [
   { name: "get_project_context", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
   { name: "project_brief", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
   { name: "create_context_pack", args: { projectId: "project-id" }, method: "GET", path: "/api/projects/project-id/context" },
-  { name: "manage_task", args: { id: "task-id", status: "waiting" }, method: "PATCH", path: "/api/tasks/task-id", body: { status: "waiting" } },
+  {
+    name: "manage_task",
+    args: { action: "update", id: "task-id", status: "waiting" },
+    method: "POST",
+    path: "/api/tasks/manage",
+    body: { action: "update", id: "task-id", status: "waiting" }
+  },
   {
     name: "get_daily_dashboard",
     args: { date: "2026-06-24", start: "2026-06-23T21:00:00.000Z", end: "2026-06-24T20:59:59.999Z" },

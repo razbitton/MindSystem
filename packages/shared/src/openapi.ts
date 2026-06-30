@@ -16,6 +16,7 @@ import {
   ingestFreeTextSchema,
   linkMemorySchema,
   loginSchema,
+  manageTaskSchema,
   memoryConsolidationSchema,
   patchDocumentSchema,
   patchNoteSchema,
@@ -195,6 +196,13 @@ export function buildOpenApiSpec() {
           responses: { "200": { description: "Task" } }
         },
         get: { summary: "List tasks", responses: { "200": { description: "Tasks" } } }
+      },
+      "/tasks/manage": {
+        post: {
+          summary: "High-level task manager for create, update, complete, cancel, pin, snooze, and clear daily objective actions",
+          requestBody: { required: true, content: { "application/json": { schema: json(manageTaskSchema) } } },
+          responses: { "200": { description: "Managed task action result" } }
+        }
       },
       "/tasks/{id}": {
         get: { summary: "Get a task", responses: { "200": { description: "Task" } } },

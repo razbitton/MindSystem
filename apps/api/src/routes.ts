@@ -133,6 +133,7 @@ import {
   deleteTask,
   getTask,
   listTasks,
+  manageTask,
   patchTask,
   setDailyObjective
 } from "./services/tasks.js";
@@ -218,6 +219,7 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
 
   if (route === "/api/tasks" && method === "GET") return "tasks:read";
   if (route === "/api/tasks" && method === "POST") return "tasks:write";
+  if (route === "/api/tasks/manage" && method === "POST") return "tasks:write";
   if (route === "/api/tasks/:id" && method === "GET") return "tasks:read";
   if (route === "/api/tasks/:id" && method === "PATCH") return "tasks:write";
   if (route === "/api/tasks/:id" && method === "DELETE") return "tasks:write";
@@ -409,6 +411,8 @@ export async function registerRoutes(app: FastifyInstance) {
     const input = createTaskSchema.parse(request.body);
     return createTask(requestContext(app, request), input, actorFor(request));
   });
+
+  app.post("/api/tasks/manage", async (request) => manageTask(requestContext(app, request), request.body ?? {}, actorFor(request)));
 
   app.get("/api/tasks", async (request) => listTasks(requestContext(app, request), request.query));
 
