@@ -47,6 +47,7 @@ type AiProcessingSelectionSummary = {
   eligibleUnprocessedRawItems?: number;
   alreadyProcessedRawItems?: number;
   pendingReviewRawItems?: number;
+  seededExistingRecords?: number;
   selectedRawItems?: number;
   limitCount?: number;
   onlyUnprocessed?: boolean;
@@ -346,6 +347,14 @@ function describeRunOutcome(run: AiProcessingRun, t: Translate) {
     });
   }
   if (summary) {
+    if ((summary.seededExistingRecords ?? 0) > 0) {
+      return t("aiProcessing.selectedMatchingWithSeeded", {
+        selected: summary.selectedRawItems ?? run.totalCount,
+        matching: summary.matchingRawItems ?? run.totalCount,
+        seeded: summary.seededExistingRecords ?? 0,
+        limit: summary.limitCount ?? run.limitCount
+      });
+    }
     return t("aiProcessing.selectedMatching", {
       selected: summary.selectedRawItems ?? run.totalCount,
       matching: summary.matchingRawItems ?? run.totalCount,

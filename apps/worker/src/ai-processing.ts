@@ -1,6 +1,7 @@
 import type { AppEnv } from "@personal-context-os/config";
 import { OpenAICodexMemoryExtractor, OpenAIMemoryExtractor, type MemoryExtractionResult } from "@personal-context-os/ai";
 import type { Queue } from "bullmq";
+import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { resolveOpenAICodexAccessTokenForWorkspace } from "./openai-codex-token.js";
 
@@ -37,6 +38,18 @@ type MemoryRow = {
   confidence_score: string;
 };
 
+type EntitySeedRow = {
+  id: string;
+  entity_type: string;
+  title: string;
+  summary: string | null;
+  body: string | null;
+  status: string;
+  canonical: unknown;
+  custom_fields: unknown;
+  updated_at: Date;
+};
+
 type ProcessingCounts = {
   processed: number;
   skipped: number;
@@ -51,6 +64,7 @@ type SelectionSummary = {
   eligibleUnprocessedRawItems: number;
   alreadyProcessedRawItems: number;
   pendingReviewRawItems: number;
+  seededExistingRecords: number;
   selectedRawItems: number;
   limitCount: number;
   onlyUnprocessed: boolean;
@@ -77,7 +91,8 @@ export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string)
     [run.id]
   );
 
-  const selectionSummary = await summarizeRawItemSelection(pool, run);
+  const seededExistingRecords = await seedExistingEntityRawItems(pool, run);
+  const selectionSummary = await summarizeRawItemSelection(pool, run, seededExistingRecords);
   const rawItems = await selectRawItems(pool, run);
   selectionSummary.selectedRawItems = rawItems.length;
   selectionSummary.reason = describeSelectionSummary(selectionSummary);
@@ -257,7 +272,105 @@ function buildRawItemFilters(run: AiProcessingRunRow, requireUnprocessed: boolea
   return { params, where };
 }
 
-async function summarizeRawItemSelection(pool: Pool, run: AiProcessingRunRow): Promise<SelectionSummary> {
+async function seedExistingEntityRawItems(pool: Pool, run: AiProcessingRunRow) {
+  if (run.raw_item_ids.length) return 0;
+  if (run.source_types.length && !run.source_types.includes("api")) return 0;
+
+  const params: unknown[] = [run.workspace_id];
+  const where = [
+    "e.workspace_id = $1",
+    "e.entity_type <> 'memory'",
+    "e.archived_at is null"
+  ];
+  if (run.since) {
+    params.push(run.since);
+    where.push(`e.updated_at >= $${params.length}`);
+  }
+  if (run.until) {
+    params.push(run.until);
+    where.push(`e.updated_at <= $${params.length}`);
+  }
+
+  const result = await pool.query<EntitySeedRow>(
+    `select e.id,
+            e.entity_type::text as entity_type,
+            e.title,
+            e.summary,
+            e.body,
+            e.status,
+            e.canonical,
+            e.custom_fields,
+            e.updated_at
+     from entities e
+     where ${where.join(" and ")}
+     order by e.updated_at asc
+     limit 10000`,
+    params
+  );
+
+  let inserted = 0;
+  for (const entity of result.rows) {
+    const rawText = formatEntityRawText(entity);
+    const contentHash = createHash("sha256").update(rawText).digest("hex");
+    const sourceExternalId = `entity:${entity.id}:${contentHash}`;
+    const payload = {
+      synthetic: true,
+      source: "existing_entity",
+      entityId: entity.id,
+      entityType: entity.entity_type,
+      sourceUpdatedAt: entity.updated_at.toISOString()
+    };
+    const insert = await pool.query(
+      `insert into raw_items (
+         workspace_id,
+         source_type,
+         source_external_id,
+         raw_text,
+         raw_payload,
+         received_at,
+         content_hash
+       )
+       select $1, 'api'::source_type, $2, $3, $4::jsonb, $5, $6
+       where not exists (
+         select 1
+         from raw_items
+         where workspace_id = $1
+           and source_external_id = $2
+       )`,
+      [
+        run.workspace_id,
+        sourceExternalId,
+        rawText,
+        JSON.stringify(payload),
+        entity.updated_at,
+        contentHash
+      ]
+    );
+    inserted += insert.rowCount ?? 0;
+  }
+
+  return inserted;
+}
+
+function formatEntityRawText(entity: EntitySeedRow) {
+  const parts = [
+    "Existing app record",
+    `Type: ${entity.entity_type}`,
+    `Title: ${entity.title}`,
+    `Status: ${entity.status}`
+  ];
+  if (entity.summary) parts.push(`Summary: ${entity.summary}`);
+  if (entity.body) parts.push(`Body:\n${entity.body}`);
+
+  const structured = JSON.stringify({
+    canonical: entity.canonical,
+    customFields: entity.custom_fields
+  }, null, 2);
+  if (structured !== "{}") parts.push(`Structured data:\n${structured}`);
+  return parts.join("\n\n");
+}
+
+async function summarizeRawItemSelection(pool: Pool, run: AiProcessingRunRow, seededExistingRecords: number): Promise<SelectionSummary> {
   const { params, where } = buildRawItemFilters(run, false);
   const result = await pool.query<{
     matching_raw_items: number;
@@ -311,6 +424,7 @@ async function summarizeRawItemSelection(pool: Pool, run: AiProcessingRunRow): P
     eligibleUnprocessedRawItems,
     alreadyProcessedRawItems: Number(row?.already_processed_raw_items ?? 0),
     pendingReviewRawItems: Number(row?.pending_review_raw_items ?? 0),
+    seededExistingRecords,
     selectedRawItems,
     limitCount: run.limit_count,
     onlyUnprocessed: run.only_unprocessed,
@@ -328,11 +442,11 @@ async function summarizeRawItemSelection(pool: Pool, run: AiProcessingRunRow): P
 
 function describeSelectionSummary(summary: SelectionSummary) {
   if (summary.selectedRawItems > 0) return null;
-  if (summary.matchingRawItems === 0) return "No raw items matched the run filters.";
+  if (summary.matchingRawItems === 0) return "No captures or existing app records matched the run filters.";
   if (summary.onlyUnprocessed && summary.eligibleUnprocessedRawItems === 0) {
-    return "All matching raw items were already linked to memory or already pending review.";
+    return "All matching source items were already linked to memory or already pending review.";
   }
-  return "No raw items were selected for processing.";
+  return "No source items were selected for processing.";
 }
 
 async function updateRunSelection(pool: Pool, runId: string, totalCount: number, selectionSummary: SelectionSummary) {
