@@ -534,16 +534,6 @@ async function applyMemoryExtraction(
     }
   }
 
-  if (extraction.degraded) {
-    counts.review += 1;
-    if (!run.dry_run) {
-      await insertReviewItem(pool, run.workspace_id, rawItem.id, "memory_extraction_degraded", "inspect_raw_item", {
-        rawItemId: rawItem.id,
-        error: extraction.error ?? "Memory extraction degraded."
-      });
-    }
-  }
-
   return counts;
 }
 
