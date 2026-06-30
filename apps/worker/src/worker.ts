@@ -16,6 +16,24 @@ const embeddingWorker = new Worker(
   "embeddings",
   async (job) => {
     const entityId = String(job.data.entityId);
+    if (env.OPENAI_AUTH_MODE === "codex") {
+      await pool.query(
+        `update chunks
+         set metadata = metadata || jsonb_build_object(
+           'embedding_status', 'skipped_codex_retrieval',
+           'retrieval_provider', 'codex',
+           'retrieval_model', $2
+         )
+         where entity_id = $1`,
+        [entityId, env.OPENAI_CODEX_RETRIEVAL_MODEL]
+      );
+      return {
+        entityId,
+        embedded: false,
+        reason: "OPENAI_AUTH_MODE=codex uses Codex query planning for recall instead of OpenAI Platform embeddings."
+      };
+    }
+
     if (!env.OPENAI_API_KEY) {
       await pool.query(
         `update chunks

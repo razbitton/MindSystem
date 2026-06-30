@@ -96,7 +96,7 @@ export function buildOpenApiSpec() {
       },
       "/memory/recall": {
         post: {
-          summary: "Recall agent memory using hybrid semantic and keyword retrieval",
+          summary: "Recall agent memory using provider-aware vector or Codex-planned retrieval",
           requestBody: { required: true, content: { "application/json": { schema: json(recallMemorySchema) } } },
           responses: { "200": { description: "Ranked memory results and retrieval metadata" } }
         }

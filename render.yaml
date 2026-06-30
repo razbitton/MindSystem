@@ -33,6 +33,8 @@ envVarGroups:
         value: https://chatgpt.com/backend-api/codex
       - key: OPENAI_CODEX_EXTRACTION_MODEL
         value: gpt-5.5
+      - key: OPENAI_CODEX_RETRIEVAL_MODEL
+        value: gpt-5.5
       - key: OPENAI_CODEX_ACCESS_TOKEN
         sync: false
       - key: OPENAI_CODEX_REFRESH_TOKEN

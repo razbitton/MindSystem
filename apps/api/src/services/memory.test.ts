@@ -13,7 +13,7 @@ describe("buildMemoryRecallSql", () => {
 
     expect(built.sql).toContain("<=>");
     expect(built.sql).toContain("vector_rank >= 0.58");
-    expect(built.sql).toContain("bool_or");
+    expect(built.sql).toContain("unnest");
     expect(built.sql).toContain("memory_records");
     expect(built.params).toContain("[0.1,0.2,0.3]");
   });
@@ -30,5 +30,23 @@ describe("buildMemoryRecallSql", () => {
     expect(built.sql).toContain("plainto_tsquery");
     expect(built.sql).toContain("ilike");
     expect(built.params).toContain("supplier");
+  });
+
+  it("matches expanded search terms when no embedding is available", () => {
+    const built = buildMemoryRecallSql("workspace-id", {
+      query: "wedding plan",
+      kinds: [],
+      entityIds: [],
+      includeSuperseded: false,
+      limit: 5
+    }, null, {
+      searchQuery: "wedding plan חתונה",
+      searchTerms: ["wedding", "חתונה"]
+    });
+
+    expect(built.sql).toContain("unnest");
+    expect(built.sql).toContain("text[]");
+    expect(built.params).toContain("wedding plan חתונה");
+    expect(built.params).toContainEqual(["wedding", "חתונה"]);
   });
 });

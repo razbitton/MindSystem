@@ -351,6 +351,40 @@ describe("MCP resources", () => {
     expect(result).toBe("# Project\n\nContext");
   });
 
+  it("returns recent raw captures as compact markdown", async () => {
+    const { runtime, calls } = createRuntime({
+      rawItems: [{
+        id: "raw-id",
+        source_type: "openclaw",
+        raw_text: "A long capture ".repeat(30),
+        created_at: "2026-07-01T00:00:00.000Z"
+      }]
+    });
+
+    const result = await readResource(runtime, { ...adminAgent, scopes: ["memory:read"] }, "pcos_token", "raw-items://recent");
+
+    expect(new URL(calls[0]?.url ?? "").searchParams.get("limit")).toBe("10");
+    expect(result).toContain("# Recent Raw Captures");
+    expect(result).toContain("raw-item://raw-id");
+    expect(result).not.toContain("A long capture ".repeat(30));
+  });
+
+  it("returns today's dashboard as compact markdown", async () => {
+    const { runtime } = createRuntime({
+      dashboardDate: "2026-07-01",
+      reviewQueueCount: 2,
+      urgentTasks: [{ id: "task-id", title: "Pay supplier", status: "todo", priority: "urgent" }],
+      recentCapturedItems: [{ id: "raw-id", source_type: "codex", raw_text: "raw body" }]
+    });
+
+    const result = await readResource(runtime, { ...adminAgent, scopes: ["memory:read"] }, "pcos_token", "dashboard://today");
+
+    expect(result).toContain("# Today's Dashboard");
+    expect(result).toContain("Review queue: 2");
+    expect(result).toContain("task://task-id");
+    expect(result).toContain("raw-item://raw-id");
+  });
+
   it("returns the static memory policy resource without calling REST", async () => {
     const { runtime, calls } = createRuntime();
     const result = await readResource(runtime, { ...adminAgent, scopes: ["memory:read"] }, "pcos_token", "memory-policy://agent");

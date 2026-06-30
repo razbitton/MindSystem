@@ -37,7 +37,7 @@ export function getAgentBootstrap(context: AppContext) {
       codexStatusEndpoint: "/api/openai-codex/status",
       codexOAuthStartEndpoint: "/api/openai-codex/oauth/start",
       codexOAuthPollEndpoint: "/api/openai-codex/oauth/poll",
-      note: "OpenAI Codex OAuth is used internally for memory extraction when OPENAI_AUTH_MODE=codex. Embeddings still require OpenAI Platform API-key auth or another embedding provider."
+      note: "When OPENAI_AUTH_MODE=codex, OpenAI Codex OAuth is used internally for memory extraction, normalization, and Codex-backed recall query planning. API-key mode uses OpenAI Platform extraction and vector embeddings."
     },
     scopes: {
       read: "memory:read",

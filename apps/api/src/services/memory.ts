@@ -1,4 +1,10 @@
-import { OpenAICodexMemoryExtractor, OpenAIEmbeddingClient, OpenAIMemoryExtractor, vectorToSql } from "@personal-context-os/ai";
+import {
+  OpenAICodexMemoryExtractor,
+  OpenAICodexMemorySearchPlanner,
+  OpenAIEmbeddingClient,
+  OpenAIMemoryExtractor,
+  vectorToSql
+} from "@personal-context-os/ai";
 import {
   entities,
   entityAliases,
@@ -34,6 +40,7 @@ import type { Actor, AppContext } from "./types.js";
 
 type MemoryRow = Record<string, unknown>;
 const MEMORY_VECTOR_RELEVANCE_THRESHOLD = 0.58;
+type MemoryRecallMode = "hybrid-vector" | "keyword-fallback" | "codex-keyword";
 
 export async function storeMemory(context: AppContext, input: unknown, actor: Actor) {
   const parsed = storeMemorySchema.parse(input);
@@ -193,39 +200,61 @@ export async function recallMemory(context: AppContext, input: unknown) {
   let embedding: number[] | null = null;
   let degraded = false;
   let error: string | null = null;
+  let mode: MemoryRecallMode = "keyword-fallback";
+  let searchQuery = parsed.query;
+  let searchKeywords: string[] = [];
 
-  try {
-    embedding = await createEmbeddingClient(context).embed(parsed.query);
-  } catch (caught) {
-    degraded = true;
-    error = caught instanceof Error ? caught.message : "Embedding generation failed.";
+  if (context.env.OPENAI_AUTH_MODE === "codex") {
+    const plan = await createMemorySearchPlanner(context).plan({ query: parsed.query });
+    searchQuery = plan.searchQuery;
+    searchKeywords = plan.keywords;
+    degraded = plan.degraded;
+    error = plan.error ?? null;
+    mode = plan.degraded ? "keyword-fallback" : "codex-keyword";
+  } else {
+    try {
+      embedding = await createEmbeddingClient(context).embed(parsed.query);
+      mode = "hybrid-vector";
+    } catch (caught) {
+      degraded = true;
+      error = caught instanceof Error ? caught.message : "Embedding generation failed.";
+      mode = "keyword-fallback";
+    }
   }
 
-  const built = buildMemoryRecallSql(context.workspaceId, parsed, embedding);
+  const searchTerms = buildRecallSearchTerms(parsed.query, searchQuery, searchKeywords);
+  const built = buildMemoryRecallSql(context.workspaceId, parsed, embedding, { searchQuery, searchTerms });
   const result = await context.pool.query(built.sql, built.params);
+  const filters: Record<string, unknown> = {
+    kinds: parsed.kinds,
+    projectId: parsed.projectId,
+    entityIds: parsed.entityIds,
+    includeSuperseded: parsed.includeSuperseded,
+    mode,
+    provider: context.env.OPENAI_AUTH_MODE === "codex" ? "codex" : "openai"
+  };
+  if (embedding) filters.minVectorRank = MEMORY_VECTOR_RELEVANCE_THRESHOLD;
+  if (searchQuery !== parsed.query) filters.searchQuery = searchQuery;
+  if (searchKeywords.length) filters.searchKeywords = searchKeywords;
 
   await context.db.insert(retrievalLogs).values({
     workspaceId: context.workspaceId,
     query: parsed.query,
-    filters: {
-      kinds: parsed.kinds,
-      projectId: parsed.projectId,
-      entityIds: parsed.entityIds,
-      includeSuperseded: parsed.includeSuperseded,
-      mode: embedding ? "hybrid-vector" : "keyword-fallback",
-      ...(embedding ? { minVectorRank: MEMORY_VECTOR_RELEVANCE_THRESHOLD } : {})
-    },
+    filters,
     resultCount: result.rowCount ?? 0
   });
 
   return {
     results: result.rows.map(mapRecallRow),
     retrieval: {
-      mode: embedding ? "hybrid-vector" : "keyword-fallback",
+      mode,
+      provider: context.env.OPENAI_AUTH_MODE === "codex" ? "codex" : "openai",
       degraded,
       error,
       count: result.rowCount ?? 0,
-      ...(embedding ? { minVectorRank: MEMORY_VECTOR_RELEVANCE_THRESHOLD } : {})
+      ...(embedding ? { minVectorRank: MEMORY_VECTOR_RELEVANCE_THRESHOLD } : {}),
+      ...(searchQuery !== parsed.query ? { searchQuery } : {}),
+      ...(searchKeywords.length ? { searchKeywords } : {})
     }
   };
 }
@@ -429,7 +458,12 @@ export async function createMemoryRecordFromCandidate(
   return { memory, entity };
 }
 
-export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInput, embedding: number[] | null) {
+export function buildMemoryRecallSql(
+  workspaceId: string,
+  query: RecallMemoryInput,
+  embedding: number[] | null,
+  options: { searchQuery?: string; searchTerms?: string[] } = {}
+) {
   const params: unknown[] = [workspaceId];
   const where = ["mr.workspace_id = $1"];
 
@@ -463,8 +497,11 @@ export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInp
     )`);
   }
 
-  params.push(query.query);
+  params.push(options.searchQuery?.trim() || query.query);
   const qIndex = params.length;
+  const searchTerms = options.searchTerms?.length ? options.searchTerms : [query.query];
+  params.push(searchTerms);
+  const termIndex = params.length;
 
   let vectorIndex: number | null = null;
   if (embedding) {
@@ -473,10 +510,13 @@ export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInp
   } else {
     where.push(`(
       c.fts @@ plainto_tsquery('english', $${qIndex})
-      or e.title ilike '%' || $${qIndex} || '%'
-      or mr.title ilike '%' || $${qIndex} || '%'
-      or mr.body ilike '%' || $${qIndex} || '%'
-      or coalesce(mr.summary, '') ilike '%' || $${qIndex} || '%'
+      or exists (
+        select 1 from unnest($${termIndex}::text[]) as search_term(term)
+        where e.title ilike '%' || search_term.term || '%'
+          or mr.title ilike '%' || search_term.term || '%'
+          or mr.body ilike '%' || search_term.term || '%'
+          or coalesce(mr.summary, '') ilike '%' || search_term.term || '%'
+      )
     )`);
   }
 
@@ -487,11 +527,12 @@ export function buildMemoryRecallSql(workspaceId: string, query: RecallMemoryInp
     : "0";
   const keywordRank = `greatest(
     coalesce(max(ts_rank(c.fts, plainto_tsquery('english', $${qIndex}))), 0),
-    case when bool_or(
-      e.title ilike '%' || $${qIndex} || '%'
-      or mr.title ilike '%' || $${qIndex} || '%'
-      or mr.body ilike '%' || $${qIndex} || '%'
-      or coalesce(mr.summary, '') ilike '%' || $${qIndex} || '%'
+    case when exists (
+      select 1 from unnest($${termIndex}::text[]) as search_term(term)
+      where e.title ilike '%' || search_term.term || '%'
+        or mr.title ilike '%' || search_term.term || '%'
+        or mr.body ilike '%' || search_term.term || '%'
+        or coalesce(mr.summary, '') ilike '%' || search_term.term || '%'
     ) then 0.2 else 0 end
   )`;
   const relevanceGate = vectorIndex
@@ -754,12 +795,39 @@ function createMemoryExtractor(context: AppContext) {
   });
 }
 
+function createMemorySearchPlanner(context: AppContext) {
+  return new OpenAICodexMemorySearchPlanner({
+    tokenProvider: () => resolveOpenAICodexAccessToken(context),
+    apiBaseUrl: context.env.OPENAI_CODEX_BASE_URL,
+    model: context.env.OPENAI_CODEX_RETRIEVAL_MODEL
+  });
+}
+
 function createEmbeddingClient(context: AppContext) {
   return new OpenAIEmbeddingClient({
     apiKey: context.env.OPENAI_API_KEY ?? "",
     apiBaseUrl: context.env.OPENAI_API_BASE_URL,
     model: context.env.OPENAI_EMBEDDING_MODEL
   });
+}
+
+function buildRecallSearchTerms(originalQuery: string, searchQuery: string, keywords: string[]) {
+  const candidates = [originalQuery, searchQuery, ...keywords];
+  const terms: string[] = [];
+  for (const candidate of candidates) {
+    const trimmed = candidate.replace(/\s+/g, " ").trim();
+    if (!trimmed) continue;
+    terms.push(trimmed);
+    for (const part of trimmed.split(/[,\n;|]+/)) {
+      const value = part.trim();
+      if (value.length >= 2) terms.push(value);
+    }
+    for (const part of trimmed.split(/\s+/)) {
+      const value = part.trim();
+      if (value.length >= 2) terms.push(value);
+    }
+  }
+  return Array.from(new Set(terms)).slice(0, 24);
 }
 
 function mapRecallRow(row: MemoryRow) {

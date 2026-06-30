@@ -269,7 +269,7 @@ Pipeline order:
 5. Create canonical and typed entities
 6. Create graph edges
 7. Create chunks
-8. Enqueue embedding and dashboard jobs
+8. Enqueue retrieval-indexing and dashboard jobs
 9. Create review items for low confidence
 
 ## AI Processing Backfill
@@ -277,6 +277,8 @@ Pipeline order:
 Admins can start a one-off AI memory backfill from Settings > Data model > AI processing, or through `POST /api/admin/ai-processing/backfill`. The backfill reads existing `raw_items`, skips captures that already have memory sources or pending memory review, extracts durable memory records with the configured OpenAI mode, dedupes against active memories, and routes low-confidence or degraded output to `review_queue`.
 
 Routine processing is configured through `PATCH /api/admin/ai-processing/schedule`. The worker checks due schedules every minute and queues bounded `memory_backfill` runs. This requires Redis, the worker service, `0010_ai_processing.sql`, and either `OPENAI_AUTH_MODE=codex` with a connected Codex OAuth account or `OPENAI_AUTH_MODE=api_key` with `OPENAI_API_KEY`.
+
+In `api_key` mode, recall uses OpenAI Platform embeddings and pgvector hybrid ranking. In `codex` mode, recall uses Codex OAuth to rewrite recall requests into compact multilingual search plans, then runs the local full-text/substring ranking path without requiring `OPENAI_API_KEY`.
 
 ## Security Model
 

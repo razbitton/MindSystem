@@ -28,6 +28,7 @@ const rawEnvSchema = z.object({
   OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
   OPENAI_CODEX_BASE_URL: z.string().url().default("https://chatgpt.com/backend-api/codex"),
   OPENAI_CODEX_EXTRACTION_MODEL: z.string().default("gpt-5.5"),
+  OPENAI_CODEX_RETRIEVAL_MODEL: z.string().default("gpt-5.5"),
   OPENAI_CODEX_ACCESS_TOKEN: z.string().optional().or(z.literal("")),
   OPENAI_CODEX_REFRESH_TOKEN: z.string().optional().or(z.literal("")),
   OPENAI_CODEX_ACCOUNT_ID: z.string().optional().or(z.literal("")),

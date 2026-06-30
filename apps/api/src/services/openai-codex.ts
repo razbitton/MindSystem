@@ -42,15 +42,23 @@ const tokenResponseSchema = z.object({
 export async function getOpenAICodexStatus(context: AppContext) {
   const connection = await getConnection(context);
   const envToken = resolveEnvOpenAICodexToken(context.env);
+  const connected = Boolean(connection || envToken);
+  const codexActive = context.env.OPENAI_AUTH_MODE === "codex" && connected;
   return {
     configured: hasOpenAICodexConfig(context.env) || Boolean(envToken),
     authMode: context.env.OPENAI_AUTH_MODE,
-    connected: Boolean(connection || envToken),
+    connected,
     source: connection ? "stored_oauth" : envToken ? "env_access_token" : null,
     accountId: connection?.accountId ?? envToken?.accountId ?? null,
     email: connection?.email ?? null,
     chatgptPlanType: connection?.chatgptPlanType ?? null,
-    expiryDate: connection?.expiryDate?.toISOString() ?? envToken?.expiresAt?.toISOString() ?? null
+    expiryDate: connection?.expiryDate?.toISOString() ?? envToken?.expiresAt?.toISOString() ?? null,
+    capabilities: {
+      extraction: codexActive,
+      normalization: codexActive,
+      recallPlanning: codexActive,
+      vectorEmbeddings: context.env.OPENAI_AUTH_MODE === "api_key" && Boolean(context.env.OPENAI_API_KEY)
+    }
   };
 }
 

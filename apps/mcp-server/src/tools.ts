@@ -286,7 +286,7 @@ export const mcpRestTools: RestToolDefinition[] = [
   },
   {
     name: "recall_memory",
-    description: "Recall durable agent memory with hybrid semantic and keyword retrieval. Prefer this over raw search when resolving user intent.",
+    description: "Recall durable agent memory with provider-aware semantic/vector or Codex-planned keyword retrieval. Prefer this over raw search when resolving user intent.",
     requiredScope: "memory:read",
     method: "POST",
     path: "/api/memory/recall",

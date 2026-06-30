@@ -73,7 +73,7 @@ export const agentMemoryPrimaryTools = [
   {
     name: "recall_memory",
     scope: "memory:read",
-    purpose: "Run focused semantic and keyword memory retrieval."
+    purpose: "Run focused provider-aware memory retrieval."
   },
   {
     name: "store_memory",
