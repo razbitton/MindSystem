@@ -26,6 +26,9 @@ type AiProcessingRun = AnyRecord & {
   id: string;
   status: string;
   dryRun: boolean;
+  onlyUnprocessed: boolean;
+  limitCount: number;
+  batchSize: number;
   totalCount: number;
   processedCount: number;
   createdCount: number;
@@ -33,8 +36,27 @@ type AiProcessingRun = AnyRecord & {
   reviewCount: number;
   failedCount: number;
   createdAt: string;
+  startedAt: string | null;
   completedAt: string | null;
   error: string | null;
+  selectionSummary: AiProcessingSelectionSummary | null;
+};
+
+type AiProcessingSelectionSummary = {
+  matchingRawItems?: number;
+  eligibleUnprocessedRawItems?: number;
+  alreadyProcessedRawItems?: number;
+  pendingReviewRawItems?: number;
+  selectedRawItems?: number;
+  limitCount?: number;
+  onlyUnprocessed?: boolean;
+  filters?: {
+    sourceTypes?: string[];
+    rawItemIdCount?: number;
+    since?: string | null;
+    until?: string | null;
+  };
+  reason?: string | null;
 };
 
 type AiProcessingSchedule = AnyRecord & {
@@ -259,8 +281,11 @@ export function AiProcessingPanel() {
                       <span className="text-xs text-muted-foreground">{formatDate(run.createdAt)}</span>
                     </div>
                     {run.error ? <p className="mt-1 truncate text-xs text-destructive">{run.error}</p> : null}
+                    <p className="mt-1 text-xs text-muted-foreground">{describeRunOutcome(run, t)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{describeRunConfig(run, t)}</p>
                   </div>
-                  <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs sm:grid-cols-6">
+                    <RunMetric label={t("aiProcessing.selected")} value={run.totalCount} />
                     <RunMetric label={t("aiProcessing.processed")} value={run.processedCount} />
                     <RunMetric label={t("aiProcessing.created")} value={run.createdCount} />
                     <RunMetric label={t("aiProcessing.updated")} value={run.updatedCount} />
@@ -292,6 +317,63 @@ function boundedNumber(value: string, min: number, max: number, fallback: number
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
+type Translate = ReturnType<typeof useI18n>["t"];
+
+function getSelectionSummary(run: AiProcessingRun) {
+  const summary = run.selectionSummary;
+  if (!summary || typeof summary !== "object") return null;
+  if (!("matchingRawItems" in summary) && !("selectedRawItems" in summary)) return null;
+  return summary;
+}
+
+function describeRunOutcome(run: AiProcessingRun, t: Translate) {
+  const summary = getSelectionSummary(run);
+  if (summary?.matchingRawItems === 0 && (summary.selectedRawItems ?? run.totalCount) === 0) {
+    return t("aiProcessing.zeroNoMatches");
+  }
+  if (
+    summary?.onlyUnprocessed &&
+    (summary.selectedRawItems ?? run.totalCount) === 0 &&
+    (summary.matchingRawItems ?? 0) > 0 &&
+    (summary.eligibleUnprocessedRawItems ?? 0) === 0
+  ) {
+    return t("aiProcessing.zeroOnlyProcessed", {
+      matching: summary.matchingRawItems ?? 0,
+      processed: summary.alreadyProcessedRawItems ?? 0,
+      review: summary.pendingReviewRawItems ?? 0
+    });
+  }
+  if (summary) {
+    return t("aiProcessing.selectedMatching", {
+      selected: summary.selectedRawItems ?? run.totalCount,
+      matching: summary.matchingRawItems ?? run.totalCount,
+      limit: summary.limitCount ?? run.limitCount
+    });
+  }
+  if (run.status === "completed" && run.totalCount === 0) return t("aiProcessing.zeroNoSelected");
+  return t("aiProcessing.selectedNoSummary", { selected: run.totalCount ?? 0, limit: run.limitCount ?? 0 });
+}
+
+function describeRunConfig(run: AiProcessingRun, t: Translate) {
+  const summary = getSelectionSummary(run);
+  const sourceTypes = summary?.filters?.sourceTypes ?? [];
+  const sources = sourceTypes.length ? sourceTypes.join(", ") : t("aiProcessing.allSources");
+  const mode = run.onlyUnprocessed ? t("aiProcessing.onlyUnprocessed") : t("aiProcessing.allMatching");
+  const runtime = formatRunDuration(run.startedAt, run.completedAt);
+  return t("aiProcessing.runConfig", { mode, sources, runtime });
+}
+
+function formatRunDuration(startedAt: string | null, completedAt: string | null) {
+  if (!startedAt || !completedAt) return "-";
+  const milliseconds = new Date(completedAt).getTime() - new Date(startedAt).getTime();
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "-";
+  const seconds = Math.round(milliseconds / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
 }
 
 function statusVariant(status: string): "default" | "success" | "warning" | "destructive" | "muted" | "outline" {

@@ -578,11 +578,21 @@ const englishDictionary = {
   "aiProcessing.noNextRun": "No run scheduled",
   "aiProcessing.recentRuns": "Recent runs",
   "aiProcessing.noRuns": "No AI processing runs yet.",
+  "aiProcessing.selected": "Selected",
   "aiProcessing.processed": "Processed",
   "aiProcessing.created": "Created",
   "aiProcessing.updated": "Updated",
   "aiProcessing.review": "Review",
-  "aiProcessing.failed": "Failed"
+  "aiProcessing.failed": "Failed",
+  "aiProcessing.zeroNoMatches": "No raw items matched this run's filters.",
+  "aiProcessing.zeroOnlyProcessed": "Found {matching} matching raw items, but {processed} were already linked to memory and {review} were pending review.",
+  "aiProcessing.zeroNoSelected": "No raw items were selected for processing.",
+  "aiProcessing.selectedMatching": "Selected {selected} of {matching} matching raw items. Limit {limit}.",
+  "aiProcessing.selectedNoSummary": "Selected {selected} raw items. Limit {limit}.",
+  "aiProcessing.onlyUnprocessed": "Only unprocessed",
+  "aiProcessing.allMatching": "All matching",
+  "aiProcessing.allSources": "All sources",
+  "aiProcessing.runConfig": "{mode}. Sources: {sources}. Runtime: {runtime}."
 } as const;
 
 type TranslationKey = keyof typeof englishDictionary;

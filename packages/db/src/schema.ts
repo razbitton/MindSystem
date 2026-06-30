@@ -464,6 +464,7 @@ export const aiProcessingRuns = pgTable("ai_processing_runs", {
   reviewCount: integer("review_count").notNull().default(0),
   failedCount: integer("failed_count").notNull().default(0),
   error: text("error"),
+  selectionSummary: jsonb("selection_summary").notNull().default({}),
   startedAt: timestamp("started_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   ...timestamps

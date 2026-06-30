@@ -46,6 +46,23 @@ type ProcessingCounts = {
   failed: number;
 };
 
+type SelectionSummary = {
+  matchingRawItems: number;
+  eligibleUnprocessedRawItems: number;
+  alreadyProcessedRawItems: number;
+  pendingReviewRawItems: number;
+  selectedRawItems: number;
+  limitCount: number;
+  onlyUnprocessed: boolean;
+  filters: {
+    sourceTypes: string[];
+    rawItemIdCount: number;
+    since: string | null;
+    until: string | null;
+  };
+  reason: string | null;
+};
+
 export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string) {
   const run = await loadRun(pool, runId);
   if (!run) throw new Error(`AI processing run not found: ${runId}`);
@@ -60,14 +77,11 @@ export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string)
     [run.id]
   );
 
+  const selectionSummary = await summarizeRawItemSelection(pool, run);
   const rawItems = await selectRawItems(pool, run);
-  await pool.query(
-    `update ai_processing_runs
-     set total_count = $2,
-         updated_at = now()
-     where id = $1`,
-    [run.id, rawItems.length]
-  );
+  selectionSummary.selectedRawItems = rawItems.length;
+  selectionSummary.reason = describeSelectionSummary(selectionSummary);
+  await updateRunSelection(pool, run.id, rawItems.length, selectionSummary);
 
   const counts: ProcessingCounts = { processed: 0, skipped: 0, created: 0, updated: 0, review: 0, failed: 0 };
   const extractor = createExtractor(pool, env, run.workspace_id);
@@ -100,7 +114,9 @@ export async function runAiProcessingJob(pool: Pool, env: AppEnv, runId: string)
        where id = $1`,
       [run.id]
     );
-    return { runId: run.id, ...counts };
+    const result = { runId: run.id, totalCount: rawItems.length, ...counts, selectionSummary };
+    console.log(JSON.stringify({ event: "ai_processing_run_completed", ...result }));
+    return result;
   } catch (error) {
     await pool.query(
       `update ai_processing_runs
@@ -189,6 +205,21 @@ async function loadRun(pool: Pool, runId: string) {
 }
 
 async function selectRawItems(pool: Pool, run: AiProcessingRunRow) {
+  const { params, where } = buildRawItemFilters(run, run.only_unprocessed);
+
+  params.push(run.limit_count);
+  const result = await pool.query<RawItemRow>(
+    `select ri.id, ri.workspace_id, ri.source_type::text as source_type, ri.raw_text, ri.created_at
+     from raw_items ri
+     where ${where.join(" and ")}
+     order by ri.created_at asc
+     limit $${params.length}`,
+    params
+  );
+  return result.rows;
+}
+
+function buildRawItemFilters(run: AiProcessingRunRow, requireUnprocessed: boolean) {
   const params: unknown[] = [run.workspace_id];
   const where = ["ri.workspace_id = $1"];
 
@@ -208,7 +239,7 @@ async function selectRawItems(pool: Pool, run: AiProcessingRunRow) {
     params.push(run.until);
     where.push(`ri.received_at <= $${params.length}`);
   }
-  if (run.only_unprocessed) {
+  if (requireUnprocessed) {
     where.push(`not exists (
       select 1
       from memory_sources ms
@@ -223,16 +254,110 @@ async function selectRawItems(pool: Pool, run: AiProcessingRunRow) {
     )`);
   }
 
-  params.push(run.limit_count);
-  const result = await pool.query<RawItemRow>(
-    `select ri.id, ri.workspace_id, ri.source_type::text as source_type, ri.raw_text, ri.created_at
+  return { params, where };
+}
+
+async function summarizeRawItemSelection(pool: Pool, run: AiProcessingRunRow): Promise<SelectionSummary> {
+  const { params, where } = buildRawItemFilters(run, false);
+  const result = await pool.query<{
+    matching_raw_items: number;
+    eligible_unprocessed_raw_items: number;
+    already_processed_raw_items: number;
+    pending_review_raw_items: number;
+  }>(
+    `select
+       count(*)::int as matching_raw_items,
+       count(*) filter (
+         where not exists (
+           select 1
+           from memory_sources ms
+           where ms.raw_item_id = ri.id
+         )
+         and not exists (
+           select 1
+           from review_queue rq
+           where rq.raw_item_id = ri.id
+             and rq.status = 'pending'
+             and rq.suggested_action in ('create_memory_record', 'inspect_raw_item')
+         )
+       )::int as eligible_unprocessed_raw_items,
+       count(*) filter (
+         where exists (
+           select 1
+           from memory_sources ms
+           where ms.raw_item_id = ri.id
+         )
+       )::int as already_processed_raw_items,
+       count(*) filter (
+         where exists (
+           select 1
+           from review_queue rq
+           where rq.raw_item_id = ri.id
+             and rq.status = 'pending'
+             and rq.suggested_action in ('create_memory_record', 'inspect_raw_item')
+         )
+       )::int as pending_review_raw_items
      from raw_items ri
-     where ${where.join(" and ")}
-     order by ri.created_at asc
-     limit $${params.length}`,
+     where ${where.join(" and ")}`,
     params
   );
-  return result.rows;
+  const row = result.rows[0];
+  const matchingRawItems = Number(row?.matching_raw_items ?? 0);
+  const eligibleUnprocessedRawItems = Number(row?.eligible_unprocessed_raw_items ?? 0);
+  const selectedRawItems = Math.min(run.limit_count, run.only_unprocessed ? eligibleUnprocessedRawItems : matchingRawItems);
+
+  const summary: SelectionSummary = {
+    matchingRawItems,
+    eligibleUnprocessedRawItems,
+    alreadyProcessedRawItems: Number(row?.already_processed_raw_items ?? 0),
+    pendingReviewRawItems: Number(row?.pending_review_raw_items ?? 0),
+    selectedRawItems,
+    limitCount: run.limit_count,
+    onlyUnprocessed: run.only_unprocessed,
+    filters: {
+      sourceTypes: run.source_types,
+      rawItemIdCount: run.raw_item_ids.length,
+      since: run.since ? run.since.toISOString() : null,
+      until: run.until ? run.until.toISOString() : null
+    },
+    reason: null
+  };
+  summary.reason = describeSelectionSummary(summary);
+  return summary;
+}
+
+function describeSelectionSummary(summary: SelectionSummary) {
+  if (summary.selectedRawItems > 0) return null;
+  if (summary.matchingRawItems === 0) return "No raw items matched the run filters.";
+  if (summary.onlyUnprocessed && summary.eligibleUnprocessedRawItems === 0) {
+    return "All matching raw items were already linked to memory or already pending review.";
+  }
+  return "No raw items were selected for processing.";
+}
+
+async function updateRunSelection(pool: Pool, runId: string, totalCount: number, selectionSummary: SelectionSummary) {
+  try {
+    await pool.query(
+      `update ai_processing_runs
+       set total_count = $2,
+           selection_summary = $3::jsonb,
+           updated_at = now()
+       where id = $1`,
+      [runId, totalCount, JSON.stringify(selectionSummary)]
+    );
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "42703") {
+      await pool.query(
+        `update ai_processing_runs
+         set total_count = $2,
+             updated_at = now()
+         where id = $1`,
+        [runId, totalCount]
+      );
+      return;
+    }
+    throw error;
+  }
 }
 
 function createExtractor(pool: Pool, env: AppEnv, workspaceId: string) {
