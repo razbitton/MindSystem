@@ -1,5 +1,6 @@
 import {
   agentScopeSchema,
+  aiOperationPolicyPatchSchema,
   buildOpenApiSpec,
   createAgentTokenSchema,
   createDocumentSchema,
@@ -40,7 +41,7 @@ import {
   startAiMemoryBackfill,
   updateAiProcessingSchedule
 } from "./services/ai-processing.js";
-import { listAiActivity } from "./services/ai-operations.js";
+import { getAiOperationPolicySettings, listAiActivity, updateAiOperationPolicy } from "./services/ai-operations.js";
 import { clearAuditEvents, deleteAuditEvent, listAuditEvents } from "./services/audit.js";
 import { startMemoryConsolidation } from "./services/consolidation.js";
 import { getDataInventory, purgeWorkspaceData } from "./services/data-management.js";
@@ -201,6 +202,8 @@ function requiredAgentScopeFor(request: FastifyRequest): AgentScope | null {
   if (route === "/api/memory/link" && method === "POST") return "memory:write";
   if (route === "/api/dashboard/today" && method === "GET") return "memory:read";
   if (route === "/api/ai-activity" && method === "GET") return "memory:read";
+  if (route === "/api/ai-operation-policy" && method === "GET") return "memory:read";
+  if (route === "/api/ai-operation-policy" && method === "PATCH") return "admin";
 
   if (route === "/api/raw-items" && method === "GET") return "memory:read";
   if (route === "/api/raw-items/clear" && method === "POST") return "memory:write";
@@ -546,6 +549,11 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get("/api/dashboard/today", async (request) => getDashboard(requestContext(app, request), request.query));
   app.get("/api/ai-activity", async (request) => listAiActivity(requestContext(app, request)));
+  app.get("/api/ai-operation-policy", async (request) => getAiOperationPolicySettings(requestContext(app, request)));
+  app.patch("/api/ai-operation-policy", async (request) => {
+    const input = aiOperationPolicyPatchSchema.parse(request.body);
+    return updateAiOperationPolicy(requestContext(app, request), input, actorFor(request));
+  });
 
   app.get("/api/google-calendar/status", async (request) => getGoogleCalendarStatus(requestContext(app, request)));
 

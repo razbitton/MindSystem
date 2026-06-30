@@ -1,6 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { agentMemoryBootstrapInstructions } from "./agent-policy.js";
 import {
+  aiOperationPolicyPatchSchema,
   aiProcessingBackfillSchema,
   aiProcessingScheduleSchema,
   createDocumentSchema,
@@ -111,6 +112,17 @@ export function buildOpenApiSpec() {
         get: {
           summary: "List recent automatic AI activity and ignored operations",
           responses: { "200": { description: "AI activity log entries" } }
+        }
+      },
+      "/ai-operation-policy": {
+        get: {
+          summary: "Get the workspace AI operation policy",
+          responses: { "200": { description: "AI operation policy" } }
+        },
+        patch: {
+          summary: "Update the workspace AI operation policy",
+          requestBody: { required: true, content: { "application/json": { schema: json(aiOperationPolicyPatchSchema) } } },
+          responses: { "200": { description: "AI operation policy" } }
         }
       },
       "/memory/{id}": {

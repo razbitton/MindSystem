@@ -217,7 +217,7 @@ async function autoMergeExactDuplicateGroup(
             $4,
             0.95,
             jsonb_build_object('title', $5, 'duplicateMemoryIds', $3),
-            'available'
+            'not_available'
      where exists (select 1 from superseded)`,
     [workspaceId, group.target_memory_id, group.duplicate_memory_ids, group.confidence_score, group.title]
   );
@@ -262,7 +262,7 @@ async function autoPinRepeatedPreference(pool: Pool, workspaceId: string, prefer
             0.9,
             0.9,
             jsonb_build_object('title', $5, 'sourceCount', $4),
-            'available'
+            'not_available'
      where exists (select 1 from pinned)`,
     [
       workspaceId,

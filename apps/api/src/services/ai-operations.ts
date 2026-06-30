@@ -1,5 +1,6 @@
 import { aiActivityLog, aiOperationPolicies } from "@personal-context-os/db";
 import {
+  aiOperationPolicyPatchSchema,
   decideAiOperation,
   getDefaultAiOperationPolicy,
   type AiAutonomyMode,
@@ -9,6 +10,7 @@ import {
   type AiOperationType
 } from "@personal-context-os/shared";
 import { desc, eq } from "drizzle-orm";
+import { writeAuditEvent } from "./audit.js";
 import type { Actor, AppContext } from "./types.js";
 
 type ActivityPayload = Actor & {
@@ -50,6 +52,64 @@ export async function getAiOperationPolicy(context: AppContext): Promise<AiOpera
 
 export async function decideWorkspaceAiOperation(context: AppContext, operation: AiOperationSignal) {
   return decideAiOperation(await getAiOperationPolicy(context), operation);
+}
+
+export async function getAiOperationPolicySettings(context: AppContext) {
+  return { policy: await getAiOperationPolicy(context) };
+}
+
+export async function updateAiOperationPolicy(context: AppContext, input: unknown, actor: Actor) {
+  const parsed = aiOperationPolicyPatchSchema.parse(input ?? {});
+  const defaults = getDefaultAiOperationPolicy(parsed.mode);
+  const nextPolicy: AiOperationPolicy = {
+    mode: parsed.mode,
+    autoApplyMinConfidence: parsed.autoApplyMinConfidence ?? defaults.autoApplyMinConfidence,
+    reviewBelowConfidence: parsed.reviewBelowConfidence ?? defaults.reviewBelowConfidence,
+    requireReviewForDestructive: parsed.requireReviewForDestructive ?? defaults.requireReviewForDestructive,
+    requireReviewForSensitive: parsed.requireReviewForSensitive ?? defaults.requireReviewForSensitive,
+    requireReviewForConflicts: parsed.requireReviewForConflicts ?? defaults.requireReviewForConflicts,
+    requireReviewForBulkChanges: parsed.requireReviewForBulkChanges ?? defaults.requireReviewForBulkChanges,
+    maxAutoApplyBatchSize: parsed.maxAutoApplyBatchSize ?? defaults.maxAutoApplyBatchSize
+  };
+
+  if (nextPolicy.reviewBelowConfidence > nextPolicy.autoApplyMinConfidence) {
+    throw new Error("reviewBelowConfidence must be less than or equal to autoApplyMinConfidence.");
+  }
+  const now = new Date();
+  const values = {
+    workspaceId: context.workspaceId,
+    mode: nextPolicy.mode,
+    autoApplyMinConfidence: String(nextPolicy.autoApplyMinConfidence),
+    reviewBelowConfidence: String(nextPolicy.reviewBelowConfidence),
+    requireReviewForDestructive: nextPolicy.requireReviewForDestructive,
+    requireReviewForSensitive: nextPolicy.requireReviewForSensitive,
+    requireReviewForConflicts: nextPolicy.requireReviewForConflicts,
+    requireReviewForBulkChanges: nextPolicy.requireReviewForBulkChanges,
+    maxAutoApplyBatchSize: nextPolicy.maxAutoApplyBatchSize,
+    updatedAt: now
+  };
+
+  const [policy] = await context.db
+    .insert(aiOperationPolicies)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [aiOperationPolicies.workspaceId],
+      set: values
+    })
+    .returning();
+
+  await writeAuditEvent(context, {
+    ...actor,
+    action: "ai operation policy updated",
+    metadata: {
+      mode: nextPolicy.mode,
+      autoApplyMinConfidence: nextPolicy.autoApplyMinConfidence,
+      reviewBelowConfidence: nextPolicy.reviewBelowConfidence,
+      maxAutoApplyBatchSize: nextPolicy.maxAutoApplyBatchSize
+    }
+  });
+
+  return { policy };
 }
 
 export async function writeAiActivity(context: AppContext, input: ActivityPayload) {

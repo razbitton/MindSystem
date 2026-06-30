@@ -114,7 +114,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`project:${project.title.toLowerCase()}`, entity.id);
       createdEntities.push({ entity, project: typed });
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
-      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "project", project, decision));
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "project", project, decision, input.sourceType));
     }
   }
 
@@ -172,7 +172,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`task:${task.title.toLowerCase()}`, entity.id);
       await linkToProject(context, entity.id, projectId, task.confidence);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
-      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_task", "task", task, decision));
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_task", "task", task, decision, input.sourceType));
     }
   }
 
@@ -213,7 +213,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`note:${note.title.toLowerCase()}`, entity.id);
       await linkToProject(context, entity.id, projectId, note.confidence);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
-      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "note", note, decision));
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "note", note, decision, input.sourceType));
     }
   }
 
@@ -253,7 +253,7 @@ export async function ingestFreeText(context: AppContext, input: IngestFreeTextI
       entityTitleToId.set(`reminder:${reminder.title.toLowerCase()}`, entity.id);
       await linkToProject(context, entity.id, projectId, reminder.confidence);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId: rawItem.id });
-      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "reminder", reminder, decision));
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItem.id, entity.id, "create_memory", "reminder", reminder, decision, input.sourceType));
     }
   }
 
@@ -349,7 +349,7 @@ async function createSimpleEntities(
       createdEntities.push({ entity });
       entityTitleToId.set(`${type}:${item.title.toLowerCase()}`, entity.id);
       await writeAuditEvent(context, { ...actor, action: "create entity", entityId: entity.id, rawItemId });
-      activityEntries.push(await logAppliedIngestItem(context, actor, rawItemId, entity.id, "create_memory", type, item, decision));
+      activityEntries.push(await logAppliedIngestItem(context, actor, rawItemId, entity.id, "create_memory", type, item, decision, input.sourceType));
     }
   }
 }
@@ -486,7 +486,8 @@ async function logAppliedIngestItem(
   operationType: AiOperationType,
   entityType: string,
   item: NormalizedEntityItem,
-  decision: AiOperationDecision
+  decision: AiOperationDecision,
+  sourceType: string
 ) {
   return writeAiActivity(context, {
     ...actor,
@@ -498,9 +499,9 @@ async function logAppliedIngestItem(
     affectedRecords: [{ type: "entity", id: entityId }],
     newValues: { entityType, item },
     confidence: item.confidence,
-    sourceReliability: sourceReliabilityForSourceType("manual"),
+    sourceReliability: sourceReliabilityForSourceType(sourceType),
     input: { entityType, item },
-    undoStatus: "available"
+    undoStatus: "not_available"
   });
 }
 

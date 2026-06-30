@@ -649,7 +649,7 @@ async function applyMemoryExtraction(
         confidence: candidate.confidence,
         sourceReliability,
         input: { candidate },
-        undoStatus: "available"
+        undoStatus: "not_available"
       });
     }
   }

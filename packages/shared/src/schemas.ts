@@ -515,6 +515,22 @@ export const aiProcessingScheduleSchema = z.object({
 });
 export type AiProcessingScheduleInput = z.infer<typeof aiProcessingScheduleSchema>;
 
+export const aiAutonomyModeSchema = z.enum(["conservative", "balanced", "autopilot"]);
+export const aiOperationPolicyPatchSchema = z.object({
+  mode: aiAutonomyModeSchema,
+  autoApplyMinConfidence: z.number().min(0).max(1).optional(),
+  reviewBelowConfidence: z.number().min(0).max(1).optional(),
+  requireReviewForDestructive: z.boolean().optional(),
+  requireReviewForSensitive: z.boolean().optional(),
+  requireReviewForConflicts: z.boolean().optional(),
+  requireReviewForBulkChanges: z.boolean().optional(),
+  maxAutoApplyBatchSize: z.coerce.number().int().positive().max(1000).optional()
+}).refine((value) => value.reviewBelowConfidence === undefined || value.autoApplyMinConfidence === undefined || value.reviewBelowConfidence <= value.autoApplyMinConfidence, {
+  message: "reviewBelowConfidence must be less than or equal to autoApplyMinConfidence.",
+  path: ["reviewBelowConfidence"]
+});
+export type AiOperationPolicyPatchInput = z.infer<typeof aiOperationPolicyPatchSchema>;
+
 export const aiProcessingRunsQuerySchema = z.object({
   status: z.string().trim().optional(),
   limit: z.coerce.number().int().positive().max(100).default(25)
