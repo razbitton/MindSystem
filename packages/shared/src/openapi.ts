@@ -107,6 +107,12 @@ export function buildOpenApiSpec() {
           responses: { "200": { description: "Context markdown, confirmed active context, workspace candidate projects, source quotes, conflicts, stale items, and retrieval trace" } }
         }
       },
+      "/ai-activity": {
+        get: {
+          summary: "List recent automatic AI activity and ignored operations",
+          responses: { "200": { description: "AI activity log entries" } }
+        }
+      },
       "/memory/{id}": {
         get: {
           summary: "Get a memory record with entity and sources",

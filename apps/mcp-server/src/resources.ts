@@ -52,7 +52,7 @@ export const resourceDefinitions: ResourceDefinition[] = [
   exactResource("notes://all", "All notes", "memory:read", "/api/notes"),
   exactResource("documents://all", "All documents", "documents:read", "/api/documents"),
   exactResource("reminders://all", "All reminders", "memory:read", "/api/reminders"),
-  exactResource("review-queue://pending", "Pending review queue", "admin", "/api/review-queue"),
+  exactResource("review-queue://pending", "Pending memory exceptions", "admin", "/api/review-queue"),
   exactResource("audit-events://recent", "Recent audit events", "admin", "/api/audit-events"),
   exactResource("retrieval-logs://recent", "Recent retrieval logs", "admin", "/api/retrieval-logs"),
   exactResource("schema-definitions://all", "Schema definitions", "admin", "/api/schema-definitions"),

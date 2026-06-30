@@ -55,6 +55,13 @@ export const memoryKind = pgEnum("memory_kind", [
 export const memoryStatus = pgEnum("memory_status", ["active", "superseded", "archived"]);
 export const memoryImportance = pgEnum("memory_importance", ["low", "medium", "high", "critical"]);
 export const memoryValidity = pgEnum("memory_validity", ["current", "stale", "disputed", "superseded"]);
+export const aiAutonomyMode = pgEnum("ai_autonomy_mode", ["conservative", "balanced", "autopilot"]);
+export const aiOperationDecision = pgEnum("ai_operation_decision", [
+  "auto_apply",
+  "auto_apply_with_audit",
+  "needs_review",
+  "reject_or_ignore"
+]);
 
 const vector = customType<{
   data: number[];
@@ -506,4 +513,41 @@ export const aiProcessingSchedules = pgTable("ai_processing_schedules", {
 }, (table) => ({
   workspaceIdx: uniqueIndex("ai_processing_schedules_workspace_idx").on(table.workspaceId),
   dueIdx: index("ai_processing_schedules_due_idx").on(table.enabled, table.nextRunAt)
+}));
+
+export const aiOperationPolicies = pgTable("ai_operation_policies", {
+  workspaceId: uuid("workspace_id").primaryKey().references(() => workspaces.id, { onDelete: "cascade" }),
+  mode: aiAutonomyMode("mode").notNull().default("balanced"),
+  autoApplyMinConfidence: numeric("auto_apply_min_confidence", { precision: 4, scale: 3 }).notNull().default("0.82"),
+  reviewBelowConfidence: numeric("review_below_confidence", { precision: 4, scale: 3 }).notNull().default("0.65"),
+  requireReviewForDestructive: boolean("require_review_for_destructive").notNull().default(true),
+  requireReviewForSensitive: boolean("require_review_for_sensitive").notNull().default(true),
+  requireReviewForConflicts: boolean("require_review_for_conflicts").notNull().default(true),
+  requireReviewForBulkChanges: boolean("require_review_for_bulk_changes").notNull().default(true),
+  maxAutoApplyBatchSize: integer("max_auto_apply_batch_size").notNull().default(10),
+  ...timestamps
+});
+
+export const aiActivityLog = pgTable("ai_activity_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  runId: uuid("run_id"),
+  actorType: text("actor_type").notNull(),
+  actorId: text("actor_id"),
+  operationType: text("operation_type").notNull(),
+  decision: aiOperationDecision("decision").notNull(),
+  reason: text("reason").notNull(),
+  rawItemId: uuid("raw_item_id").references(() => rawItems.id, { onDelete: "set null" }),
+  entityId: uuid("entity_id").references(() => entities.id, { onDelete: "set null" }),
+  affectedRecords: jsonb("affected_records").notNull().default([]),
+  previousValues: jsonb("previous_values").notNull().default({}),
+  newValues: jsonb("new_values").notNull().default({}),
+  confidence: numeric("confidence", { precision: 4, scale: 3 }),
+  sourceReliability: numeric("source_reliability", { precision: 4, scale: 3 }),
+  input: jsonb("input").notNull().default({}),
+  undoStatus: text("undo_status").notNull().default("not_available"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  workspaceCreatedIdx: index("ai_activity_log_workspace_created_idx").on(table.workspaceId, table.createdAt),
+  workspaceDecisionIdx: index("ai_activity_log_workspace_decision_idx").on(table.workspaceId, table.decision)
 }));

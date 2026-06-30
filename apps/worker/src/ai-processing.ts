@@ -1,12 +1,19 @@
 import type { AppEnv } from "@personal-context-os/config";
 import { OpenAICodexMemoryExtractor, OpenAIMemoryExtractor, type MemoryExtractionResult } from "@personal-context-os/ai";
-import { findSimilarMemory } from "@personal-context-os/shared";
+import {
+  decideAiOperation,
+  findSimilarMemory,
+  getDefaultAiOperationPolicy,
+  sourceReliabilityDefaults,
+  type AiOperationDecision,
+  type AiOperationType,
+  type AiOperationPolicy
+} from "@personal-context-os/shared";
 import type { Queue } from "bullmq";
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { resolveOpenAICodexAccessTokenForWorkspace } from "./openai-codex-token.js";
 
-const AUTO_APPLY_CONFIDENCE = 0.75;
 const chunkSize = 1800;
 
 type MemoryCandidate = MemoryExtractionResult["candidates"][number];
@@ -65,6 +72,25 @@ type ProcessingCounts = {
 
 type AiProcessingOptions = {
   embeddingQueue?: Queue;
+};
+
+type AiActivityInput = {
+  workspaceId: string;
+  runId?: string | null;
+  actorType: "user" | "agent" | "system";
+  actorId?: string | null;
+  operationType: AiOperationType;
+  decision: AiOperationDecision;
+  reason: string;
+  rawItemId?: string | null;
+  entityId?: string | null;
+  affectedRecords?: unknown[];
+  previousValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
+  confidence?: number | null;
+  sourceReliability?: number | null;
+  input?: Record<string, unknown>;
+  undoStatus?: string;
 };
 
 type SelectionSummary = {
@@ -506,23 +532,74 @@ async function applyMemoryExtraction(
   options: AiProcessingOptions
 ): Promise<ProcessingCounts> {
   const counts: ProcessingCounts = { processed: 0, skipped: 0, created: 0, updated: 0, review: 0, failed: 0 };
+  const policy = await loadAiOperationPolicy(pool, run.workspace_id);
 
   if (!extraction.candidates.length) {
-    counts.review += 1;
     if (!run.dry_run) {
-      await insertReviewItem(pool, run.workspace_id, rawItem.id, "no_memory_candidates", "inspect_raw_item", {
+      await insertAiActivity(pool, {
+        workspaceId: run.workspace_id,
+        runId: run.id,
+        actorType: "system",
+        actorId: run.id,
+        operationType: "inspect_raw_item",
+        decision: "reject_or_ignore",
+        reason: "no_memory_candidates_logged",
         rawItemId: rawItem.id,
-        sourceType: rawItem.source_type
+        confidence: 0,
+        sourceReliability: sourceReliabilityDefaults.backfilled_raw_capture,
+        input: {
+          rawItemId: rawItem.id,
+          sourceType: rawItem.source_type
+        }
       });
     }
+    counts.skipped += 1;
     return counts;
   }
 
   for (const candidate of extraction.candidates) {
-    if (candidate.confidence < AUTO_APPLY_CONFIDENCE) {
+    const conflicts = await findConflictingMemories(pool, run.workspace_id, candidate);
+    const sourceReliability = memoryCandidateSourceReliability(candidate, rawItem.source_type);
+    const decision = decideAiOperation(policy, {
+      operationType: "create_memory",
+      confidence: candidate.confidence,
+      sourceReliability,
+      hasSourceQuote: Boolean(candidate.sourceQuote),
+      userExplicitlyRequested: false,
+      destructive: false,
+      reversible: true,
+      bulkCount: extraction.candidates.length,
+      conflicts,
+      ambiguousTargets: [],
+      sensitiveFlags: sensitiveFlags(candidate),
+      projectResolved: true,
+      possiblyImportant: candidate.importance === "high" || candidate.importance === "critical"
+    });
+
+    if (decision === "reject_or_ignore") {
+      counts.skipped += 1;
+      if (!run.dry_run) {
+        await insertAiActivity(pool, {
+          workspaceId: run.workspace_id,
+          runId: run.id,
+          actorType: "system",
+          actorId: run.id,
+          operationType: "create_memory",
+          decision,
+          reason: candidate.kind === "topic_note" ? "ignored_low_value_topic_note" : "ignored_low_confidence_memory_backfill",
+          rawItemId: rawItem.id,
+          confidence: candidate.confidence,
+          sourceReliability,
+          input: { candidate }
+        });
+      }
+      continue;
+    }
+
+    if (decision === "needs_review") {
       counts.review += 1;
       if (!run.dry_run) {
-        await insertReviewItem(pool, run.workspace_id, rawItem.id, "low_confidence_memory_backfill", "create_memory_record", candidate);
+        await insertReviewItem(pool, run.workspace_id, rawItem.id, memoryReviewReason(candidate, conflicts), "create_memory_record", candidate);
       }
       continue;
     }
@@ -537,9 +614,43 @@ async function applyMemoryExtraction(
     if (existing) {
       await refreshExistingMemory(pool, run.workspace_id, existing, rawItem.id, candidate);
       counts.updated += 1;
+      await insertAiActivity(pool, {
+        workspaceId: run.workspace_id,
+        runId: run.id,
+        actorType: "system",
+        actorId: run.id,
+        operationType: "update_memory",
+        decision,
+        reason: "refreshed_existing_memory_source",
+        rawItemId: rawItem.id,
+        entityId: existing.entity_id,
+        affectedRecords: [{ type: "memory_record", id: existing.id }],
+        previousValues: { confidenceScore: existing.confidence_score },
+        newValues: { confidenceScore: String(Math.max(Number(existing.confidence_score), candidate.confidence)) },
+        confidence: candidate.confidence,
+        sourceReliability,
+        input: { candidate }
+      });
     } else {
-      await createMemoryRecordFromCandidate(pool, run, rawItem.id, candidate, options.embeddingQueue);
+      const created = await createMemoryRecordFromCandidate(pool, run, rawItem.id, candidate, options.embeddingQueue);
       counts.created += 1;
+      await insertAiActivity(pool, {
+        workspaceId: run.workspace_id,
+        runId: run.id,
+        actorType: "system",
+        actorId: run.id,
+        operationType: "create_memory",
+        decision,
+        reason: "auto_applied_memory_backfill",
+        rawItemId: rawItem.id,
+        entityId: created.entityId,
+        affectedRecords: [{ type: "memory_record", id: created.memoryId }, { type: "entity", id: created.entityId }],
+        newValues: created,
+        confidence: candidate.confidence,
+        sourceReliability,
+        input: { candidate },
+        undoStatus: "available"
+      });
     }
   }
 
@@ -573,6 +684,24 @@ async function findDuplicateMemory(pool: Pool, workspaceId: string, candidate: M
   return findSimilarMemory(nearby.rows, candidate);
 }
 
+async function findConflictingMemories(pool: Pool, workspaceId: string, candidate: MemoryCandidate) {
+  if (!["decision", "constraint", "commitment"].includes(candidate.kind)) return [];
+
+  const result = await pool.query<{ id: string; title: string; body: string | null; confidence_score: string }>(
+    `select id, title, body, confidence_score::text
+     from memory_records
+     where workspace_id = $1
+       and kind = $2::memory_kind
+       and status = 'active'
+       and validity = 'current'
+       and title ilike $3
+     limit 5`,
+    [workspaceId, candidate.kind, candidate.title.trim()]
+  );
+
+  return result.rows.filter((memory) => (memory.body ?? "").trim() !== candidate.body.trim());
+}
+
 async function refreshExistingMemory(
   pool: Pool,
   workspaceId: string,
@@ -604,6 +733,7 @@ async function createMemoryRecordFromCandidate(
   const client = await pool.connect();
   let committed = false;
   let entityId: string | null = null;
+  let memoryId: string | null = null;
   try {
     await client.query("begin");
     const projectId = await resolveProjectId(client, run.workspace_id, candidate);
@@ -677,7 +807,7 @@ async function createMemoryRecordFromCandidate(
         JSON.stringify(candidate.customFields)
       ]
     );
-    const memoryId = memoryResult.rows[0]?.id;
+    memoryId = memoryResult.rows[0]?.id ?? null;
     if (!memoryId) throw new Error("Failed to create memory record.");
 
     await createMemorySource(client, run.workspace_id, memoryId, rawItemId, candidate);
@@ -702,6 +832,8 @@ async function createMemoryRecordFromCandidate(
   if (entityId && embeddingQueue) {
     await enqueueEmbeddingJob(embeddingQueue, run.workspace_id, entityId);
   }
+
+  return { entityId, memoryId };
 }
 
 async function resolveProjectId(client: PoolClient, workspaceId: string, candidate: MemoryCandidate) {
@@ -857,6 +989,110 @@ async function insertReviewItem(
      values ($1, $2, $3, $4, $5::jsonb)`,
     [workspaceId, rawItemId, reason, suggestedAction, JSON.stringify(suggestedPayload)]
   );
+}
+
+async function loadAiOperationPolicy(pool: Pool, workspaceId: string): Promise<AiOperationPolicy> {
+  const result = await pool.query<{
+    mode: "conservative" | "balanced" | "autopilot";
+    auto_apply_min_confidence: string;
+    review_below_confidence: string;
+    require_review_for_destructive: boolean;
+    require_review_for_sensitive: boolean;
+    require_review_for_conflicts: boolean;
+    require_review_for_bulk_changes: boolean;
+    max_auto_apply_batch_size: number;
+  }>(
+    `select mode::text,
+            auto_apply_min_confidence::text,
+            review_below_confidence::text,
+            require_review_for_destructive,
+            require_review_for_sensitive,
+            require_review_for_conflicts,
+            require_review_for_bulk_changes,
+            max_auto_apply_batch_size
+     from ai_operation_policies
+     where workspace_id = $1
+     limit 1`,
+    [workspaceId]
+  );
+
+  const policy = result.rows[0];
+  if (!policy) return getDefaultAiOperationPolicy("balanced");
+
+  return {
+    mode: policy.mode,
+    autoApplyMinConfidence: Number(policy.auto_apply_min_confidence),
+    reviewBelowConfidence: Number(policy.review_below_confidence),
+    requireReviewForDestructive: policy.require_review_for_destructive,
+    requireReviewForSensitive: policy.require_review_for_sensitive,
+    requireReviewForConflicts: policy.require_review_for_conflicts,
+    requireReviewForBulkChanges: policy.require_review_for_bulk_changes,
+    maxAutoApplyBatchSize: policy.max_auto_apply_batch_size
+  };
+}
+
+async function insertAiActivity(pool: Pool, input: AiActivityInput) {
+  await pool.query(
+    `insert into ai_activity_log (
+       workspace_id,
+       run_id,
+       actor_type,
+       actor_id,
+       operation_type,
+       decision,
+       reason,
+       raw_item_id,
+       entity_id,
+       affected_records,
+       previous_values,
+       new_values,
+       confidence,
+       source_reliability,
+       input,
+       undo_status
+     )
+     values ($1, $2, $3, $4, $5, $6::ai_operation_decision, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15::jsonb, $16)`,
+    [
+      input.workspaceId,
+      input.runId ?? null,
+      input.actorType,
+      input.actorId ?? null,
+      input.operationType,
+      input.decision,
+      input.reason,
+      input.rawItemId ?? null,
+      input.entityId ?? null,
+      JSON.stringify(input.affectedRecords ?? []),
+      JSON.stringify(input.previousValues ?? {}),
+      JSON.stringify(input.newValues ?? {}),
+      input.confidence === undefined || input.confidence === null ? null : String(input.confidence),
+      input.sourceReliability === undefined || input.sourceReliability === null ? null : String(input.sourceReliability),
+      JSON.stringify(input.input ?? {}),
+      input.undoStatus ?? "not_available"
+    ]
+  );
+}
+
+function memoryCandidateSourceReliability(candidate: MemoryCandidate, sourceType: string) {
+  const explicit = numberField(candidate.customFields, "sourceReliability");
+  if (explicit !== null) return explicit;
+  if (sourceType === "manual") return sourceReliabilityDefaults.manual_note;
+  if (sourceType === "codex" || sourceType === "api") return sourceReliabilityDefaults.direct_user_command;
+  if (sourceType === "web" || sourceType === "openclaw") return sourceReliabilityDefaults.unclear_imported_text;
+  return sourceReliabilityDefaults.backfilled_raw_capture;
+}
+
+function sensitiveFlags(candidate: MemoryCandidate) {
+  const flags = candidate.customFields.sensitiveFlags;
+  if (Array.isArray(flags)) return flags.filter((flag): flag is string => typeof flag === "string");
+  return [];
+}
+
+function memoryReviewReason(candidate: MemoryCandidate, conflicts: unknown[]) {
+  if (conflicts.length > 0) return "memory_conflict";
+  if (sensitiveFlags(candidate).length > 0) return "sensitive_memory_candidate";
+  if (!candidate.sourceQuote) return "missing_source_quote";
+  return "medium_confidence_memory_backfill";
 }
 
 async function enqueueEmbeddingJob(queue: Queue, workspaceId: string, entityId: string) {

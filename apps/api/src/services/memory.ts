@@ -11,6 +11,7 @@ import {
   reviewQueue
 } from "@personal-context-os/db";
 import {
+  sourceReliabilityDefaults,
   findSimilarMemory,
   getRelevantContextSchema,
   linkMemorySchema,
@@ -23,9 +24,9 @@ import {
 } from "@personal-context-os/shared";
 import { and, eq, ilike } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import { decideWorkspaceAiOperation, writeAiActivity } from "./ai-operations.js";
 import { createGenericEntity } from "./entities.js";
 import { findProjectByName } from "./entity-resolution.js";
-import { AUTO_APPLY_CONFIDENCE } from "./ingest-plan.js";
 import { resolveOpenAICodexAccessToken } from "./openai-codex.js";
 import { enqueuePostIngestJobs } from "./queues.js";
 import { writeAuditEvent } from "./audit.js";
@@ -69,6 +70,7 @@ export async function storeMemory(context: AppContext, input: unknown, actor: Ac
   const created: unknown[] = [];
   const updated: unknown[] = [];
   const reviewItems: unknown[] = [];
+  const activityEntries: unknown[] = [];
   const entityIds: string[] = [];
 
   for (const rawCandidate of extraction.candidates) {
@@ -77,15 +79,62 @@ export async function storeMemory(context: AppContext, input: unknown, actor: Ac
       projectId: rawCandidate.projectId ?? parsed.projectId ?? undefined
     });
 
-    if (candidate.confidence < AUTO_APPLY_CONFIDENCE) {
-      reviewItems.push(await createMemoryReviewItem(context, rawItem.id, "low_confidence_memory", candidate));
+    const conflicts = await findConflictingMemories(context, candidate);
+    const sourceReliability = memoryCandidateSourceReliability(candidate, parsed.sourceType);
+    const decision = await decideWorkspaceAiOperation(context, {
+      operationType: "create_memory",
+      confidence: candidate.confidence,
+      sourceReliability,
+      hasSourceQuote: Boolean(candidate.sourceQuote),
+      userExplicitlyRequested: isExplicitMemoryStore(parsed.sourceType, parsed.rawPayload),
+      destructive: false,
+      reversible: true,
+      bulkCount: extraction.candidates.length,
+      conflicts,
+      ambiguousTargets: [],
+      sensitiveFlags: sensitiveFlags(candidate),
+      projectResolved: true,
+      possiblyImportant: candidate.importance === "high" || candidate.importance === "critical"
+    });
+
+    if (decision === "reject_or_ignore") {
+      activityEntries.push(await writeAiActivity(context, {
+        ...actor,
+        operationType: "create_memory",
+        decision,
+        reason: memoryDecisionReason(decision, candidate, conflicts),
+        rawItemId: rawItem.id,
+        confidence: candidate.confidence,
+        sourceReliability,
+        input: { candidate }
+      }));
+      continue;
+    }
+
+    if (decision === "needs_review") {
+      reviewItems.push(await createMemoryReviewItem(context, rawItem.id, memoryDecisionReason(decision, candidate, conflicts), candidate));
       continue;
     }
 
     const existing = await findDuplicateMemory(context, candidate);
     if (existing) {
-      updated.push(await refreshExistingMemory(context, existing, rawItem.id, candidate));
+      const refreshed = await refreshExistingMemory(context, existing, rawItem.id, candidate);
+      updated.push(refreshed);
       entityIds.push(existing.entityId);
+      activityEntries.push(await writeAiActivity(context, {
+        ...actor,
+        operationType: "update_memory",
+        decision,
+        reason: "refreshed_existing_memory_source",
+        rawItemId: rawItem.id,
+        entityId: existing.entityId,
+        affectedRecords: [{ type: "memory_record", id: existing.id }],
+        previousValues: { confidenceScore: existing.confidenceScore, lastSeenAt: existing.lastSeenAt },
+        newValues: { confidenceScore: refreshed?.confidenceScore, lastSeenAt: refreshed?.lastSeenAt },
+        confidence: candidate.confidence,
+        sourceReliability,
+        input: { candidate }
+      }));
       continue;
     }
 
@@ -97,19 +146,34 @@ export async function storeMemory(context: AppContext, input: unknown, actor: Ac
     });
     created.push(memory);
     entityIds.push(memory.entity.id);
+    activityEntries.push(await writeAiActivity(context, {
+      ...actor,
+      operationType: "create_memory",
+      decision,
+      reason: "auto_applied_memory_candidate",
+      rawItemId: rawItem.id,
+      entityId: memory.entity.id,
+      affectedRecords: [{ type: "memory_record", id: memory.memory.id }, { type: "entity", id: memory.entity.id }],
+      newValues: { memory: memory.memory, entity: memory.entity },
+      confidence: candidate.confidence,
+      sourceReliability,
+      input: { candidate },
+      undoStatus: "available"
+    }));
   }
 
   await enqueuePostIngestJobs(context, entityIds);
 
   if (extraction.degraded) {
-    reviewItems.push(await createMemoryReviewItem(context, rawItem.id, "memory_extraction_degraded", {
-      kind: "topic_note",
-      title: "Inspect memory extraction",
-      body: rawText,
-      summary: "Memory extraction degraded; inspect the raw item.",
-      importance: "medium",
+    activityEntries.push(await writeAiActivity(context, {
+      ...actor,
+      operationType: "inspect_raw_item",
+      decision: "reject_or_ignore",
+      reason: "memory_extraction_degraded_logged",
+      rawItemId: rawItem.id,
       confidence: 0.5,
-      customFields: { error: extraction.error ?? "Memory extraction degraded." }
+      sourceReliability: sourceReliabilityDefaults.assistant_generated_summary,
+      input: { error: extraction.error ?? "Memory extraction degraded.", rawText }
     }));
   }
 
@@ -118,6 +182,7 @@ export async function storeMemory(context: AppContext, input: unknown, actor: Ac
     created,
     updated,
     reviewItems,
+    activityEntries,
     degraded: extraction.degraded,
     extractionError: extraction.error ?? null
   };
@@ -537,6 +602,31 @@ async function findDuplicateMemory(context: AppContext, candidate: MemoryCandida
   return findSimilarMemory(nearby, candidate);
 }
 
+async function findConflictingMemories(context: AppContext, candidate: MemoryCandidate) {
+  if (!["decision", "constraint", "commitment"].includes(candidate.kind)) return [];
+
+  const existing = await context.db
+    .select({
+      id: memoryRecords.id,
+      title: memoryRecords.title,
+      body: memoryRecords.body,
+      confidenceScore: memoryRecords.confidenceScore
+    })
+    .from(memoryRecords)
+    .where(
+      and(
+        eq(memoryRecords.workspaceId, context.workspaceId),
+        eq(memoryRecords.kind, candidate.kind),
+        eq(memoryRecords.status, "active"),
+        eq(memoryRecords.validity, "current"),
+        ilike(memoryRecords.title, candidate.title.trim())
+      )
+    )
+    .limit(5);
+
+  return existing.filter((memory) => memory.body.trim() !== candidate.body.trim());
+}
+
 async function getMemoryRecord(context: AppContext, id: string) {
   const [memory] = await context.db
     .select()
@@ -747,4 +837,33 @@ function numberField(record: Record<string, unknown>, key: string) {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function memoryCandidateSourceReliability(candidate: MemoryCandidate, sourceType: string) {
+  const explicit = numberField(candidate.customFields, "sourceReliability");
+  if (explicit !== null) return explicit;
+  if (sourceType === "manual") return sourceReliabilityDefaults.manual_note;
+  if (sourceType === "codex" || sourceType === "api") return sourceReliabilityDefaults.direct_user_command;
+  if (sourceType === "web" || sourceType === "openclaw") return sourceReliabilityDefaults.unclear_imported_text;
+  return sourceReliabilityDefaults.backfilled_raw_capture;
+}
+
+function sensitiveFlags(candidate: MemoryCandidate) {
+  const flags = candidate.customFields.sensitiveFlags;
+  if (Array.isArray(flags)) return flags.filter((flag): flag is string => typeof flag === "string");
+  return [];
+}
+
+function isExplicitMemoryStore(sourceType: string, rawPayload: Record<string, unknown>) {
+  return Boolean(rawPayload.userExplicitlyRequested) || sourceType === "codex" || sourceType === "manual" || sourceType === "api";
+}
+
+function memoryDecisionReason(decision: string, candidate: MemoryCandidate, conflicts: unknown[]) {
+  if (conflicts.length > 0) return "memory_conflict";
+  if (sensitiveFlags(candidate).length > 0) return "sensitive_memory_candidate";
+  if (decision === "reject_or_ignore") {
+    return candidate.kind === "topic_note" ? "ignored_low_value_topic_note" : "ignored_low_confidence_memory";
+  }
+  if (!candidate.sourceQuote) return "missing_source_quote";
+  return "medium_confidence_memory";
 }

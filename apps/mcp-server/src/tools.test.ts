@@ -53,6 +53,7 @@ const expectedScopes: Record<string, AgentScope> = {
   get_project_context: "projects:read",
   project_brief: "projects:read",
   get_daily_dashboard: "memory:read",
+  list_ai_activity: "memory:read",
   get_urgent_tasks: "tasks:read",
   manage_task: "tasks:write",
   link_entities: "memory:write",
