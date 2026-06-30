@@ -24,7 +24,7 @@ export async function createMindSystemOpenAIResponse(
     tools: options.tools ?? []
   });
 
-  if (input.storeTurnDelta !== false) {
+  if (input.storeTurnDelta === true) {
     const delta: TurnDeltaInput = {
       userMessage: input.message,
       assistantMessage: extractOpenAIText(response)

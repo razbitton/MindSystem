@@ -1,5 +1,6 @@
 import type { AppEnv } from "@personal-context-os/config";
 import { OpenAICodexMemoryExtractor, OpenAIMemoryExtractor, type MemoryExtractionResult } from "@personal-context-os/ai";
+import { findSimilarMemory } from "@personal-context-os/shared";
 import type { Queue } from "bullmq";
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
@@ -36,6 +37,9 @@ type MemoryRow = {
   id: string;
   entity_id: string;
   confidence_score: string;
+  title: string;
+  summary: string | null;
+  body: string | null;
 };
 
 type EntitySeedRow = {
@@ -544,7 +548,7 @@ async function applyMemoryExtraction(
 
 async function findDuplicateMemory(pool: Pool, workspaceId: string, candidate: MemoryCandidate) {
   const result = await pool.query<MemoryRow>(
-    `select id, entity_id, confidence_score::text
+    `select id, entity_id, confidence_score::text, title, summary, body
      from memory_records
      where workspace_id = $1
        and kind = $2::memory_kind
@@ -553,7 +557,20 @@ async function findDuplicateMemory(pool: Pool, workspaceId: string, candidate: M
      limit 1`,
     [workspaceId, candidate.kind, candidate.title.trim()]
   );
-  return result.rows[0] ?? null;
+  if (result.rows[0]) return result.rows[0];
+
+  const nearby = await pool.query<MemoryRow>(
+    `select id, entity_id, confidence_score::text, title, summary, body
+     from memory_records
+     where workspace_id = $1
+       and kind = $2::memory_kind
+       and status = 'active'
+       and validity = 'current'
+     order by updated_at desc
+     limit 50`,
+    [workspaceId, candidate.kind]
+  );
+  return findSimilarMemory(nearby.rows, candidate);
 }
 
 async function refreshExistingMemory(

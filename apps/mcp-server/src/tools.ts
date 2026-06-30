@@ -1,6 +1,7 @@
 import type { AgentScope } from "@personal-context-os/shared";
 
 export type ToolHttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type ToolTier = "default" | "advanced" | "admin";
 
 export interface ToolDefinition {
   name: string;
@@ -10,7 +11,7 @@ export interface ToolDefinition {
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
   annotations?: Record<string, unknown>;
-  tier?: "default" | "advanced" | "admin";
+  tier?: ToolTier;
 }
 
 export interface RestToolDefinition extends ToolDefinition {
@@ -183,6 +184,7 @@ const memoryCandidateProperties = {
 const contextOutputSchema = objectSchema({
   contextMarkdown: { type: "string" },
   activeProjects: { type: "array", items: { type: "object" } },
+  workspaceCandidateProjects: { type: "array", items: { type: "object" } },
   userPreferences: { type: "array", items: { type: "object" } },
   relevantMemories: { type: "array", items: { type: "object" } },
   decisions: { type: "array", items: { type: "object" } },
@@ -300,7 +302,7 @@ export const mcpRestTools: RestToolDefinition[] = [
     }, ["message"]),
     outputSchema: contextOutputSchema,
     annotations: { readOnlyHint: true },
-    tier: "default"
+    tier: "advanced"
   },
   {
     name: "store_memory",
@@ -704,7 +706,7 @@ export const mcpRestTools: RestToolDefinition[] = [
     path: projectContextPath,
     inputSchema: objectSchema({ projectId: { type: "string" } }, ["projectId"]),
     annotations: { readOnlyHint: true },
-    tier: "default"
+    tier: "advanced"
   },
   {
     name: "project_brief",
@@ -1098,6 +1100,23 @@ export const toolDefinitions: ToolDefinition[] = [...mcpRestTools, ...directTool
 
 export function getToolDefinition(name: string) {
   return toolDefinitions.find((tool) => tool.name === name);
+}
+
+export function listToolDefinitionsForTier(tier: ToolTier = "default") {
+  const visible = toolDefinitions.filter((tool) => toolIsVisibleForTier(tool, tier));
+  return visible.map(({ requiredScope, ...tool }) => tool);
+}
+
+function toolIsVisibleForTier(tool: ToolDefinition, tier: ToolTier) {
+  const toolTier = resolveToolTier(tool);
+  if (tier === "admin") return true;
+  if (tier === "advanced") return toolTier === "default" || toolTier === "advanced";
+  return toolTier === "default";
+}
+
+function resolveToolTier(tool: ToolDefinition): ToolTier {
+  if (tool.tier) return tool.tier;
+  return tool.requiredScope === "admin" ? "admin" : "advanced";
 }
 
 export function getRestToolDefinition(name: string) {

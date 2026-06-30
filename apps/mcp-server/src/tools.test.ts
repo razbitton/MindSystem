@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentScope } from "@personal-context-os/shared";
 import { requireToolScope } from "./auth.js";
-import { getToolDefinition, toolDefinitions } from "./tools.js";
+import { getToolDefinition, listToolDefinitionsForTier, toolDefinitions } from "./tools.js";
 
 const expectedScopes: Record<string, AgentScope> = {
   prepare_turn_context: "memory:read",
@@ -154,5 +154,30 @@ describe("MCP tool definitions", () => {
     for (const name of forbiddenNames) {
       expect(names).not.toContain(name);
     }
+  });
+
+  it("keeps the default discovery surface small and agent-oriented", () => {
+    const names = listToolDefinitionsForTier("default").map((tool) => tool.name);
+
+    expect(names).toEqual([
+      "prepare_turn_context",
+      "recall_memory",
+      "store_memory",
+      "remember",
+      "supersede_memory",
+      "update_memory",
+      "link_memory",
+      "project_brief",
+      "manage_task"
+    ]);
+  });
+
+  it("hides compatibility, CRUD, and admin tools from default discovery", () => {
+    const names = listToolDefinitionsForTier("default").map((tool) => tool.name);
+
+    expect(names).not.toContain("get_relevant_context");
+    expect(names).not.toContain("get_project_context");
+    expect(names).not.toContain("list_projects");
+    expect(names).not.toContain("purge_workspace_data");
   });
 });

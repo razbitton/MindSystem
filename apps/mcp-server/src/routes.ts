@@ -7,7 +7,7 @@ import { authenticateAgent, requireToolScope, type AgentIdentity } from "./auth.
 import { executeTool, readResource, type McpExecutionRuntime } from "./execution.js";
 import { isAcceptedClientNotification, type JsonRpcEnvelope } from "./protocol.js";
 import { agentBootstrapText, getResourceDefinition, listedResources } from "./resources.js";
-import { getToolDefinition, toolDefinitions } from "./tools.js";
+import { getToolDefinition, listToolDefinitionsForTier, type ToolTier } from "./tools.js";
 
 export interface McpRouteOptions {
   db: DbClient;
@@ -60,7 +60,13 @@ async function handleJsonRpc(
   }
 
   if (method === "tools/list") {
-    return { tools: toolDefinitions.map(({ requiredScope, ...tool }) => tool) };
+    const tier = parseToolTier(params.tier);
+    if (tier === "admin") {
+      if (!bearerToken) throw new Error("Agent token required to list admin tools");
+      const agent = await authenticateAgent(db, bearerToken);
+      requireToolScope(agent.scopes, "admin");
+    }
+    return { tools: listToolDefinitionsForTier(tier) };
   }
 
   if (method === "resources/list") {
@@ -209,6 +215,10 @@ function extractToken(headers: IncomingHttpHeaders) {
   if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length).trim();
   const token = headers["x-agent-token"];
   return Array.isArray(token) ? token[0] ?? null : token ?? null;
+}
+
+function parseToolTier(value: unknown): ToolTier {
+  return value === "advanced" || value === "admin" ? value : "default";
 }
 
 function summarizeResult(result: unknown) {

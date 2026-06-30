@@ -1,3 +1,4 @@
+import { findSimilarMemory } from "@personal-context-os/shared";
 import type { Pool } from "pg";
 
 type ConsolidationJobInput = {
@@ -31,7 +32,7 @@ export async function runMemoryConsolidationJob(pool: Pool, input: Consolidation
       memoryId: group.target_memory_id,
       targetMemoryId: group.target_memory_id,
       duplicateMemoryIds: group.duplicate_memory_ids,
-      customFields: { consolidationReason: "duplicate_title_kind" }
+      customFields: { consolidationReason: "duplicate_title_or_semantic_similarity" }
     };
     counts.reviewItems += await insertReviewItem(pool, input.workspaceId, "duplicate_memory_candidate", "merge_memory_records", payload, group.target_memory_id);
   }
@@ -58,6 +59,32 @@ export async function runMemoryConsolidationJob(pool: Pool, input: Consolidation
 
 async function findDuplicateGroups(pool: Pool, input: ConsolidationJobInput) {
   const result = await pool.query<{
+    id: string;
+    kind: string;
+    title: string;
+    body: string;
+    summary: string | null;
+    importance: string;
+    confidence_score: string;
+  }>(
+    `select mr.id,
+            mr.kind::text,
+            mr.title,
+            mr.body,
+            mr.summary,
+            mr.importance::text,
+            mr.confidence_score::text
+     from memory_records mr
+     where mr.workspace_id = $1
+       and mr.status = 'active'
+       and mr.validity = 'current'
+     order by mr.updated_at desc
+     limit $2`,
+    [input.workspaceId, Math.min(input.limit * 10, 1000)]
+  );
+  const rows = result.rows;
+  const used = new Set<string>();
+  const groups: Array<{
     kind: string;
     title: string;
     body: string;
@@ -66,34 +93,32 @@ async function findDuplicateGroups(pool: Pool, input: ConsolidationJobInput) {
     confidence_score: string;
     target_memory_id: string;
     duplicate_memory_ids: string[];
-  }>(
-    `with grouped as (
-       select kind::text,
-              lower(trim(title)) as normalized_title,
-              min(id::text)::uuid as target_memory_id,
-              array_agg(id order by updated_at desc) as memory_ids,
-              count(*)::int as count
-       from memory_records
-       where workspace_id = $1
-         and status = 'active'
-         and validity = 'current'
-       group by kind, lower(trim(title))
-       having count(*) > 1
-       limit $2
-     )
-     select mr.kind::text,
-            mr.title,
-            mr.body,
-            mr.summary,
-            mr.importance::text,
-            mr.confidence_score::text,
-            g.target_memory_id,
-            array_remove(g.memory_ids, g.target_memory_id) as duplicate_memory_ids
-     from grouped g
-     join memory_records mr on mr.id = g.target_memory_id`,
-    [input.workspaceId, input.limit]
-  );
-  return result.rows;
+  }> = [];
+
+  for (const row of rows) {
+    if (used.has(row.id)) continue;
+    const duplicateIds = rows
+      .filter((candidate) => candidate.id !== row.id && !used.has(candidate.id) && candidate.kind === row.kind)
+      .filter((candidate) => findSimilarMemory([row], candidate))
+      .map((candidate) => candidate.id);
+
+    if (!duplicateIds.length) continue;
+    groups.push({
+      kind: row.kind,
+      title: row.title,
+      body: row.body,
+      summary: row.summary,
+      importance: row.importance,
+      confidence_score: row.confidence_score,
+      target_memory_id: row.id,
+      duplicate_memory_ids: duplicateIds
+    });
+    used.add(row.id);
+    for (const id of duplicateIds) used.add(id);
+    if (groups.length >= input.limit) break;
+  }
+
+  return groups;
 }
 
 async function findStaleMemories(pool: Pool, input: ConsolidationJobInput) {

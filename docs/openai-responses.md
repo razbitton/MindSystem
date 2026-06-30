@@ -20,12 +20,16 @@ const response = await openai.responses.create({
   input: message,
   tools: highSignalTools
 });
+```
 
-await mind.storeTurnDelta({
-  conversationId,
-  userMessage: message,
-  assistantMessage: response.output_text,
-  projectId: activeProjectId
+Do not store raw assistant output by default. If the turn produces a durable user-confirmed fact, store that filtered fact explicitly:
+
+```ts
+await mind.remember({
+  text: "Decision: keep the beta invite-only until onboarding is stable.",
+  projectId: activeProjectId,
+  sourceType: "api",
+  rawPayload: { conversationId }
 });
 ```
 

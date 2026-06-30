@@ -103,7 +103,7 @@ export function buildOpenApiSpec() {
         post: {
           summary: "Prepare deterministic model-ready context for an agent turn",
           requestBody: { required: true, content: { "application/json": { schema: json(prepareTurnContextSchema) } } },
-          responses: { "200": { description: "Context markdown, structured context fields, source quotes, conflicts, stale items, and retrieval trace" } }
+          responses: { "200": { description: "Context markdown, confirmed active context, workspace candidate projects, source quotes, conflicts, stale items, and retrieval trace" } }
         }
       },
       "/memory/{id}": {

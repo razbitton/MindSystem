@@ -80,17 +80,25 @@ export async function mergeReviewItem(context: AppContext, id: string, input: un
   const parsed = reviewMergeSchema.parse(input ?? {});
   const payload = (parsed.editedPayload ?? item.suggestedPayload) as Record<string, unknown>;
   const candidate = memoryCandidateSchema.parse(payload);
+  const [targetMemory] = await context.db
+    .select()
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.workspaceId, context.workspaceId), eq(memoryRecords.id, parsed.targetMemoryId)))
+    .limit(1);
+  if (!targetMemory) throw new Error("Target memory not found");
+
+  const mergedReviewItemIds = uniqueStrings([
+    ...arrayOfStrings(recordObject(targetMemory.customFields).mergedReviewItemIds),
+    id
+  ]);
   const [target] = await context.db
     .update(memoryRecords)
     .set({
       lastSeenAt: new Date(),
       lastVerifiedAt: new Date(),
       validity: "current",
-      confidenceScore: String(Math.max(candidate.confidence, 0.8)),
-      customFields: mergeObjects(targetCustomFields(payload), {
-        mergedReviewItemIds: [id],
-        lastMergeReason: item.reason
-      }),
+      confidenceScore: String(mergeReviewConfidence(targetMemory.confidenceScore, candidate.confidence)),
+      customFields: buildReviewMergeCustomFields(targetMemory.customFields, targetCustomFields(payload), mergedReviewItemIds, item.reason),
       updatedAt: new Date()
     })
     .where(and(eq(memoryRecords.workspaceId, context.workspaceId), eq(memoryRecords.id, parsed.targetMemoryId)))
@@ -170,11 +178,18 @@ export async function pinReviewPreference(context: AppContext, id: string, actor
     ?? stringOrUndefined((item.suggestedPayload as Record<string, unknown>).memoryId);
   if (!targetMemoryId) throw new Error("Review item does not identify a target memory.");
 
+  const [targetMemory] = await context.db
+    .select()
+    .from(memoryRecords)
+    .where(and(eq(memoryRecords.workspaceId, context.workspaceId), eq(memoryRecords.id, targetMemoryId), eq(memoryRecords.kind, "preference")))
+    .limit(1);
+  if (!targetMemory) throw new Error("Target preference memory not found");
+
   const [memory] = await context.db
     .update(memoryRecords)
     .set({
       importance: "high",
-      customFields: { pinned: true, pinnedFromReviewItemId: id },
+      customFields: buildPinnedPreferenceCustomFields(targetMemory.customFields, id),
       lastVerifiedAt: new Date(),
       validity: "current",
       updatedAt: new Date()
@@ -254,6 +269,41 @@ function targetCustomFields(payload: Record<string, unknown>) {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function mergeObjects(left: Record<string, unknown>, right: Record<string, unknown>) {
-  return { ...left, ...right };
+export function mergeReviewConfidence(existingConfidence: string | number | null | undefined, candidateConfidence: number) {
+  return Math.max(Number(existingConfidence) || 0, candidateConfidence, 0.8);
+}
+
+export function buildReviewMergeCustomFields(
+  existingCustomFields: unknown,
+  candidateCustomFields: Record<string, unknown>,
+  mergedReviewItemIds: string[],
+  reason: string
+) {
+  return mergeObjects(recordObject(existingCustomFields), candidateCustomFields, {
+    mergedReviewItemIds,
+    lastMergeReason: reason
+  });
+}
+
+export function buildPinnedPreferenceCustomFields(existingCustomFields: unknown, reviewItemId: string) {
+  return mergeObjects(recordObject(existingCustomFields), {
+    pinned: true,
+    pinnedFromReviewItemId: reviewItemId
+  });
+}
+
+function recordObject(value: unknown) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function arrayOfStrings(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values)];
+}
+
+function mergeObjects(...objects: Record<string, unknown>[]) {
+  return Object.assign({}, ...objects);
 }

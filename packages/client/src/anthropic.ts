@@ -26,7 +26,7 @@ export async function createMindSystemAnthropicMessage(
     tools: options.tools ?? []
   });
 
-  if (input.storeTurnDelta !== false) {
+  if (input.storeTurnDelta === true) {
     const delta: TurnDeltaInput = {
       userMessage: input.message,
       assistantMessage: extractAnthropicText(response)

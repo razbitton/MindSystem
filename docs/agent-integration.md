@@ -6,8 +6,8 @@ MindSystem should sit before the model call, not only behind optional tools.
 
 1. Call `POST /api/context/turn` with the current message, recent messages, active project, and token budget.
 2. Insert `contextMarkdown` into the model system/developer context.
-3. Expose only high-level tools by default: `prepare_turn_context`, `remember`, `update_memory`, `project_brief`, and `manage_task`.
-4. After the turn, call `storeTurnDelta` or `POST /api/memory/store` only for durable new facts, decisions, preferences, constraints, commitments, project updates, people, notes, or open questions.
+3. Expose only high-level tools by default: `prepare_turn_context`, `recall_memory`, `store_memory` / `remember`, `supersede_memory` / `update_memory`, `link_memory`, `project_brief`, and `manage_task`.
+4. After the turn, call `POST /api/memory/store` only for durable user-confirmed facts, decisions, preferences, constraints, commitments, project updates, people, notes, or open questions. SDK `storeTurnDelta` is opt-in and should not be used for raw assistant output unless a separate durable-fact extraction step has already filtered it.
 
 ## Least Privilege
 

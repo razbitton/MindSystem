@@ -23,14 +23,15 @@ export async function prepareTurnContext(context: AppContext, input: unknown) {
   const relevantMemories = fitToTokenBudget(recalled.results, Math.floor(parsed.maxTokens * 0.55));
   const memoryProjectIds = uniqueStrings(relevantMemories.map((item) => stringValue(item, "projectId")));
   const projectIds = uniqueStrings([parsed.activeProjectId ?? null, ...memoryProjectIds]);
-  const activeProjects = await loadProjects(context, projectIds);
+  const activeProjects = projectIds.length > 0 ? await loadProjectsByIds(context, projectIds) : [];
+  const workspaceCandidateProjects = projectIds.length > 0 ? [] : await loadRecentProjects(context);
   const inferredProjectIds = activeProjects.map((project) => project.id);
-  const openTasks = await loadOpenTasks(context, inferredProjectIds);
-  const reminders = await loadUpcomingReminders(context, inferredProjectIds);
+  const openTasks = inferredProjectIds.length ? await loadOpenTasks(context, inferredProjectIds) : [];
+  const reminders = inferredProjectIds.length ? await loadUpcomingReminders(context, inferredProjectIds) : [];
   const staleItems = relevantMemories.filter(isStaleMemory);
   const conflicts = relevantMemories.filter((item) => stringValue(item, "validity") === "disputed");
   const sourceQuotes = buildSourceQuotes(relevantMemories);
-  const noReliableContext = relevantMemories.length === 0 && activeProjects.length === 0 && openTasks.length === 0;
+  const noReliableContext = relevantMemories.length === 0 && activeProjects.length === 0 && openTasks.length === 0 && reminders.length === 0;
   const recommendedToolUse = buildRecommendedToolUse(parsed, {
     noReliableContext,
     staleItems,
@@ -42,6 +43,7 @@ export async function prepareTurnContext(context: AppContext, input: unknown) {
       parsed,
       noReliableContext,
       activeProjects,
+      workspaceCandidateProjects,
       relevantMemories,
       decisions: relevantMemories.filter((item) => item.kind === "decision"),
       userPreferences: relevantMemories.filter((item) => item.kind === "preference"),
@@ -55,6 +57,7 @@ export async function prepareTurnContext(context: AppContext, input: unknown) {
       recommendedToolUse
     }),
     activeProjects,
+    workspaceCandidateProjects,
     userPreferences: relevantMemories.filter((item) => item.kind === "preference"),
     relevantMemories,
     decisions: relevantMemories.filter((item) => item.kind === "decision"),
@@ -74,6 +77,7 @@ export async function prepareTurnContext(context: AppContext, input: unknown) {
       resultCount: recalled.retrieval.count,
       keptMemoryCount: relevantMemories.length,
       activeProjectId: parsed.activeProjectId ?? null,
+      workspaceCandidateProjectCount: workspaceCandidateProjects.length,
       activeEntityIds: parsed.activeEntityIds,
       client: parsed.client,
       maxTokens: parsed.maxTokens,
@@ -91,6 +95,7 @@ export async function prepareTurnContext(context: AppContext, input: unknown) {
       client: parsed.client,
       maxTokens: parsed.maxTokens,
       noReliableContext,
+      workspaceCandidateProjectCount: workspaceCandidateProjects.length,
       recalledMode: recalled.retrieval.mode
     },
     resultCount: relevantMemories.length
@@ -129,6 +134,7 @@ export async function getRelevantContext(context: AppContext, input: unknown) {
     openQuestions: broker.openQuestions,
     sources: broker.sourceQuotes,
     activeProjects: broker.activeProjects,
+    workspaceCandidateProjects: broker.workspaceCandidateProjects,
     reminders: broker.reminders,
     conflicts: broker.conflicts,
     staleItems: broker.staleItems,
@@ -141,16 +147,16 @@ function buildTurnQuery(input: PrepareTurnContextInput) {
   return [input.message, ...input.recentMessages.slice(-5)].join("\n");
 }
 
-async function loadProjects(context: AppContext, projectIds: string[]) {
-  if (projectIds.length > 0) {
-    return context.db
-      .select()
-      .from(projects)
-      .where(and(eq(projects.workspaceId, context.workspaceId), inArray(projects.id, projectIds)))
-      .orderBy(desc(projects.updatedAt))
-      .limit(8);
-  }
+async function loadProjectsByIds(context: AppContext, projectIds: string[]) {
+  return context.db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.workspaceId, context.workspaceId), inArray(projects.id, projectIds)))
+    .orderBy(desc(projects.updatedAt))
+    .limit(8);
+}
 
+async function loadRecentProjects(context: AppContext) {
   return context.db
     .select()
     .from(projects)
@@ -205,6 +211,7 @@ function buildContextMarkdown(input: {
   parsed: PrepareTurnContextInput;
   noReliableContext: boolean;
   activeProjects: BrokerRecord[];
+  workspaceCandidateProjects: BrokerRecord[];
   relevantMemories: BrokerRecord[];
   decisions: BrokerRecord[];
   userPreferences: BrokerRecord[];
@@ -232,6 +239,10 @@ function buildContextMarkdown(input: {
     "",
     "## Active Project",
     ...bullets(input.activeProjects, projectLine, "No active project was inferred."),
+    "",
+    "## Workspace Candidates",
+    input.workspaceCandidateProjects.length ? "These are recent projects, not confirmed relevant." : null,
+    ...bullets(input.workspaceCandidateProjects, projectLine, "No recent project candidates loaded."),
     "",
     "## Current Relevant Facts",
     ...bullets(input.relevantMemories.filter((item) => !["decision", "preference", "constraint", "open_question"].includes(String(item.kind))), memoryLine, "No directly relevant facts found."),

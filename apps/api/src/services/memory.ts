@@ -11,6 +11,7 @@ import {
   reviewQueue
 } from "@personal-context-os/db";
 import {
+  findSimilarMemory,
   getRelevantContextSchema,
   linkMemorySchema,
   memoryCandidateSchema,
@@ -533,7 +534,7 @@ async function findDuplicateMemory(context: AppContext, candidate: MemoryCandida
     )
     .limit(50);
 
-  return nearby.find((memory) => memorySimilarity(memory, candidate) >= 0.72) ?? null;
+  return findSimilarMemory(nearby, candidate);
 }
 
 async function getMemoryRecord(context: AppContext, id: string) {
@@ -746,19 +747,4 @@ function numberField(record: Record<string, unknown>, key: string) {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
-}
-
-function memorySimilarity(memory: typeof memoryRecords.$inferSelect, candidate: MemoryCandidate) {
-  const left = tokenSet([memory.title, memory.summary, memory.body].filter(Boolean).join(" "));
-  const right = tokenSet([candidate.title, candidate.summary, candidate.body].filter(Boolean).join(" "));
-  if (left.size === 0 || right.size === 0) return 0;
-  let intersection = 0;
-  for (const token of left) {
-    if (right.has(token)) intersection += 1;
-  }
-  return intersection / Math.max(left.size, right.size);
-}
-
-function tokenSet(value: string) {
-  return new Set(value.toLowerCase().split(/[^a-z0-9\u0590-\u05ff]+/i).filter((token) => token.length > 2));
 }
