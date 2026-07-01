@@ -36,6 +36,7 @@ describe("OpenAICodexNormalizer", () => {
 
     const result = await normalizer.normalize({ text: "Preference: write summaries in Hebrew" });
 
+    expect(calls[0]?.body.stream).toBe(true);
     expect(Array.isArray(calls[0]?.body.input)).toBe(true);
     expect(calls[0]?.body.input).toEqual([
       expect.objectContaining({

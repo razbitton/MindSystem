@@ -1,4 +1,5 @@
 import { memoryCandidateSchema, type MemoryCandidate } from "@personal-context-os/shared";
+import { codexInputMessage, readCodexResponseText, resolveCodexResponsesUrl } from "./codex-responses.js";
 
 export interface MemoryExtractionResult {
   candidates: MemoryCandidate[];
@@ -168,7 +169,7 @@ export class OpenAICodexMemoryExtractor implements MemoryExtractor {
         body: JSON.stringify({
           model: this.model,
           store: false,
-          stream: false,
+          stream: true,
           instructions: memoryExtractionInstructions(),
           input: codexInputMessage({
             now: (input.now ?? new Date()).toISOString(),
@@ -190,8 +191,7 @@ export class OpenAICodexMemoryExtractor implements MemoryExtractor {
         throw new Error(`OpenAI Codex extraction failed: ${response.status} ${await response.text()}`);
       }
 
-      const json = (await response.json()) as Record<string, unknown>;
-      const content = extractResponseText(json);
+      const content = await readCodexResponseText(response);
       if (!content) throw new Error("OpenAI Codex extraction returned no content.");
       const parsed = JSON.parse(stripJsonCodeFence(content)) as { candidates?: unknown[] };
       return {
@@ -293,21 +293,6 @@ function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
-function resolveCodexResponsesUrl(baseUrl: string) {
-  const normalized = baseUrl.replace(/\/+$/, "");
-  if (normalized.endsWith("/codex/responses")) return normalized;
-  if (normalized.endsWith("/codex")) return `${normalized}/responses`;
-  return `${normalized}/codex/responses`;
-}
-
-function codexInputMessage(payload: unknown) {
-  return [{
-    type: "message",
-    role: "user",
-    content: [{ type: "input_text", text: JSON.stringify(payload) }]
-  }];
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -330,28 +315,6 @@ function memoryExtractionInstructions() {
     "Input: 'maybe later' -> no candidates.",
     "Return only JSON that matches the requested schema."
   ].join(" ");
-}
-
-function extractResponseText(json: Record<string, unknown>) {
-  if (typeof json.output_text === "string") return json.output_text;
-
-  const output = Array.isArray(json.output) ? json.output : [];
-  const parts: string[] = [];
-  for (const item of output) {
-    if (!isRecord(item)) continue;
-    const content = Array.isArray(item.content) ? item.content : [];
-    for (const contentItem of content) {
-      if (!isRecord(contentItem)) continue;
-      const text = contentItem.text;
-      if (typeof text === "string") parts.push(text);
-    }
-  }
-  if (parts.length) return parts.join("\n");
-
-  const choices = Array.isArray(json.choices) ? json.choices : [];
-  const first = choices.find(isRecord);
-  const message = first && isRecord(first.message) ? first.message : null;
-  return typeof message?.content === "string" ? message.content : "";
 }
 
 function stripJsonCodeFence(value: string) {

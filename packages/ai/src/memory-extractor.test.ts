@@ -98,6 +98,7 @@ describe("memory extractors", () => {
     expect(calls[0]?.url).toBe("https://chatgpt.com/backend-api/codex/responses");
     expect(calls[0]?.headers.authorization).toBe("Bearer codex-access");
     expect(calls[0]?.headers["chatgpt-account-id"]).toBe("acct_123");
+    expect(calls[0]?.body.stream).toBe(true);
     expect(Array.isArray(calls[0]?.body.input)).toBe(true);
     expect(calls[0]?.body.input).toEqual([
       expect.objectContaining({

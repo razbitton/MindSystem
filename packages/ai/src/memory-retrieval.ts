@@ -1,4 +1,5 @@
 import type { OpenAICodexToken } from "./memory-extractor.js";
+import { codexInputMessage, readCodexResponseText, resolveCodexResponsesUrl } from "./codex-responses.js";
 
 export interface MemorySearchPlan {
   searchQuery: string;
@@ -53,7 +54,7 @@ export class OpenAICodexMemorySearchPlanner implements MemorySearchPlanner {
         body: JSON.stringify({
           model: this.model,
           store: false,
-          stream: false,
+          stream: true,
           instructions: memorySearchPlanningInstructions(),
           input: codexInputMessage({
             now: (input.now ?? new Date()).toISOString(),
@@ -74,8 +75,7 @@ export class OpenAICodexMemorySearchPlanner implements MemorySearchPlanner {
         throw new Error(`OpenAI Codex memory search planning failed: ${response.status} ${await response.text()}`);
       }
 
-      const json = (await response.json()) as Record<string, unknown>;
-      const content = extractResponseText(json);
+      const content = await readCodexResponseText(response);
       if (!content) throw new Error("OpenAI Codex memory search planning returned no content.");
       const parsed = parseSearchPlan(JSON.parse(stripJsonCodeFence(content)), input.query);
       return {
@@ -151,42 +151,6 @@ function memorySearchPlanJsonSchema() {
       }
     }
   };
-}
-
-function resolveCodexResponsesUrl(baseUrl: string) {
-  const normalized = baseUrl.replace(/\/+$/, "");
-  if (normalized.endsWith("/codex/responses")) return normalized;
-  if (normalized.endsWith("/codex")) return `${normalized}/responses`;
-  return `${normalized}/codex/responses`;
-}
-
-function codexInputMessage(payload: unknown) {
-  return [{
-    type: "message",
-    role: "user",
-    content: [{ type: "input_text", text: JSON.stringify(payload) }]
-  }];
-}
-
-function extractResponseText(json: Record<string, unknown>) {
-  if (typeof json.output_text === "string") return json.output_text;
-
-  const output = Array.isArray(json.output) ? json.output : [];
-  const parts: string[] = [];
-  for (const item of output) {
-    if (!isRecord(item)) continue;
-    const content = Array.isArray(item.content) ? item.content : [];
-    for (const contentItem of content) {
-      if (!isRecord(contentItem)) continue;
-      if (typeof contentItem.text === "string") parts.push(contentItem.text);
-    }
-  }
-  if (parts.length) return parts.join("\n");
-
-  const choices = Array.isArray(json.choices) ? json.choices : [];
-  const first = choices.find(isRecord);
-  const message = first && isRecord(first.message) ? first.message : null;
-  return typeof message?.content === "string" ? message.content : "";
 }
 
 function stripJsonCodeFence(value: string) {

@@ -1,4 +1,5 @@
 import { normalizerOutputSchema, type NormalizerOutput } from "@personal-context-os/shared";
+import { codexInputMessage, readCodexResponseText, resolveCodexResponsesUrl } from "./codex-responses.js";
 import { HeuristicNormalizer } from "./heuristic-normalizer.js";
 import type { FreeTextNormalizer } from "./normalizer.js";
 import type { OpenAICodexToken } from "./memory-extractor.js";
@@ -117,7 +118,7 @@ export class OpenAICodexNormalizer implements FreeTextNormalizer {
         body: JSON.stringify({
           model: this.model,
           store: false,
-          stream: false,
+          stream: true,
           instructions: normalizationInstructions(),
           input: codexInputMessage({
             now: (input.now ?? new Date()).toISOString(),
@@ -137,8 +138,7 @@ export class OpenAICodexNormalizer implements FreeTextNormalizer {
 
       if (!response.ok) throw new Error(`OpenAI Codex normalization failed: ${response.status} ${await response.text()}`);
 
-      const json = (await response.json()) as Record<string, unknown>;
-      const content = extractResponseText(json);
+      const content = await readCodexResponseText(response);
       if (!content) throw new Error("OpenAI Codex normalization returned no content.");
       return parseNormalizerOutput(JSON.parse(stripJsonCodeFence(content)));
     } catch (error) {
@@ -348,37 +348,6 @@ function removeNullish(value: unknown): unknown {
 
 function ensureTrailingSlash(value: string) {
   return value.endsWith("/") ? value : `${value}/`;
-}
-
-function resolveCodexResponsesUrl(baseUrl: string) {
-  const normalized = baseUrl.replace(/\/+$/, "");
-  if (normalized.endsWith("/codex/responses")) return normalized;
-  if (normalized.endsWith("/codex")) return `${normalized}/responses`;
-  return `${normalized}/codex/responses`;
-}
-
-function codexInputMessage(payload: unknown) {
-  return [{
-    type: "message",
-    role: "user",
-    content: [{ type: "input_text", text: JSON.stringify(payload) }]
-  }];
-}
-
-function extractResponseText(json: Record<string, unknown>) {
-  if (typeof json.output_text === "string") return json.output_text;
-
-  const output = Array.isArray(json.output) ? json.output : [];
-  const parts: string[] = [];
-  for (const item of output) {
-    if (!isRecord(item)) continue;
-    const content = Array.isArray(item.content) ? item.content : [];
-    for (const contentItem of content) {
-      if (!isRecord(contentItem)) continue;
-      if (typeof contentItem.text === "string") parts.push(contentItem.text);
-    }
-  }
-  return parts.join("\n");
 }
 
 function stripJsonCodeFence(value: string) {

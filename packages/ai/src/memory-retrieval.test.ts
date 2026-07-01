@@ -31,6 +31,7 @@ describe("OpenAICodexMemorySearchPlanner", () => {
     expect(result.searchQuery).toContain("חתונה");
     expect(result.keywords).toEqual(["wedding", "חתונה", "vendors"]);
     expect(calls[0]?.method).toBe("POST");
+    expect(body.stream).toBe(true);
     const input = body.input;
     expect(Array.isArray(input)).toBe(true);
     if (!Array.isArray(input)) throw new Error("Expected Codex input to be an array.");
