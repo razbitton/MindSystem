@@ -119,7 +119,7 @@ export class OpenAICodexNormalizer implements FreeTextNormalizer {
           store: false,
           stream: false,
           instructions: normalizationInstructions(),
-          input: JSON.stringify({
+          input: codexInputMessage({
             now: (input.now ?? new Date()).toISOString(),
             projectHint: input.projectHint ?? null,
             text: input.text
@@ -355,6 +355,14 @@ function resolveCodexResponsesUrl(baseUrl: string) {
   if (normalized.endsWith("/codex/responses")) return normalized;
   if (normalized.endsWith("/codex")) return `${normalized}/responses`;
   return `${normalized}/codex/responses`;
+}
+
+function codexInputMessage(payload: unknown) {
+  return [{
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text: JSON.stringify(payload) }]
+  }];
 }
 
 function extractResponseText(json: Record<string, unknown>) {

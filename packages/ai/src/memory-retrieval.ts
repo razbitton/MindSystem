@@ -55,7 +55,7 @@ export class OpenAICodexMemorySearchPlanner implements MemorySearchPlanner {
           store: false,
           stream: false,
           instructions: memorySearchPlanningInstructions(),
-          input: JSON.stringify({
+          input: codexInputMessage({
             now: (input.now ?? new Date()).toISOString(),
             query: input.query
           }),
@@ -158,6 +158,14 @@ function resolveCodexResponsesUrl(baseUrl: string) {
   if (normalized.endsWith("/codex/responses")) return normalized;
   if (normalized.endsWith("/codex")) return `${normalized}/responses`;
   return `${normalized}/codex/responses`;
+}
+
+function codexInputMessage(payload: unknown) {
+  return [{
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text: JSON.stringify(payload) }]
+  }];
 }
 
 function extractResponseText(json: Record<string, unknown>) {

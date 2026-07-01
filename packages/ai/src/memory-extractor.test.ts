@@ -58,11 +58,12 @@ describe("memory extractors", () => {
   });
 
   it("uses the ChatGPT Codex Responses backend with account headers", async () => {
-    const calls: { url: string; headers: Record<string, string> }[] = [];
+    const calls: { url: string; headers: Record<string, string>; body: Record<string, unknown> }[] = [];
     const fetchFn: typeof fetch = async (input, init) => {
       calls.push({
         url: input instanceof URL ? input.toString() : String(input),
-        headers: init?.headers as Record<string, string>
+        headers: init?.headers as Record<string, string>,
+        body: JSON.parse(String(init?.body))
       });
       return new Response(JSON.stringify({
         output_text: JSON.stringify({
@@ -97,6 +98,14 @@ describe("memory extractors", () => {
     expect(calls[0]?.url).toBe("https://chatgpt.com/backend-api/codex/responses");
     expect(calls[0]?.headers.authorization).toBe("Bearer codex-access");
     expect(calls[0]?.headers["chatgpt-account-id"]).toBe("acct_123");
+    expect(Array.isArray(calls[0]?.body.input)).toBe(true);
+    expect(calls[0]?.body.input).toEqual([
+      expect.objectContaining({
+        type: "message",
+        role: "user",
+        content: [expect.objectContaining({ type: "input_text" })]
+      })
+    ]);
     expect(result.degraded).toBe(false);
     expect(result.candidates[0]?.kind).toBe("preference");
   });
